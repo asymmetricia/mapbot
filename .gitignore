@@ -2,3 +2,6 @@
 /mapbot.iml
 /mapbot.ipr
 /mapbot.iws
+/.copy
+/.docker
+/.push
