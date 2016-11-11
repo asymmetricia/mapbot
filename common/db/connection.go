@@ -8,7 +8,7 @@ import (
 	"github.com/pdbogen/mapbot/common/db/schema"
 )
 
-func Open(host, user, pass, db string, port int) (*sql.DB, error) {
+func Open(host, user, pass, db string, port int, reset bool) (*sql.DB, error) {
 	dbConn, err := sql.Open(
 		"postgres",
 		fmt.Sprintf(
@@ -25,6 +25,12 @@ func Open(host, user, pass, db string, port int) (*sql.DB, error) {
 	}
 	if err := dbConn.Ping(); err != nil {
 		return nil, err
+	}
+
+	if reset {
+		if err := schema.Reset(dbConn); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := schema.Apply(dbConn); err != nil {

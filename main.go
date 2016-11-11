@@ -1,11 +1,16 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
+	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/ui/slack"
-	"github.com/pdbogen/mapbot/common/db"
-	"time"
+	"golang.org/x/crypto/acme/autocert"
+	"net/http"
+	"github.com/pdbogen/mapbot/hub"
 )
 
 var log = mbLog.Log
@@ -13,25 +18,58 @@ var log = mbLog.Log
 func main() {
 	SlackClientToken := flag.String("slack-client-id", "", "slack Client ID")
 	SlackClientSecret := flag.String("slack-client-secret", "", "slack Client Secret")
-	SlackDomain := flag.String("slack-domain", "map.haversack.io", "domain name to receive redirects, construct URLs, and request ACME certs")
-	SlackOauthPort := flag.Int("slack-oauth-port", 8443, "port on which slack UI module will receive OAuth redirects")
+	Domain := flag.String("domain", "map.haversack.io", "domain name to receive redirects, construct URLs, and request ACME certs")
+	Port := flag.Int("port", 8443, "port to listen on for web requests and slack aotuh responses")
+	Tls := flag.Bool("tls", false, "if set, mapbot will use ACME to obtain a cert from Let's Encrypt for the above-configured domain")
 	DbHost := flag.String("db-host", "localhost", "fqdn of a postgresql server")
 	DbPort := flag.Int("db-port", 5432, "port to use on db-host")
 	DbUser := flag.String("db-user", "postgres", "postgresql user to use for authentication")
 	DbPass := flag.String("db-pass", "postgres", "postgresql pass to use for authentication")
 	DbName := flag.String("db-name", "mapbot", "postgresql database name to use")
+	DbReset := flag.Bool("db-reset", false, "USE WITH CARE: resets the schema by dropping ALL TABLES and re-executing migrations")
 	flag.Parse()
 
-	dbHandle, err := db.Open(*DbHost, *DbUser, *DbPass, *DbName, *DbPort)
+	dbHandle, err := db.Open(*DbHost, *DbUser, *DbPass, *DbName, *DbPort, *DbReset)
 	if err != nil {
 		log.Fatalf("unable to connection to database: %s", err)
 	}
 
-	if _, err := slack.New(*SlackClientToken, *SlackClientSecret, *SlackOauthPort, dbHandle, *SlackDomain); err != nil {
+	proto := "http"
+	if *Tls {
+		proto = "https"
+	}
+
+	hub := &hub.Hub{}
+
+	slackUi, err := slack.New(
+		*SlackClientToken,
+		*SlackClientSecret,
+		dbHandle,
+		proto,
+		*Domain,
+		*Port,
+		hub,
+	)
+	if err != nil {
 		log.Fatalf("unable to start Slack module: %s", err)
 	}
 
-	for {
-		time.Sleep(time.Hour)
+	mgr := autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(*Domain),
+	}
+	router := mux.NewRouter()
+	router.HandleFunc("/oauth", slackUi.OAuthPost)
+	router.HandleFunc("/", slackUi.OAuthGet)
+	server := &http.Server{
+		Addr:      fmt.Sprintf(":%d", *Port),
+		Handler:   router,
+		TLSConfig: &tls.Config{GetCertificate: mgr.GetCertificate},
+	}
+	log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
+	if *Tls {
+		log.Fatal(server.ListenAndServeTLS("", ""))
+	} else {
+		log.Fatal(server.ListenAndServe())
 	}
 }

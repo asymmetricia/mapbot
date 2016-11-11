@@ -1,0 +1,8 @@
+client_id: 29086941717.101401959280
+client_secret: "{{vault_client_secret}}"
+db_host: elmer-02.db.elephantsql.com
+db_user: dfauhblf
+db_name: dfauhblf
+db_pass: "{{vault_db_pass}}"
+host_name: map.haversack.io
+port: 8443

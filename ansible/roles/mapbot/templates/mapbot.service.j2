@@ -1,0 +1,23 @@
+[Unit]
+Description=mapbot service
+After=network.target
+Requires=docker.service
+
+[Service]
+ExecStart=/usr/bin/docker run \
+  -e CLIENT_ID={{client_id}} \
+  -e CLIENT_SECRET={{client_secret}} \
+  -e DB_HOST={{db_host}} \
+  -e DB_USER={{db_user}} \
+  -e DB_PASS={{db_pass}} \
+  -e DB_NAME={{db_name}} \
+  -e FQDN={{host_name}} \
+  -e PORT={{port}} \
+  -p {{port}}:{{port}} \
+  mapbot
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

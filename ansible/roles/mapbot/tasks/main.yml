@@ -1,0 +1,17 @@
+---
+- name: install service
+  become: true
+  template: dest=/etc/systemd/system/mapbot.service src=mapbot.service.j2
+  register: service
+- name: reload systemd
+  become: true
+  command: systemctl daemon-reload
+  when: service.changed
+- name: restart service
+  become: true
+  service: name=mapbot.service enabled=yes state=restarted
+  when: service.changed
+- name: enable & start service
+  become: true
+  service: name=mapbot.service enabled=yes state=started
+  when: not service.changed
