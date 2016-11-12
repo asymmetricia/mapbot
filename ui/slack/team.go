@@ -8,7 +8,6 @@ import (
 	"github.com/pdbogen/mapbot/model/tabula"
 	"reflect"
 	"strings"
-	"sync"
 )
 
 func (s *SlackUi) runTeams() error {
@@ -25,7 +24,7 @@ func (s *SlackUi) runTeams() error {
 		}
 
 		if err := s.addTeam(token, botToken); err != nil {
-			return fmt.Errorf("adding team: %s", err)
+			log.Errorf("error adding team with token %s; but will try others", token)
 		}
 	}
 	return nil
@@ -45,9 +44,18 @@ func (s *SlackUi) addTeam(token string, bot_token *BotToken) error {
 		hub:       s.botHub,
 	}
 
-	s.teamWg.Add(1)
-	team.run(&s.teamWg)
+	ti, err := team.client.GetTeamInfo()
+	if err != nil {
+		return fmt.Errorf("obtaining info: %s", err)
+	}
+	team.Info = ti
+	team.run()
 	s.Teams = append(s.Teams, team)
+
+	s.botHub.Subscribe(
+		hub.CommandType(fmt.Sprintf("internal:send:slack:%s:*", team.Info.ID)),
+		team.Send,
+	)
 
 	return team.Save(s.db)
 }
@@ -68,7 +76,7 @@ func (t *Team) Save(db *sql.DB) error {
 	return err
 }
 
-func (t *Team) run(wg *sync.WaitGroup) {
+func (t *Team) run() {
 	if t.Quit == nil {
 		t.Quit = make(<-chan bool, 0)
 	}
@@ -89,16 +97,15 @@ func (t *Team) manageMessages() {
 			switch event.Type {
 			case "message":
 				if msg, ok := event.Data.(*slack.MessageEvent); ok {
+					if msg.User == t.botToken.BotId {
+						continue
+					}
 					log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
 					argv := strings.Split(msg.Text, " ")
 					t.hub.Publish(&hub.Command{
-						Type:    hub.CommandType(argv[0]),
+						From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
+						Type:    hub.CommandType("user:" + argv[0]),
 						Payload: argv[1:],
-						Context: &CommandContext{
-							UserId:  msg.User,
-							Team:    t,
-							Channel: msg.Channel,
-						},
 					})
 				} else {
 					log.Warningf("Received message, but type was %s", reflect.TypeOf(event.Data))
@@ -110,20 +117,25 @@ func (t *Team) manageMessages() {
 	}
 }
 
-// Respond sends the given message back according to how it was received, as indicated by the provided CommandContext.
-func (t *Team) Respond(cc *CommandContext, msg string) {
-	channel, timestamp, err := t.botClient.PostMessage(
-		cc.Channel,
-		msg,
-		slack.PostMessageParameters{
-			Text: msg,
-			Username: "mapbot",
-			AsUser: true,
-		})
-	if err != nil {
-		log.Errorf("PostMessage failed: %s", err)
-	} else {
-		log.Debugf("PostMessage to %s succeeded at %s", channel, timestamp)
+func (t *Team) Send(h *hub.Hub, c *hub.Command) {
+	comps := strings.Split(string(c.Type), ":")
+	if len(comps) < 5 {
+		log.Errorf("%s: received but cannot process command %s", t.Info.ID, c.Type)
+		return
+	}
+
+	if msg, ok := c.Payload.(string); ok {
+		_, _, err := t.botClient.PostMessage(
+			comps[4],
+			msg,
+			slack.PostMessageParameters{
+				Text: msg,
+				Username: "mapbot",
+				AsUser: true,
+			})
+		if err != nil {
+			log.Errorf("%s: error posting message %q to channel %q: %s", t.Info.ID, msg, comps[4], err)
+		}
 	}
 }
 
@@ -134,6 +146,7 @@ type CommandContext struct {
 }
 
 type Team struct {
+	Info      *slack.TeamInfo
 	Channels  []Channel
 	Quit      <-chan bool
 	token     string

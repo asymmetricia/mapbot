@@ -10,7 +10,6 @@ import (
 	"golang.org/x/oauth2"
 	SlackOAuth "golang.org/x/oauth2/slack"
 	"sync"
-	"reflect"
 )
 
 var log = mbLog.Log
@@ -36,6 +35,7 @@ func New(id string, secret string, db *sql.DB, proto string, domain string, port
 				"bot",
 				"files:write:user",
 				"commands",
+				"team:read",
 			},
 		},
 		csrf: []string{
@@ -51,17 +51,15 @@ func New(id string, secret string, db *sql.DB, proto string, domain string, port
 		return nil, err
 	}
 
-	botHub.Subscribe(hub.CommandType("howdy"), CmdHowdy)
+	botHub.Subscribe(hub.CommandType("user:howdy"), CmdHowdy)
 
 	return ret, nil
 }
 
-func CmdHowdy(c *hub.Command) {
-	if cc, ok := c.Context.(*CommandContext); ok {
-		cc.Team.Respond(cc, "Howdy!")
-	} else {
-		log.Errorf("received howdy with unknown context type %s", reflect.TypeOf(c.Context))
-	}
+func CmdHowdy(h *hub.Hub, c *hub.Command) {
+	h.Publish(&hub.Command{
+		Type: hub.CommandType(c.From),
+		Payload: "Howdy!"})
 }
 
 type SlackUi struct {
