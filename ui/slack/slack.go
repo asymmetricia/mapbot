@@ -58,7 +58,7 @@ func New(id string, secret string, db *sql.DB, proto string, domain string, port
 
 func CmdHowdy(h *hub.Hub, c *hub.Command) {
 	h.Publish(&hub.Command{
-		Type: hub.CommandType(c.From),
+		Type:    hub.CommandType(c.From),
 		Payload: "Howdy!"})
 }
 

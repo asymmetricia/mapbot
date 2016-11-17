@@ -7,10 +7,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/controller/map"
+	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
-	"github.com/pdbogen/mapbot/hub"
 )
 
 var log = mbLog.Log
@@ -40,6 +41,7 @@ func main() {
 	}
 
 	hub := &hub.Hub{}
+	mapController.Register(hub)
 
 	slackUi, err := slack.New(
 		*SlackClientToken,

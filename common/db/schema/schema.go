@@ -2,9 +2,9 @@ package schema
 
 import (
 	"database/sql"
-	"sort"
 	"fmt"
 	mbLog "github.com/pdbogen/mapbot/common/log"
+	"sort"
 )
 
 var log = mbLog.Log
@@ -13,12 +13,52 @@ var schema = []Migration{
 	Migration{
 		0,
 		"CREATE TABLE slack_teams (token VARCHAR(128) UNIQUE, bot_id VARCHAR(64), bot_token VARCHAR(64))",
-		"DROP TABLE slack_teams",
+		"DROP TABLE IF EXISTS slack_teams",
 	},
 	Migration{
 		1,
 		"CREATE TABLE slack_nonces (nonce VARCHAR(64), expiry TIMESTAMP)",
-		"DROP TABLE slack_nonces",
+		"DROP TABLE IF EXISTS slack_nonces",
+	},
+	Migration{
+		2,
+		"CREATE TABLE tabulas (" +
+			"id BIGSERIAL PRIMARY KEY, " +
+			"name VARCHAR(128), " +
+			"url VARCHAR(256)," +
+			"offset_x integer default 0," +
+			"offset_y integer default 0," +
+			"dpi real default 0" +
+			")",
+		"DROP TABLE IF EXISTS tabulas",
+	},
+	Migration{
+		3,
+		"CREATE TABLE user_tabulas (" +
+			"user_id VARCHAR(9), " +
+			"tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE, " +
+			"PRIMARY KEY (user_id, tabula_id)" +
+			")",
+		"DROP TABLE IF EXISTS user_tabulas",
+	},
+	Migration{
+		4,
+		"CREATE TABLE users (id VARCHAR(9) PRIMARY KEY, prefAutoShow BOOLEAN)",
+		"DROP TABLE IF EXISTS users",
+	},
+	Migration{
+		5,
+		"ALTER TABLE user_tabulas ADD CONSTRAINT user_id_fk FOREIGN KEY (user_id) REFERENCES users (id)",
+		"ALTER TABLE user_tabulas DROP CONSTRAINT user_id_fk",
+	},
+	Migration{
+		6,
+		"ALTER TABLE tabulas " +
+			"ADD COLUMN grid_r INT NOT NULL DEFAULT 0, " +
+			"ADD COLUMN grid_g INT NOT NULL DEFAULT 0, " +
+			"ADD COLUMN grid_b INT NOT NULL DEFAULT 0, " +
+			"ADD COLUMN grid_a INT NOT NULL DEFAULT 0",
+		"ALTER TABLE tabulas DROP COLUMN grid_r, DROP COLUMN grid_g, DROP COLUMN grid_b, DROP COLUMN grid_a",
 	},
 }
 
@@ -51,8 +91,8 @@ var _ sort.Interface = (SortMigrationById)(nil)
 var initialized bool = false
 
 type Migration struct {
-	Id int
-	Up string
+	Id   int
+	Up   string
 	Down string
 }
 
@@ -111,7 +151,6 @@ func (m *Migration) ApplyDown(db *sql.DB) error {
 	_, err = db.Exec("DELETE FROM migrations WHERE migration_id=$1", m.Id)
 	return err
 }
-
 
 func (m *Migration) Applied(db *sql.DB) (bool, error) {
 	results, err := db.Query("SELECT * FROM migrations WHERE migration_id=$1", m.Id)

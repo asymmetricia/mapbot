@@ -1,41 +1,42 @@
 package hub
 
 import (
-	mbLog "github.com/pdbogen/mapbot/common/log"
-	"github.com/ryanuber/go-glob"
 	"fmt"
+	mbLog "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/model/user"
+	"github.com/ryanuber/go-glob"
 )
 
 var log = mbLog.Log
 
 type Hub struct {
-	Subscribers map[CommandType][]Subscriber
+	subscribers map[CommandType][]Subscriber
 }
 
 func (h *Hub) Subscribe(c CommandType, s Subscriber) {
 	log.Debugf("subscribe: %s", c)
-	if h.Subscribers == nil {
-		h.Subscribers = map[CommandType][]Subscriber{
+	if h.subscribers == nil {
+		h.subscribers = map[CommandType][]Subscriber{
 			c: []Subscriber{},
 		}
 	}
 
-	if subs, ok := h.Subscribers[c]; ok {
-		h.Subscribers[c] = append(subs, s)
+	if subs, ok := h.subscribers[c]; ok {
+		h.subscribers[c] = append(subs, s)
 	} else {
-		h.Subscribers[c] = []Subscriber{s}
+		h.subscribers[c] = []Subscriber{s}
 	}
 }
 
 // Publish searches publishers for a subscriber to the given command's type, and executes the subscriber in a goroutine.
 func (h *Hub) Publish(c *Command) {
-	log.Debugf("publish: %s->%s: %v", c.From, string(c.Type), c.Payload)
-	if h.Subscribers == nil {
-		h.Subscribers = map[CommandType][]Subscriber{}
+	log.Debugf("publish: %s->%s (%s): %v", c.From, string(c.Type), c.User, c.Payload)
+	if h.subscribers == nil {
+		h.subscribers = map[CommandType][]Subscriber{}
 	}
 
 	found := false
-	for cmd, subs := range h.Subscribers {
+	for cmd, subs := range h.subscribers {
 		if glob.Glob(string(cmd), string(c.Type)) {
 			for _, sub := range subs {
 				found = true
@@ -46,16 +47,55 @@ func (h *Hub) Publish(c *Command) {
 
 	if !found && c.From != "" {
 		h.Publish(&Command{
-			Type: CommandType(c.From),
+			Type:    CommandType(c.From),
 			Payload: fmt.Sprintf("No handler for command '%s'", c.Type),
+			TeamId:  c.TeamId,
+			User:    c.User,
 		})
 	}
+}
+
+func (h *Hub) Error(trigger *Command, message string) {
+	if trigger.From == "" {
+		log.Errorf("trigger command has no `from`; cannot publish error %q", message)
+		return
+	}
+
+	h.Publish(&Command{
+		Type:    CommandType(trigger.From),
+		Payload: message,
+		TeamId:  trigger.TeamId,
+		User:    trigger.User,
+	})
 }
 
 type Command struct {
 	Type    CommandType
 	From    string
 	Payload interface{}
+	TeamId  string
+	User    *user.User
+}
+
+// WithType returns a copy of the command with the type replaced by the given type. The payload is not deep-copied.
+func (c *Command) WithType(n CommandType) *Command {
+	return &Command{
+		Type:    n,
+		From:    c.From,
+		Payload: c.Payload,
+		TeamId:  c.TeamId,
+		User:    c.User,
+	}
+}
+
+func (c *Command) WithPayload(p interface{}) *Command {
+	return &Command{
+		Type:    c.Type,
+		From:    c.From,
+		Payload: p,
+		TeamId:  c.TeamId,
+		User:    c.User,
+	}
 }
 
 // CommandType is a one of two major structures- either a user command or an internal command.

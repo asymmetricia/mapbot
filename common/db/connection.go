@@ -8,6 +8,8 @@ import (
 	"github.com/pdbogen/mapbot/common/db/schema"
 )
 
+var Instance *sql.DB
+
 func Open(host, user, pass, db string, port int, reset bool) (*sql.DB, error) {
 	dbConn, err := sql.Open(
 		"postgres",
@@ -36,6 +38,8 @@ func Open(host, user, pass, db string, port int, reset bool) (*sql.DB, error) {
 	if err := schema.Apply(dbConn); err != nil {
 		return nil, err
 	}
+
+	Instance = dbConn
 
 	return dbConn, nil
 }

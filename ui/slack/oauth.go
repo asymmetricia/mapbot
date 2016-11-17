@@ -42,6 +42,7 @@ func (ui *SlackUi) validateNonce(nonce string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("querying nonces: %s", err)
 	}
+	defer results.Close()
 
 	return results.Next(), nil
 }

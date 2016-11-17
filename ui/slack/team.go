@@ -6,8 +6,14 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/tabula"
+	"image/png"
+	"io/ioutil"
+	"mime"
 	"reflect"
+	"regexp"
 	"strings"
+	"github.com/pdbogen/mapbot/common/db"
+	"github.com/pdbogen/mapbot/model/user"
 )
 
 func (s *SlackUi) runTeams() error {
@@ -16,6 +22,7 @@ func (s *SlackUi) runTeams() error {
 		return fmt.Errorf("running query: %s", err)
 	}
 	defer results.Close()
+
 	for results.Next() {
 		var token string
 		var botToken *BotToken = &BotToken{}
@@ -85,6 +92,8 @@ func (t *Team) run() {
 	go t.manageMessages()
 }
 
+var slackUrlRe = regexp.MustCompile(`<(http[^>]*)(\|[^>]+)?>`)
+
 func (t *Team) manageMessages() {
 	for {
 		select {
@@ -97,15 +106,44 @@ func (t *Team) manageMessages() {
 			switch event.Type {
 			case "message":
 				if msg, ok := event.Data.(*slack.MessageEvent); ok {
-					if msg.User == t.botToken.BotId {
+					if msg.User == t.botToken.BotId || msg.User == "" {
 						continue
 					}
-					log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
+
 					argv := strings.Split(msg.Text, " ")
+					for i, arg := range argv {
+						if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
+							argv[i] = matches[1]
+						}
+					}
+
+					if msg.Channel[0] != 'D' {
+						if len(argv) < 1 || argv[0] != "<@"+t.botToken.BotId+">" {
+							log.Debugf("Skipping non-direct message %q", msg.Text)
+							return
+						}
+						argv = argv[1:]
+					}
+
+					log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
+
+					u, err := user.New(db.Instance, user.Id(msg.User), user.Name(msg.Username))
+					if err != nil {
+						log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
+						continue
+					}
+
+					if u == nil {
+						log.Errorf("nil obtaining/creating user %q, but no error?!", msg.User)
+						continue
+					}
+
 					t.hub.Publish(&hub.Command{
 						From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
 						Type:    hub.CommandType("user:" + argv[0]),
 						Payload: argv[1:],
+						TeamId:  t.Info.ID,
+						User:    u,
 					})
 				} else {
 					log.Warningf("Received message, but type was %s", reflect.TypeOf(event.Data))
@@ -124,18 +162,56 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if msg, ok := c.Payload.(string); ok {
+	channel := comps[4]
+
+	switch msg := c.Payload.(type) {
+	case string:
 		_, _, err := t.botClient.PostMessage(
-			comps[4],
+			channel,
 			msg,
 			slack.PostMessageParameters{
-				Text: msg,
+				Text:     msg,
 				Username: "mapbot",
-				AsUser: true,
+				AsUser:   true,
 			})
 		if err != nil {
 			log.Errorf("%s: error posting message %q to channel %q: %s", t.Info.ID, msg, comps[4], err)
 		}
+	case *tabula.Tabula:
+		repErr := func(ctx string, err error) {
+			log.Errorf("%s: error %s image %q: %s", t.Info.ID, ctx, msg.Name, err)
+			t.Send(h, c.WithPayload(fmt.Sprintf("error %s map %q: %s", ctx, msg.Name, err)))
+		}
+		img, err := msg.Render()
+		if err != nil {
+			repErr("rendering", err)
+			return
+		}
+
+		buf, err := ioutil.TempFile("", "")
+		if err != nil {
+			repErr("opeaning tmpfile for", err)
+			return
+		}
+		defer buf.Close()
+
+		err = png.Encode(buf, img)
+		if err != nil {
+			repErr("encoding", err)
+			return
+		}
+
+		_, err = t.botClient.UploadFile(
+			slack.FileUploadParameters{
+				Filetype: mime.TypeByExtension(".png"),
+				Channels: []string{channel},
+				File:     buf.Name(),
+			})
+		if err != nil {
+			repErr("uploading", err)
+			return
+		}
+
 	}
 }
 
