@@ -1,12 +1,12 @@
 package user
 
 import (
-	"github.com/pdbogen/mapbot/model/tabula"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
 	mbLog "github.com/pdbogen/mapbot/common/log"
-	"errors"
-	"database/sql/driver"
+	"github.com/pdbogen/mapbot/model/tabula"
 )
 
 var log = mbLog.Log
@@ -20,9 +20,9 @@ type UserStore struct {
 }
 
 type User struct {
-	Name    Name
-	Id      Id
-	Tabulas []*tabula.Tabula
+	Name     Name
+	Id       Id
+	Tabulas  []*tabula.Tabula
 	AutoShow bool
 }
 
@@ -62,7 +62,7 @@ func New(db *sql.DB, id Id, name Name) (*User, error) {
 		return u, nil
 	}
 
-	user := &User{ Id: id, Name: name, Tabulas: []*tabula.Tabula{} }
+	user := &User{Id: id, Name: name, Tabulas: []*tabula.Tabula{}}
 
 	res, err := db.Query("SELECT tabula_id FROM user_tabulas WHERE user_id=$1", &id)
 	if err != nil {

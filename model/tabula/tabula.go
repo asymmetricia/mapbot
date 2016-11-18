@@ -86,8 +86,8 @@ func Get(db *sql.DB, id Id) (*Tabula, error) {
 }
 
 func (t *Tabula) loadMasks(db *sql.DB) error {
-	res, err := db.Query(`SELECT name, "order", red, green, blue, alpha, top, "left", width, height ` +
-		`FROM tabula_masks WHERE tabula_id=$1 ORDER BY "order"`, int64(*t.Id))	
+	res, err := db.Query(`SELECT name, "order", red, green, blue, alpha, top, "left", width, height `+
+		`FROM tabula_masks WHERE tabula_id=$1 ORDER BY "order"`, int64(*t.Id))
 	if err != nil {
 		return err
 	}

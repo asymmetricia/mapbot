@@ -4,16 +4,16 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/nlopes/slack"
+	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/tabula"
+	"github.com/pdbogen/mapbot/model/user"
 	"image/png"
 	"io/ioutil"
 	"mime"
 	"reflect"
 	"regexp"
 	"strings"
-	"github.com/pdbogen/mapbot/common/db"
-	"github.com/pdbogen/mapbot/model/user"
 )
 
 func (s *SlackUi) runTeams() error {

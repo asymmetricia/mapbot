@@ -2,8 +2,8 @@ package rand
 
 import (
 	"fmt"
-	"time"
 	"math/rand"
+	"time"
 )
 
 var random = rand.NewSource(time.Now().UnixNano())
@@ -18,7 +18,7 @@ func RandHex(n int) string {
 			digitsRem = 7
 			randomNumber = random.Int63()
 		}
-		buf[i] = (fmt.Sprintf("%x", randomNumber & 0x0F))[0]
+		buf[i] = (fmt.Sprintf("%x", randomNumber&0x0F))[0]
 		randomNumber >>= 4
 		digitsRem--
 	}

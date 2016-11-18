@@ -2,9 +2,9 @@ package mask
 
 import (
 	"database/sql"
-	"image/color"
-	"fmt"
 	"errors"
+	"fmt"
+	"image/color"
 )
 
 type Mask struct {
@@ -52,9 +52,9 @@ func (m *Mask) Save(db *sql.DB, id int64) error {
 	}
 
 	_, err := db.Exec(
-		`INSERT INTO tabula_masks (name, "order", tabula_id, red, green, blue, alpha, top, "left", width, height) ` +
-			`VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ` +
-			`ON CONFLICT (name, tabula_id) DO UPDATE ` +
+		`INSERT INTO tabula_masks (name, "order", tabula_id, red, green, blue, alpha, top, "left", width, height) `+
+			`VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) `+
+			`ON CONFLICT (name, tabula_id) DO UPDATE `+
 			`SET "order"=$2, red=$4, green=$5, blue=$6, alpha=$7, top=$8, "left"=$9, width=$10, height=$11`,
 		m.Name, *m.Order, id, m.Color.R, m.Color.G, m.Color.B, m.Color.A, m.Top, m.Left, m.Width, m.Height,
 	)

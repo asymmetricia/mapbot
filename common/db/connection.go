@@ -2,10 +2,10 @@ package db
 
 import (
 	"database/sql"
-	_ "github.com/lib/pq"
 	"fmt"
-	"strings"
+	_ "github.com/lib/pq"
 	"github.com/pdbogen/mapbot/common/db/schema"
+	"strings"
 )
 
 var Instance *sql.DB

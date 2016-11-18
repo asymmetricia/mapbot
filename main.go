@@ -8,11 +8,11 @@ import (
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/controller/map"
+	"github.com/pdbogen/mapbot/controller/mask"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
-	"github.com/pdbogen/mapbot/controller/mask"
 )
 
 var log = mbLog.Log
