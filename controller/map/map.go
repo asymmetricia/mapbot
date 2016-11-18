@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/controller/cmdproc"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"image/color"
@@ -14,25 +15,20 @@ import (
 
 var log = mbLog.Log
 
-type subcommand struct {
-	Args  string
-	Usage string
-	Cmd   hub.Subscriber
-}
-
 func Register(h *hub.Hub) {
-	h.Subscribe("user:map", routeCommand)
+	h.Subscribe("user:map", processor.Route)
 }
 
-var subCommands map[string]subcommand
+var processor *cmdproc.CommandProcessor
 
 func init() {
-	subCommands = map[string]subcommand{
-		"help": subcommand{"", "display this message", cmdHelp},
-		"add":  subcommand{"<name> <url>", "add a map to your gazeteer", cmdAdd},
-		"show": subcommand{"<name>", "show a gridded map", cmdShow},
-		"set":  subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
-		"list": subcommand{"", "list your maps", cmdList},
+	processor = &cmdproc.CommandProcessor{
+		Commands: map[string]cmdproc.Subcommand{
+			"add":  cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
+			"show": cmdproc.Subcommand{"<name>", "show a gridded map", cmdShow},
+			"set":  cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
+			"list": cmdproc.Subcommand{"", "list your maps", cmdList},
+		},
 	}
 }
 
@@ -109,7 +105,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 			}
 			t.Dpi = float32(n)
 		default:
-			h.Error(c, "usage: map set "+subCommands["set"].Args)
+			h.Error(c, "usage: map set "+processor.Commands["set"].Args)
 			return
 		}
 		if err := t.Save(db.Instance); err != nil {
@@ -123,7 +119,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 			User:    c.User,
 		})
 	} else {
-		h.Error(c, "usage: map set "+subCommands["set"].Args)
+		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
 	}
 }
 
@@ -181,34 +177,5 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		})
 	} else {
 		h.Error(c, "usage: map add <name> <url>")
-	}
-}
-
-func cmdHelp(h *hub.Hub, c *hub.Command) {
-	help := "Select from the following map commands:"
-	for cmd, sc := range subCommands {
-		help += "\n" + cmd
-		if sc.Args != "" {
-			help += " " + sc.Args
-		}
-		help += " - " + sc.Usage
-	}
-	h.Publish(&hub.Command{
-		Type:    hub.CommandType(c.From),
-		Payload: help,
-	})
-}
-
-func routeCommand(h *hub.Hub, c *hub.Command) {
-	if args, ok := c.Payload.([]string); ok && len(args) > 0 {
-		if s, ok := subCommands[args[0]]; ok {
-			new_type := hub.CommandType(fmt.Sprintf("%s:%s", c.Type, args[0]))
-			new_payload := args[1:]
-			s.Cmd(h, c.WithType(new_type).WithPayload(new_payload))
-		} else {
-			h.Error(c, fmt.Sprintf("Sub-command %q not found; try 'help'", args[0]))
-		}
-	} else {
-		h.Error(c, "No sub-command specified. Try 'help'")
 	}
 }

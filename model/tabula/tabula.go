@@ -11,6 +11,7 @@ import (
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 	mbLog "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/model/mask"
 	"golang.org/x/image/math/fixed"
 	"image"
 	"image/color"
@@ -36,6 +37,7 @@ type Tabula struct {
 	OffsetY    int
 	Dpi        float32
 	GridColor  *color.NRGBA
+	Masks      map[string]*mask.Mask
 }
 
 type Id int64
@@ -76,17 +78,46 @@ func Get(db *sql.DB, id Id) (*Tabula, error) {
 		return nil, fmt.Errorf("retrieving columns: %s", err)
 	}
 
+	if err := ret.loadMasks(db); err != nil {
+		return nil, fmt.Errorf("loading masks: %s", err)
+	}
+
 	return ret, nil
+}
+
+func (t *Tabula) loadMasks(db *sql.DB) error {
+	res, err := db.Query(`SELECT name, "order", red, green, blue, alpha, top, "left", width, height ` +
+		`FROM tabula_masks WHERE tabula_id=$1 ORDER BY "order"`, int64(*t.Id))	
+	if err != nil {
+		return err
+	}
+	t.Masks = map[string]*mask.Mask{}
+	defer res.Close()
+	for res.Next() {
+		m := &mask.Mask{}
+		err := res.Scan(
+			&m.Name,
+			&m.Order,
+			&m.Color.R, &m.Color.G, &m.Color.B, &m.Color.A,
+			&m.Top, &m.Left,
+			&m.Width, &m.Height,
+		)
+		if err != nil {
+			return err
+		}
+		t.Masks[m.Name] = m
+	}
+	return nil
 }
 
 func (t *Tabula) Save(db *sql.DB) error {
 	if t.GridColor == nil {
-		t.GridColor = &color.NRGBA{A:255}
+		t.GridColor = &color.NRGBA{A: 255}
 	}
 	r, g, b, a := t.GridColor.R, t.GridColor.G, t.GridColor.B, t.GridColor.A
 
 	if t.Id == nil {
-		results, err := db.Query(
+		result, err := db.Exec(
 			"INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) "+
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "+
 				"RETURNING id",
@@ -95,27 +126,35 @@ func (t *Tabula) Save(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		defer results.Close()
-		if results.Next() {
-			t.Id = new(Id)
-			results.Scan(t.Id)
-			return nil
+
+		if i, err := result.LastInsertId(); err != nil {
+			return err
 		} else {
-			return errors.New("INSERT query did not return a new row ID")
+			t.Id = new(Id)
+			*t.Id = Id(i)
 		}
 	} else {
 		_, err := db.Exec(
 			"INSERT INTO tabulas (id, name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) "+
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "+
-				"ON CONFLICT (id) DO UPDATE SET name=$2, url=$3, offset_x=$4, offset_y=$5, dpi=$6, " +
+				"ON CONFLICT (id) DO UPDATE SET name=$2, url=$3, offset_x=$4, offset_y=$5, dpi=$6, "+
 				"grid_r=$7, grid_g=$8, grid_b=$9, grid_a=$10",
 			int64(*t.Id), string(t.Name), t.Url, t.OffsetX, t.OffsetY, t.Dpi, r, g, b, a,
 		)
 		if err != nil {
 			return err
 		}
-		return nil
 	}
+
+	if t.Masks != nil {
+		for _, m := range t.Masks {
+			if err := m.Save(db, int64(*t.Id)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // New attempts to create a new map from the image in the given URL.
@@ -166,17 +205,17 @@ func (t *Tabula) Hydrate() error {
 }
 
 func blendAt(i *image.RGBA, x, y int, c color.Color) {
-	i.Set(x, y, blend(c, i.RGBAAt(x,y)))
+	i.Set(x, y, blend(c, i.RGBAAt(x, y)))
 }
 
 func blend(a color.Color, b color.Color) color.Color {
 	a_r, a_g, a_b, a_a := a.RGBA()
 	b_r, b_g, b_b, b_a := b.RGBA()
 	return &color.RGBA{
-		R: uint8((a_r + b_r * (0xFFFF - a_a) / 0xFFFF) >> 8),
-		G: uint8((a_g + b_g * (0xFFFF - a_a) / 0xFFFF) >> 8),
-		B: uint8((a_b + b_b * (0xFFFF - a_a) / 0xFFFF) >> 8),
-		A: uint8((a_a + b_a * (0xFFFF - a_a) / 0xFFFF) >> 8),
+		R: uint8((a_r + b_r*(0xFFFF-a_a)/0xFFFF) >> 8),
+		G: uint8((a_g + b_g*(0xFFFF-a_a)/0xFFFF) >> 8),
+		B: uint8((a_b + b_b*(0xFFFF-a_a)/0xFFFF) >> 8),
+		A: uint8((a_a + b_a*(0xFFFF-a_a)/0xFFFF) >> 8),
 	}
 }
 

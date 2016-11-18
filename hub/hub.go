@@ -56,8 +56,12 @@ func (h *Hub) Publish(c *Command) {
 }
 
 func (h *Hub) Error(trigger *Command, message string) {
+	h.Reply(trigger, message)
+}
+
+func (h *Hub) Reply(trigger *Command, message string) {
 	if trigger.From == "" {
-		log.Errorf("trigger command has no `from`; cannot publish error %q", message)
+		log.Errorf("trigger command has no `from`; cannot publish message %q", message)
 		return
 	}
 

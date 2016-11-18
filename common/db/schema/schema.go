@@ -60,6 +60,24 @@ var schema = []Migration{
 			"ADD COLUMN grid_a INT NOT NULL DEFAULT 0",
 		"ALTER TABLE tabulas DROP COLUMN grid_r, DROP COLUMN grid_g, DROP COLUMN grid_b, DROP COLUMN grid_a",
 	},
+	Migration{
+		7,
+		`CREATE TABLE tabula_masks (` +
+			`name VARCHAR(128),` +
+			`"order" INT NOT NULL DEFAULT 0,` +
+			`tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
+			`red INT NOT NULL DEFAULT 0,` +
+			`green INT NOT NULL DEFAULT 0,` +
+			`blue INT NOT NULL DEFAULT 0,` +
+			`alpha INT NOT NULL DEFAULT 0,` +
+			`top INT NOT NULL DEFAULT 0,` +
+			`"left" INT NOT NULL DEFAULT 0,` +
+			`width INT NOT NULL DEFAULT 0,` +
+			`height INT NOT NULL DEFAULT 0,` +
+			`PRIMARY KEY (tabula_id, name)` +
+			`)`,
+		"DROP TABLE tabula_masks",
+	},
 }
 
 func Reset(db *sql.DB) error {

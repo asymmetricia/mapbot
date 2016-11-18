@@ -7,6 +7,10 @@
 * [X] Background Image
 * [X] Alignment (offset & DPI)
 * [ ] Mask Sets
+    * [ ] New
+    * [ ] Add Rectangle
+    * [ ] Clear Rectangle
+    * [ ] Enable / Disable
 * [ ] Overlays
 * [X] Overlay coordinates
 

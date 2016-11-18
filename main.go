@@ -12,6 +12,7 @@ import (
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
+	"github.com/pdbogen/mapbot/controller/mask"
 )
 
 var log = mbLog.Log
@@ -42,6 +43,7 @@ func main() {
 
 	hub := &hub.Hub{}
 	mapController.Register(hub)
+	maskController.Register(hub)
 
 	slackUi, err := slack.New(
 		*SlackClientToken,
