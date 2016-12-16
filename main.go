@@ -37,7 +37,7 @@ func main() {
 	var dbHandle *sql.DB
 	var err error
 	if *ESKey != "" {
-		dbHandle, err = db.OpenElephant(*ESKey, *ESType)
+		dbHandle, err = db.OpenElephant(*ESKey, *ESType, *DbReset)
 	} else {
 		dbHandle, err = db.Open(*DbHost, *DbUser, *DbPass, *DbName, *DbPort, *DbReset)
 	}
