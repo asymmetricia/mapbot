@@ -142,7 +142,6 @@ func (t *Team) manageMessages() {
 						From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
 						Type:    hub.CommandType("user:" + argv[0]),
 						Payload: argv[1:],
-						TeamId:  t.Info.ID,
 						User:    u,
 					})
 				} else {

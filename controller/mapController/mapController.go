@@ -54,7 +54,6 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 	h.Publish(&hub.Command{
 		Type:    hub.CommandType(c.From),
 		Payload: response,
-		TeamId:  c.TeamId,
 		User:    c.User,
 	})
 }
@@ -115,7 +114,6 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		h.Publish(&hub.Command{
 			Type:    hub.CommandType(c.From),
 			Payload: fmt.Sprintf("map %s %s set to %q", args[0], args[1], args[2]),
-			TeamId:  c.TeamId,
 			User:    c.User,
 		})
 	} else {
@@ -130,7 +128,6 @@ func cmdShow(h *hub.Hub, c *hub.Command) {
 			h.Publish(&hub.Command{
 				Type:    hub.CommandType(c.From),
 				Payload: t,
-				TeamId:  c.TeamId,
 				User:    c.User,
 			})
 		} else {
@@ -150,7 +147,6 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		h.Publish(&hub.Command{
 			Type:    hub.CommandType(c.From),
 			Payload: "Getting background image.. this could take a moment.",
-			TeamId:  c.TeamId,
 			User:    c.User,
 		})
 		t, err := tabula.New(args[0], args[1])
@@ -172,7 +168,6 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		h.Publish(&hub.Command{
 			Type:    hub.CommandType(c.From),
 			Payload: fmt.Sprintf("map %q saved", args[0]),
-			TeamId:  c.TeamId,
 			User:    c.User,
 		})
 	} else {

@@ -49,7 +49,6 @@ func (h *Hub) Publish(c *Command) {
 		h.Publish(&Command{
 			Type:    CommandType(c.From),
 			Payload: fmt.Sprintf("No handler for command '%s'", c.Type),
-			TeamId:  c.TeamId,
 			User:    c.User,
 		})
 	}
@@ -68,16 +67,17 @@ func (h *Hub) Reply(trigger *Command, message string) {
 	h.Publish(&Command{
 		Type:    CommandType(trigger.From),
 		Payload: message,
-		TeamId:  trigger.TeamId,
 		User:    trigger.User,
 	})
 }
 
+// Command represents a request for the mapbot system to execute some action. It may be a request from outside (usually
+// having user:... as a type) or an internal request (such as to generate a response). From should be the command type
+// that will "reply"; so for a user command from slack, it would be the slack Command Type that will trigger a response.
 type Command struct {
 	Type    CommandType
 	From    string
 	Payload interface{}
-	TeamId  string
 	User    *user.User
 }
 
@@ -87,7 +87,6 @@ func (c *Command) WithType(n CommandType) *Command {
 		Type:    n,
 		From:    c.From,
 		Payload: c.Payload,
-		TeamId:  c.TeamId,
 		User:    c.User,
 	}
 }
@@ -97,7 +96,6 @@ func (c *Command) WithPayload(p interface{}) *Command {
 		Type:    c.Type,
 		From:    c.From,
 		Payload: p,
-		TeamId:  c.TeamId,
 		User:    c.User,
 	}
 }

@@ -28,7 +28,6 @@ func (c *CommandProcessor) Help(h *hub.Hub, cmd *hub.Command) {
 	h.Publish(&hub.Command{
 		Type:    hub.CommandType(cmd.From),
 		Payload: help,
-		TeamId:  cmd.TeamId,
 		User:    cmd.User,
 	})
 }
