@@ -143,6 +143,7 @@ func (t *Team) manageMessages() {
 						Type:    hub.CommandType("user:" + argv[0]),
 						Payload: argv[1:],
 						User:    u,
+						ContextId: t.Info.ID + "-" + msg.Channel,
 					})
 				} else {
 					log.Warningf("Received message, but type was %s", reflect.TypeOf(event.Data))

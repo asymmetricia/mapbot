@@ -50,6 +50,7 @@ func (h *Hub) Publish(c *Command) {
 			Type:    CommandType(c.From),
 			Payload: fmt.Sprintf("No handler for command '%s'", c.Type),
 			User:    c.User,
+			ContextId: c.ContextId,
 		})
 	}
 }
@@ -68,17 +69,21 @@ func (h *Hub) Reply(trigger *Command, message string) {
 		Type:    CommandType(trigger.From),
 		Payload: message,
 		User:    trigger.User,
+		ContextId: trigger.ContextId,
 	})
 }
 
 // Command represents a request for the mapbot system to execute some action. It may be a request from outside (usually
 // having user:... as a type) or an internal request (such as to generate a response). From should be the command type
 // that will "reply"; so for a user command from slack, it would be the slack Command Type that will trigger a response.
+// The ContextId should uniquely identify something like a "room," "channel," or "session" for whatever UI model this
+// command involves.
 type Command struct {
-	Type    CommandType
-	From    string
-	Payload interface{}
-	User    *user.User
+	Type      CommandType
+	From      string
+	Payload   interface{}
+	User      *user.User
+	ContextId string
 }
 
 // WithType returns a copy of the command with the type replaced by the given type. The payload is not deep-copied.
@@ -88,6 +93,7 @@ func (c *Command) WithType(n CommandType) *Command {
 		From:    c.From,
 		Payload: c.Payload,
 		User:    c.User,
+		ContextId: c.ContextId,
 	}
 }
 
@@ -97,6 +103,7 @@ func (c *Command) WithPayload(p interface{}) *Command {
 		From:    c.From,
 		Payload: p,
 		User:    c.User,
+		ContextId: c.ContextId,
 	}
 }
 
@@ -108,7 +115,7 @@ func (c *Command) WithPayload(p interface{}) *Command {
 // Example: user:howdy
 //
 // Internal commands originate from some internal module, perhaps in response to a user command. They should be of the
-// form: internal:<module>:<module:specific:path>
+// form: internal:<module>:<module:specific:path>. `from` typically matters less for internal commands.
 //
 // Example: internal:send:slack:SOME_TEAM_ID:SOME_CHANNEL_ID
 //
