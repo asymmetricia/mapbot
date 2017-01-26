@@ -1,4 +1,4 @@
-package maskController
+package mask
 
 import (
 	"fmt"

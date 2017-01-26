@@ -10,33 +10,33 @@ import (
 var log = mbLog.Log
 
 type Hub struct {
-	subscribers map[CommandType][]Subscriber
+	Subscribers map[CommandType][]Subscriber
 }
 
 func (h *Hub) Subscribe(c CommandType, s Subscriber) {
 	log.Debugf("subscribe: %s", c)
-	if h.subscribers == nil {
-		h.subscribers = map[CommandType][]Subscriber{
+	if h.Subscribers == nil {
+		h.Subscribers = map[CommandType][]Subscriber{
 			c: []Subscriber{},
 		}
 	}
 
-	if subs, ok := h.subscribers[c]; ok {
-		h.subscribers[c] = append(subs, s)
+	if subs, ok := h.Subscribers[c]; ok {
+		h.Subscribers[c] = append(subs, s)
 	} else {
-		h.subscribers[c] = []Subscriber{s}
+		h.Subscribers[c] = []Subscriber{s}
 	}
 }
 
 // Publish searches publishers for a subscriber to the given command's type, and executes the subscriber in a goroutine.
 func (h *Hub) Publish(c *Command) {
 	log.Debugf("publish: %s->%s (%s): %v", c.From, string(c.Type), c.User, c.Payload)
-	if h.subscribers == nil {
-		h.subscribers = map[CommandType][]Subscriber{}
+	if h.Subscribers == nil {
+		h.Subscribers = map[CommandType][]Subscriber{}
 	}
 
 	found := false
-	for cmd, subs := range h.subscribers {
+	for cmd, subs := range h.Subscribers {
 		if glob.Glob(string(cmd), string(c.Type)) {
 			for _, sub := range subs {
 				found = true
