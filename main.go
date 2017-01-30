@@ -2,19 +2,20 @@ package main
 
 import (
 	"crypto/tls"
+	"database/sql"
 	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
+	helpController "github.com/pdbogen/mapbot/controller/help"
 	"github.com/pdbogen/mapbot/controller/mapController"
 	maskController "github.com/pdbogen/mapbot/controller/mask"
-	helpController "github.com/pdbogen/mapbot/controller/help"
+	tokenController "github.com/pdbogen/mapbot/controller/token"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
-	"database/sql"
 )
 
 var log = mbLog.Log
@@ -55,6 +56,7 @@ func main() {
 	mapController.Register(hub)
 	maskController.Register(hub)
 	helpController.Register(hub)
+	tokenController.Register(hub)
 
 	slackUi, err := slack.New(
 		*SlackClientToken,

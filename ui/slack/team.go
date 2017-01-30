@@ -182,7 +182,7 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 			log.Errorf("%s: error %s image %q: %s", t.Info.ID, ctx, msg.Name, err)
 			t.Send(h, c.WithPayload(fmt.Sprintf("error %s map %q: %s", ctx, msg.Name, err)))
 		}
-		img, err := msg.Render()
+		img, err := msg.Render(c.ContextId)
 		if err != nil {
 			repErr("rendering", err)
 			return

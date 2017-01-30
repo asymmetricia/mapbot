@@ -6,6 +6,7 @@ import (
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/controller/cmdproc"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"image/color"
 	"regexp"
@@ -23,16 +24,18 @@ var processor *cmdproc.CommandProcessor
 
 func init() {
 	processor = &cmdproc.CommandProcessor{
+		Command: "map",
 		Commands: map[string]cmdproc.Subcommand{
-			"add":  cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
-			"show": cmdproc.Subcommand{"<name>", "show a gridded map", cmdShow},
-			"set":  cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
-			"list": cmdproc.Subcommand{"", "list your maps", cmdList},
+			"add":    cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
+			"show":   cmdproc.Subcommand{"<name>", "show a gridded map", cmdShow},
+			"set":    cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
+			"list":   cmdproc.Subcommand{"", "list your maps", cmdList},
+			"select": cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
 		},
 	}
 }
 
-func notFound(n tabula.Name) string {
+func notFound(n tabula.TabulaName) string {
 	return fmt.Sprintf("you don't have a map named %q", string(n))
 }
 
@@ -62,9 +65,9 @@ var colorRegex = regexp.MustCompile("^#[0-9a-fA-F]{8}$")
 
 func cmdSet(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && len(args) == 3 {
-		t, ok := c.User.TabulaByName(tabula.Name(args[0]))
+		t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
 		if !ok {
-			h.Error(c, notFound(tabula.Name(args[0])))
+			h.Error(c, notFound(tabula.TabulaName(args[0])))
 			return
 		}
 		switch strings.ToLower(args[1]) {
@@ -121,9 +124,42 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 	}
 }
 
+func cmdSelect(h *hub.Hub, c *hub.Command) {
+	if args, ok := c.Payload.([]string); ok && len(args) == 1 {
+		t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
+		if !ok {
+			h.Error(c, notFound(tabula.TabulaName(args[0])))
+			return
+		}
+
+		ctx, err := context.Load(db.Instance, c.ContextId)
+		if err != nil {
+			log.Errorf("Error loading context %q: %s", c.ContextId, err)
+			h.Error(c, "error loading context")
+			return
+		}
+
+		ctx.ActiveTabula = t
+
+		if err := ctx.Save(db.Instance); err != nil {
+			log.Errorf("Error saving context %q: %s", c.ContextId, err)
+			h.Error(c, "error saving context")
+			return
+		}
+
+		h.Publish(&hub.Command{
+			Type:    hub.CommandType(c.From),
+			Payload: t,
+			User:    c.User,
+		})
+	} else {
+		h.Error(c, "usage: map select <name>")
+	}
+}
+
 func cmdShow(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && len(args) == 1 {
-		t, ok := c.User.TabulaByName(tabula.Name(args[0]))
+		t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
 		if ok {
 			h.Publish(&hub.Command{
 				Type:    hub.CommandType(c.From),
@@ -131,7 +167,7 @@ func cmdShow(h *hub.Hub, c *hub.Command) {
 				User:    c.User,
 			})
 		} else {
-			h.Error(c, notFound(tabula.Name(args[0])))
+			h.Error(c, notFound(tabula.TabulaName(args[0])))
 		}
 	} else {
 		h.Error(c, "usage: map show <name>")
@@ -156,12 +192,12 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		}
 
 		if err := t.Save(db.Instance); err != nil {
-			h.Error(c, fmt.Sprintf("error saving to database: %s", err))
+			h.Error(c, fmt.Sprintf("error saving map to database: %s", err))
 			return
 		}
 
 		if err := c.User.Assign(db.Instance, t); err != nil {
-			h.Error(c, fmt.Sprintf("error saving to database: %s", err))
+			h.Error(c, fmt.Sprintf("error saving user record to database: %s", err))
 			return
 		}
 

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
+	"github.com/nfnt/resize"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/mask"
 	"golang.org/x/image/math/fixed"
@@ -26,11 +27,11 @@ import (
 
 var log = mbLog.Log
 
-type Name string
+type TabulaName string
 
 type Tabula struct {
-	Id         *Id
-	Name       Name
+	Id         *TabulaId
+	Name       TabulaName
 	Url        string
 	Background *image.RGBA
 	OffsetX    int
@@ -38,21 +39,22 @@ type Tabula struct {
 	Dpi        float32
 	GridColor  *color.NRGBA
 	Masks      map[string]*mask.Mask
+	Tokens     map[string]image.Point
 }
 
-type Id int64
+type TabulaId int64
 
-func (i *Id) Value() (driver.Value, error) {
+func (i *TabulaId) Value() (driver.Value, error) {
 	return int64(*i), nil
 }
 
-var _ driver.Valuer = (*Id)(nil)
+var _ driver.Valuer = (*TabulaId)(nil)
 
 func (t *Tabula) String() string {
 	return fmt.Sprintf("Tabula{id=%d,Name=%s,Url=%s,Offset=(%d,%d),Dpi=%f}", t.Id, t.Name, t.Url, t.OffsetX, t.OffsetY, t.Dpi)
 }
 
-func Get(db *sql.DB, id Id) (*Tabula, error) {
+func Get(db *sql.DB, id TabulaId) (*Tabula, error) {
 	res, err := db.Query("SELECT name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a FROM tabulas WHERE id=$1", int64(id))
 	if err != nil {
 		return nil, err
@@ -64,7 +66,7 @@ func Get(db *sql.DB, id Id) (*Tabula, error) {
 	}
 
 	ret := &Tabula{
-		Id: new(Id),
+		Id: new(TabulaId),
 	}
 
 	*ret.Id = id
@@ -117,7 +119,7 @@ func (t *Tabula) Save(db *sql.DB) error {
 	r, g, b, a := t.GridColor.R, t.GridColor.G, t.GridColor.B, t.GridColor.A
 
 	if t.Id == nil {
-		result, err := db.Exec(
+		result, err := db.Query(
 			"INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) "+
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "+
 				"RETURNING id",
@@ -127,11 +129,16 @@ func (t *Tabula) Save(db *sql.DB) error {
 			return err
 		}
 
-		if i, err := result.LastInsertId(); err != nil {
+		if !result.Next() {
+			return errors.New("missing tabula ID from query result")
+		}
+
+		var i int
+		if err := result.Scan(&i); err != nil {
 			return err
 		} else {
-			t.Id = new(Id)
-			*t.Id = Id(i)
+			t.Id = new(TabulaId)
+			*t.Id = TabulaId(i)
 		}
 	} else {
 		_, err := db.Exec(
@@ -160,7 +167,7 @@ func (t *Tabula) Save(db *sql.DB) error {
 // New attempts to create a new map from the image in the given URL.
 func New(name, url string) (*Tabula, error) {
 	return &Tabula{
-		Name: Name(name),
+		Name: TabulaName(name),
 		Url:  url,
 		//Background: ret,
 		Dpi: 10,
@@ -204,10 +211,12 @@ func (t *Tabula) Hydrate() error {
 	return nil
 }
 
+// BlendAt alters the point (given by (x,y)) in the image i by blending the color there with the color c
 func blendAt(i *image.RGBA, x, y int, c color.Color) {
 	i.Set(x, y, blend(c, i.RGBAAt(x, y)))
 }
 
+// blend calculates the result of alpha blending of the two colors
 func blend(a color.Color, b color.Color) color.Color {
 	a_r, a_g, a_b, a_a := a.RGBA()
 	b_r, b_g, b_b, b_a := b.RGBA()
@@ -243,7 +252,6 @@ func addGrid(i image.Image, xOff float32, yOff float32, Dpi float32, col color.C
 				continue
 			}
 			blendAt(gridded, int(x), int(y), col)
-			//gridded.Set(int(x), int(y), col)
 		}
 	}
 
@@ -257,7 +265,6 @@ func addGrid(i image.Image, xOff float32, yOff float32, Dpi float32, col color.C
 				continue
 			}
 			blendAt(gridded, int(x), int(y), col)
-			//gridded.Set(int(x), int(y), col)
 		}
 	}
 
@@ -440,21 +447,53 @@ func addCoordinates(i image.Image, xOff float32, yOff float32, dpi float32) imag
 	return result
 }
 
-func (t *Tabula) Render() (image.Image, error) {
+func addTokens(in image.Image, xOff float32, yOff float32, dpi float32, tokens map[string]image.Point) image.Image {
+	//ctx, err := context.Load(db.Instance, ctxId)
+	//if err != nil {
+	//	log.Warningf("retrieving context %q failed; skipping token rendering: %s", ctxId, err)
+	//	return in
+	//}
+	//
+	//for name, coord := range ctx.Tokens {
+	//}
+	return in
+}
+
+var cache = map[string]image.Image{}
+
+func (t *Tabula) Render(ctxId string) (image.Image, error) {
 	if t.Dpi == 0 {
 		return nil, errors.New("cannot render tabula with zero DPI")
 	}
 
-	if t.Background == nil {
-		if err := t.Hydrate(); err != nil {
-			return nil, fmt.Errorf("retrieving background: %s", err)
+	var resized image.Image
+	if cached, ok := cache[t.Url]; ok {
+		resized = cached
+	} else {
+		log.Info("Cache miss: %s", t.Url)
+		if t.Background == nil {
+			if err := t.Hydrate(); err != nil {
+				return nil, fmt.Errorf("retrieving background: %s", err)
+			}
 		}
+
+		dx := t.Background.Rect.Dx()
+		dy := t.Background.Rect.Dy()
+		resized = t.Background
+		if dx > 2000 || dy > 2000 {
+			if t.Background.Rect.Dx() > t.Background.Rect.Dy() {
+				resized = resize.Resize(2000, 0, t.Background, resize.Bilinear)
+			} else {
+				resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
+			}
+		}
+		cache[t.Url] = resized
 	}
-
-	gridded := addGrid(t.Background, float32(t.OffsetX), float32(t.OffsetY), t.Dpi, t.GridColor)
+	gridded := addGrid(resized, float32(t.OffsetX), float32(t.OffsetY), t.Dpi, t.GridColor)
 	coord := addCoordinates(gridded, float32(t.OffsetX), float32(t.OffsetY), t.Dpi)
+	tokened := addTokens(coord, float32(t.OffsetX), float32(t.OffsetY), t.Dpi, t.Tokens)
 
-	return coord, nil
+	return tokened, nil
 }
 
 func copyImage(in image.Image) *image.RGBA {

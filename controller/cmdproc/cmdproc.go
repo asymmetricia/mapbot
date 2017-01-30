@@ -13,17 +13,18 @@ type Subcommand struct {
 }
 
 type CommandProcessor struct {
+	Command string
 	Commands map[string]Subcommand
 }
 
 func (c *CommandProcessor) Help(h *hub.Hub, cmd *hub.Command) {
 	help := fmt.Sprintf("Select from the following %s commands:", cmd.Type)
-	for cmd, sc := range c.Commands {
-		help += "\n" + cmd
+	for subCommand, sc := range c.Commands {
+		help += "\n`" + c.Command + " " + subCommand
 		if sc.Args != "" {
 			help += " " + sc.Args
 		}
-		help += " - " + sc.Usage
+		help += "` - " + sc.Usage
 	}
 	h.Publish(&hub.Command{
 		Type:    hub.CommandType(cmd.From),

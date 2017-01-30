@@ -74,7 +74,7 @@ func New(db *sql.DB, id Id, name Name) (*User, error) {
 		return nil, fmt.Errorf("hydrating user: %s", err)
 	}
 
-	var tid tabula.Id
+	var tid tabula.TabulaId
 	for res.Next() {
 		if err := res.Scan(&tid); err != nil {
 			return nil, fmt.Errorf("retrieving results: %s", err)
@@ -94,7 +94,7 @@ func New(db *sql.DB, id Id, name Name) (*User, error) {
 	return user, nil
 }
 
-func (u *User) TabulaByName(name tabula.Name) (*tabula.Tabula, bool) {
+func (u *User) TabulaByName(name tabula.TabulaName) (*tabula.Tabula, bool) {
 	if u == nil || u.Tabulas == nil {
 		return nil, false
 	}

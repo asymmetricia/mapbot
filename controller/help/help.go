@@ -23,7 +23,7 @@ func helpAll(h *hub.Hub, cmd *hub.Command) {
 
 	response := "The following top-level commands are registered:\n" +
 		strings.Join(handlers, "\n") +
-		"Most commands respond to `<command> help`"
+		"\nMost commands respond to `<command> help`"
 	h.Reply(cmd, response)
 }
 

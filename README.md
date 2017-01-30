@@ -14,7 +14,7 @@
 * [ ] Overlays
 * [X] Overlay coordinates
 
-### Character
+### Token
 
 * [ ] Name / Glyphicon
 * [ ] Icon
@@ -27,7 +27,7 @@
     * [X] Set map alignment
     * [X] Save map
     * [ ] Add by upload
-* [ ] Select Saved Map
+* [X] Select Saved Map
 * [ ] Add Mask Set
 * [ ] Add rectangular mask to mask set
 * [ ] Select/Unselect mask  set

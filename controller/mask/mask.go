@@ -21,6 +21,7 @@ var processor *cmdproc.CommandProcessor
 
 func init() {
 	processor = &cmdproc.CommandProcessor{
+		Command: "mask",
 		Commands: map[string]cmdproc.Subcommand{
 			"add": cmdproc.Subcommand{"<map-name> <mask-name>", "add a new mask to one of your maps", cmdAdd},
 			"up":  cmdproc.Subcommand{"<map-name> <mask-name>", "moves the indicated mask up, so that it will be applied earlier", cmdUp},
@@ -53,7 +54,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	t, ok := c.User.TabulaByName(tabula.Name(args[0]))
+	t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
 	if !ok {
 		h.Error(c, fmt.Sprintf("you have no map %q", args[0]))
 		return
