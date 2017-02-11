@@ -13,7 +13,7 @@ type Subcommand struct {
 }
 
 type CommandProcessor struct {
-	Command string
+	Command  string
 	Commands map[string]Subcommand
 }
 

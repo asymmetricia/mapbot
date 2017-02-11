@@ -10,8 +10,8 @@ func TestCoordsToPoint(t *testing.T) {
 	}
 
 	type Test struct {
-		x string
-		y string
+		x    string
+		y    string
 		resX int
 		resY int
 	}

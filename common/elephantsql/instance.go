@@ -1,12 +1,12 @@
 package elephantsql
 
 import (
-	"fmt"
-	"net/url"
-	"strings"
 	"database/sql"
 	"errors"
+	"fmt"
+	"net/url"
 	"strconv"
+	"strings"
 )
 
 type Instance struct {

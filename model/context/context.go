@@ -19,7 +19,7 @@ func Load(db *sql.DB, id string) (*Context, error) {
 	defer res.Close()
 
 	ret := &Context{
-		Id:     id,
+		Id: id,
 	}
 
 	if !res.Next() {

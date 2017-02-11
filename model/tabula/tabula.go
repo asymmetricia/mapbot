@@ -470,8 +470,8 @@ func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, size f
 	draw.Draw(
 		i,
 		image.Rect(
-			int(x*t.Dpi) + t.OffsetX, int(y*t.Dpi) + t.OffsetY,
-			int((x+1)*t.Dpi) + t.OffsetX, int((y+1)*t.Dpi) + t.OffsetY,
+			int(x*t.Dpi)+t.OffsetX, int(y*t.Dpi)+t.OffsetY,
+			int((x+1)*t.Dpi)+t.OffsetX, int((y+1)*t.Dpi)+t.OffsetY,
 		),
 		g,
 		image.Pt(0, 0),
@@ -506,7 +506,7 @@ func (t *Tabula) addCoordinates(i image.Image) image.Image {
 	return result
 }
 
-func (t *Tabula) addTokens(in image.Image) (error) {
+func (t *Tabula) addTokens(in image.Image) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
 		return errors.New("image provided could not be used as a draw.Image")
@@ -520,8 +520,9 @@ func (t *Tabula) addTokens(in image.Image) (error) {
 
 type cacheEntry struct {
 	version int
-	image image.Image
+	image   image.Image
 }
+
 var cache = map[string]cacheEntry{}
 
 func (t *Tabula) Render(ctxId string) (image.Image, error) {

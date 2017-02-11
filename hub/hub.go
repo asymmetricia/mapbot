@@ -47,9 +47,9 @@ func (h *Hub) Publish(c *Command) {
 
 	if !found && c.From != "" {
 		h.Publish(&Command{
-			Type:    CommandType(c.From),
-			Payload: fmt.Sprintf("No handler for command '%s'", c.Type),
-			User:    c.User,
+			Type:      CommandType(c.From),
+			Payload:   fmt.Sprintf("No handler for command '%s'", c.Type),
+			User:      c.User,
 			ContextId: c.ContextId,
 		})
 	}
@@ -66,9 +66,9 @@ func (h *Hub) Reply(trigger *Command, message string) {
 	}
 
 	h.Publish(&Command{
-		Type:    CommandType(trigger.From),
-		Payload: message,
-		User:    trigger.User,
+		Type:      CommandType(trigger.From),
+		Payload:   message,
+		User:      trigger.User,
 		ContextId: trigger.ContextId,
 	})
 }
@@ -89,20 +89,20 @@ type Command struct {
 // WithType returns a copy of the command with the type replaced by the given type. The payload is not deep-copied.
 func (c *Command) WithType(n CommandType) *Command {
 	return &Command{
-		Type:    n,
-		From:    c.From,
-		Payload: c.Payload,
-		User:    c.User,
+		Type:      n,
+		From:      c.From,
+		Payload:   c.Payload,
+		User:      c.User,
 		ContextId: c.ContextId,
 	}
 }
 
 func (c *Command) WithPayload(p interface{}) *Command {
 	return &Command{
-		Type:    c.Type,
-		From:    c.From,
-		Payload: p,
-		User:    c.User,
+		Type:      c.Type,
+		From:      c.From,
+		Payload:   p,
+		User:      c.User,
 		ContextId: c.ContextId,
 	}
 }

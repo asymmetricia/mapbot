@@ -1,8 +1,8 @@
 package types
 
 import (
-	"image/color"
 	"image"
+	"image/color"
 )
 
 type TabulaName string

@@ -19,11 +19,11 @@ type ElephantSql struct {
 // These are the five ElephantSQL instance types available. TypeTinyTurtle is the free tier. Available instance types
 // are described in detail on https://www.elephantsql.com/plans.html.
 const (
-	TypeTinyTurtle = "turtle"
-	TypePrettyPanda = "panda"
-	TypeHappyHippo = "hippo"
+	TypeTinyTurtle       = "turtle"
+	TypePrettyPanda      = "panda"
+	TypeHappyHippo       = "hippo"
 	TypeEnormousElephant = "elephant"
-	TypePuffyPigeon = "pigeon"
+	TypePuffyPigeon      = "pigeon"
 )
 
 // NewInstance creates a new ElephantSQL instance with the given name and of the given type. Regions may be an array
@@ -63,7 +63,7 @@ func (e *ElephantSql) NewInstance(name, instance_type string, regions []string) 
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode / 100 != 2 {
+	if res.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("server returned non-2XX status %d %q", res.StatusCode, res.Status)
 	}
 
@@ -100,7 +100,7 @@ func (e *ElephantSql) ListInstances() ([]Instance, error) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode / 100 != 2 {
+	if res.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("server returned non-2XX status %d %q", res.StatusCode, res.Status)
 	}
 
@@ -132,7 +132,7 @@ func (e *ElephantSql) Enrich(i *Instance) (*Instance, error) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode / 100 != 2 {
+	if res.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("server returned non-2XX status %d %q", res.StatusCode, res.Status)
 	}
 

@@ -1,9 +1,9 @@
 package help
 
 import (
+	"fmt"
 	"github.com/pdbogen/mapbot/hub"
 	"strings"
-	"fmt"
 )
 
 func Register(h *hub.Hub) {
@@ -30,7 +30,7 @@ func helpAll(h *hub.Hub, cmd *hub.Command) {
 func helpSingle(h *hub.Hub, cmd *hub.Command) {
 	args := cmd.Payload.([]string)
 	for k, _ := range h.Subscribers {
-		if strings.HasPrefix(string(k), "user:" + args[0]) {
+		if strings.HasPrefix(string(k), "user:"+args[0]) {
 			h.Publish(cmd.WithType(k).WithPayload([]string{"help"}))
 			return
 		}
