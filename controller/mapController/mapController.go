@@ -120,6 +120,11 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 			Payload: fmt.Sprintf("map %s %s set to %q", args[0], args[1], args[2]),
 			User:    c.User,
 		})
+		h.Publish(&hub.Command{
+			Type:    hub.CommandType(c.From),
+			Payload: t,
+			User:    c.User,
+		})
 	} else {
 		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
 	}
