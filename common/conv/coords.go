@@ -31,5 +31,5 @@ func CoordsToPoint(x, y string) (image.Point, error) {
 	if err != nil {
 		return image.Point{}, fmt.Errorf("invalid Y coordinate: %s", err)
 	}
-	return image.Point{accumX, accumY}, nil
+	return image.Point{accumX - 1, accumY - 1}, nil
 }

@@ -16,10 +16,10 @@
 
 ### Token
 
-* [ ] Name / Glyphicon
-* [ ] Icon
+* [X] Name
+* [ ] Icon / Glyphicon
 * [ ] Size
-* [ ] Position on map
+* [X] Position on map
 
 ## Slack UI
 

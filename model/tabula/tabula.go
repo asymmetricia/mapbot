@@ -228,22 +228,26 @@ func blend(a color.Color, b color.Color) color.Color {
 	}
 }
 
-func addGrid(i image.Image, xOff float32, yOff float32, Dpi float32, col color.Color) image.Image {
+func (t *Tabula) addGrid(i image.Image) image.Image {
 	bounds := i.Bounds()
 	gridded := copyImage(i)
 
+	xOff := float32(t.OffsetX)
 	for xOff > 0 {
-		xOff -= Dpi
-	}
-	for yOff > 0 {
-		yOff -= Dpi
+		xOff -= t.Dpi
 	}
 
+	yOff := float32(t.OffsetY)
+	for yOff > 0 {
+		yOff -= t.Dpi
+	}
+
+	var col color.Color = t.GridColor
 	if col == nil {
 		col = &color.Black
 	}
 
-	for x := xOff; x < float32(bounds.Max.X); x += Dpi {
+	for x := xOff; x < float32(bounds.Max.X); x += t.Dpi {
 		if x < 0 {
 			continue
 		}
@@ -260,7 +264,7 @@ func addGrid(i image.Image, xOff float32, yOff float32, Dpi float32, col color.C
 		if x < 0 {
 			continue
 		}
-		for y := yOff; y < float32(bounds.Max.Y); y += Dpi {
+		for y := yOff; y < float32(bounds.Max.Y); y += t.Dpi {
 			if y < 0 {
 				continue
 			}
@@ -399,14 +403,30 @@ max_x:
 	return result
 }
 
-func addCoordinates(i image.Image, xOff float32, yOff float32, dpi float32) image.Image {
+// drawAt *modifies* the image given by `i` so that the string given by `what` is printed in the square at tabula
+// coordinates x,y (not image coordinates), scaled so that the string given occupies `size` squares.
+func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, size float32) {
+	g := glyph(what, t.Dpi*size)
+	draw.Draw(
+		i,
+		image.Rect(
+			int(x*t.Dpi) + t.OffsetX, int(y*t.Dpi) + t.OffsetY,
+			int((x+1)*t.Dpi) + t.OffsetX, int((y+1)*t.Dpi) + t.OffsetY,
+		),
+		g,
+		image.Pt(0, 0),
+		draw.Over,
+	)
+}
+
+func (t *Tabula) addCoordinates(i image.Image) image.Image {
 	letters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
 		"N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 
 	result := copyImage(i)
 
-	rows := int(float32(i.Bounds().Max.Y) / dpi)
-	cols := int(float32(i.Bounds().Max.X) / dpi)
+	rows := int(float32(i.Bounds().Max.Y) / t.Dpi)
+	cols := int(float32(i.Bounds().Max.X) / t.Dpi)
 	// 0 1 2 3 4 ... 25 26 27 28
 	// A B C D E ... Y  Z  AA AB
 	for x := 0; x < cols; x++ {
@@ -416,47 +436,26 @@ func addCoordinates(i image.Image, xOff float32, yOff float32, dpi float32) imag
 			tmp = int(tmp/26) - 1
 			c = letters[tmp%26] + c
 		}
-
-		g := glyph(c, dpi/2)
-		draw.Draw(
-			result,
-			image.Rect(
-				int(float32(x)*dpi), int(0),
-				int(float32(x+1)*dpi), int(dpi/2),
-			),
-			g,
-			image.Pt(0, 0),
-			draw.Over,
-		)
+		t.printAt(result, c, float32(x), 0, 0.5)
 	}
 
 	for y := 0; y < rows; y++ {
-		g := glyph(strconv.Itoa(y+1), dpi/2)
-		draw.Draw(
-			result,
-			image.Rect(
-				int(dpi/2), int(dpi*float32(y)+dpi/2),
-				int(dpi), int(dpi*float32(y+1)),
-			),
-			g,
-			image.Pt(0, 0),
-			draw.Over,
-		)
+		t.printAt(result, strconv.Itoa(y+1), 0.5, float32(y)+0.5, 0.5)
 	}
 
 	return result
 }
 
-func addTokens(in image.Image, xOff float32, yOff float32, dpi float32, tokens map[string]image.Point) image.Image {
-	//ctx, err := context.Load(db.Instance, ctxId)
-	//if err != nil {
-	//	log.Warningf("retrieving context %q failed; skipping token rendering: %s", ctxId, err)
-	//	return in
-	//}
-	//
-	//for name, coord := range ctx.Tokens {
-	//}
-	return in
+func (t *Tabula) addTokens(in image.Image) (error) {
+	drawable, ok := in.(draw.Image)
+	if !ok {
+		return errors.New("image provided could not be used as a draw.Image")
+	}
+	for name, coord := range t.Tokens {
+		log.Debugf("Adding token %s at (%d,%d)", name, coord.X, coord.Y)
+		t.printAt(drawable, name, float32(coord.X), float32(coord.Y), 1)
+	}
+	return nil
 }
 
 var cache = map[string]image.Image{}
@@ -470,7 +469,7 @@ func (t *Tabula) Render(ctxId string) (image.Image, error) {
 	if cached, ok := cache[t.Url]; ok {
 		resized = cached
 	} else {
-		log.Info("Cache miss: %s", t.Url)
+		log.Infof("Cache miss: %s", t.Url)
 		if t.Background == nil {
 			if err := t.Hydrate(); err != nil {
 				return nil, fmt.Errorf("retrieving background: %s", err)
@@ -489,11 +488,14 @@ func (t *Tabula) Render(ctxId string) (image.Image, error) {
 		}
 		cache[t.Url] = resized
 	}
-	gridded := addGrid(resized, float32(t.OffsetX), float32(t.OffsetY), t.Dpi, t.GridColor)
-	coord := addCoordinates(gridded, float32(t.OffsetX), float32(t.OffsetY), t.Dpi)
-	tokened := addTokens(coord, float32(t.OffsetX), float32(t.OffsetY), t.Dpi, t.Tokens)
+	gridded := t.addGrid(resized)
+	coord := t.addCoordinates(gridded)
+	err := t.addTokens(coord)
+	if err != nil {
+		return nil, err
+	}
 
-	return tokened, nil
+	return coord, nil
 }
 
 func copyImage(in image.Image) *image.RGBA {

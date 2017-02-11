@@ -1,14 +1,15 @@
 package token
 
 import (
-	"github.com/pdbogen/mapbot/hub"
-	"github.com/pdbogen/mapbot/controller/cmdproc"
-	mbLog "github.com/pdbogen/mapbot/common/log"
-	"reflect"
-	"github.com/pdbogen/mapbot/common/db"
-	"github.com/pdbogen/mapbot/model/context"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/conv"
+	"github.com/pdbogen/mapbot/common/db"
+	mbLog "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/controller/cmdproc"
+	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/context"
+	"image"
+	"reflect"
 )
 
 var log = mbLog.Log
@@ -21,8 +22,11 @@ var processor *cmdproc.CommandProcessor
 
 func init() {
 	processor = &cmdproc.CommandProcessor{
+		Command: "token",
 		Commands: map[string]cmdproc.Subcommand{
-			"add":    cmdproc.Subcommand{"<name> <X> <Y>", "add a token to the currently selected map (see `map select`). Token names should be very short.", cmdAdd},
+			"add":  cmdproc.Subcommand{"<name> <X> <Y>", "add a token (or change its location) to the currently selected map (see `map select`). Token names should be very short.", cmdAdd},
+			"show": cmdproc.Subcommand{"<name> <X> <Y>", "synonym for add", cmdAdd},
+			"move": cmdproc.Subcommand{"<name> <X> <Y>", "synonym for add", cmdAdd},
 			//"show":   cmdproc.Subcommand{"<name>", "show a gridded map", cmdShow},
 			//"set":    cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
 			//"list":   cmdproc.Subcommand{"", "list your maps", cmdList},
@@ -30,8 +34,6 @@ func init() {
 		},
 	}
 }
-
-
 
 func cmdAdd(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
@@ -42,7 +44,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 	}
 
 	if len(args) != 3 {
-		h.Error(c, "usage: token add " + processor.Commands["add"].Args)
+		h.Error(c, "usage: token add "+processor.Commands["add"].Args)
 		return
 	}
 
@@ -59,10 +61,6 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 	}
 
 	name := args[0]
-	if _, ok := ctx.ActiveTabula.Tokens[name]; ok {
-		h.Error(c, fmt.Sprintf("A token %q is already on this map; use move or pick a new name", name))
-		return
-	}
 
 	coord, err := conv.CoordsToPoint(args[1], args[2])
 	if err != nil {
@@ -70,6 +68,9 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
+	if ctx.ActiveTabula.Tokens == nil {
+		ctx.ActiveTabula.Tokens = map[string]image.Point{}
+	}
 	ctx.ActiveTabula.Tokens[name] = coord
 	ctx.ActiveTabula.Save(db.Instance)
 
