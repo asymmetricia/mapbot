@@ -83,13 +83,16 @@ var schema = []Migration{
 		`CREATE TABLE contexts (context_id VARCHAR(128) PRIMARY KEY, active_tabula BIGSERIAL REFERENCES tabulas (id) ON DELETE SET NULL)`,
 		`DROP TABLE contexts`,
 	},
-	//Migration{
-	//	9,
-	//	`CREATE TABLE tabula_tokens(` +
-	//		`name VARCHAR(128),` +
-	//		`tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
-	//		`x INT NOT NULL DEAFULT 0,`,
-	//},
+	Migration{
+		9,
+		`CREATE TABLE tabula_tokens(` +
+			`name VARCHAR(128),` +
+			`tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
+			`x INT NOT NULL DEFAULT 0,` +
+			`y INT NOT NULL DEFAULT 0` +
+			`)`,
+		`DROP TABLE tabula_tokens`,
+	},
 }
 
 func Reset(db *sql.DB) error {

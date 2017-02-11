@@ -161,6 +161,64 @@ func (t *Tabula) Save(db *sql.DB) error {
 		}
 	}
 
+	if t.Tokens != nil {
+		if err := t.saveTokens(db); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *Tabula) saveTokens(db *sql.DB) error {
+	if t.Id == nil {
+		return errors.New("cannot save tokens for tabula with nil ID")
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("preparing transaction: %s", err)
+	}
+	// Read list of existing tokens
+	res, err := tx.Query("SELECT name FROM tabula_tokens WHERE tabula_id=$1", t.Id)
+	if err != nil {
+		return fmt.Errorf("retrieving list to sync: %s", err)
+	}
+	names := []string{}
+	for res.Next() {
+		var name string
+		res.Scan(name)
+		names = append(names, name)
+	}
+
+	// Delete tokens not on tabula
+	del, err := tx.Prepare("DELETE FROM tabula_tokens WHERE tabula_id=$1 AND name=$2")
+	if err != nil {
+		return fmt.Errorf("error preparing DELETE: %s", err)
+	}
+	for _, name := range names {
+		if _, ok := t.Tokens[name]; !ok {
+			_, err := del.Exec(t.Id, name)
+			if err != nil {
+				log.Warningf("error attempting to delete token %q on tabula %d: %s", name, t.Id, err)
+			}
+		}
+	}
+	// Add Or Replace existing tokens
+	add, err := tx.Prepare(
+		"INSERT INTO tabula_tokens (name, tabula_id, x, y) VALUES ($1,$2,$3,$4) " +
+			"ON CONFLICT (name, tabula_id) DO UPDATE SET x=$3, y=$4",
+	)
+	if err != nil {
+		return fmt.Errorf("error preparing ADD: %s", err)
+	}
+	for name, pos := range t.Tokens {
+		if _, err := add.Exec(name, t.Id, pos.X, pos.Y); err != nil {
+			log.Warningf("error saving token %q at pos (%d,%d) on tabula %d: %s", name, pos.X, pos.Y, t.Id, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing changes: %s", err)
+	}
 	return nil
 }
 
