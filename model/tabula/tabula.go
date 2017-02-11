@@ -40,6 +40,7 @@ type Tabula struct {
 	GridColor  *color.NRGBA
 	Masks      map[string]*mask.Mask
 	Tokens     map[string]image.Point
+	Version    int
 }
 
 type TabulaId int64
@@ -55,7 +56,7 @@ func (t *Tabula) String() string {
 }
 
 func Get(db *sql.DB, id TabulaId) (*Tabula, error) {
-	res, err := db.Query("SELECT name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a FROM tabulas WHERE id=$1", int64(id))
+	res, err := db.Query("SELECT name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version FROM tabulas WHERE id=$1", int64(id))
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +77,7 @@ func Get(db *sql.DB, id TabulaId) (*Tabula, error) {
 	if err := res.Scan(
 		&(ret.Name), &(ret.Url), &(ret.OffsetX), &(ret.OffsetY), &(ret.Dpi),
 		&(ret.GridColor.R), &(ret.GridColor.G), &(ret.GridColor.B), &(ret.GridColor.A),
+		&(ret.Version),
 	); err != nil {
 		return nil, fmt.Errorf("retrieving columns: %s", err)
 	}
@@ -120,10 +122,10 @@ func (t *Tabula) Save(db *sql.DB) error {
 
 	if t.Id == nil {
 		result, err := db.Query(
-			"INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) "+
-				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "+
+			"INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version) "+
+				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "+
 				"RETURNING id",
-			string(t.Name), t.Url, t.OffsetX, t.OffsetY, t.Dpi, r, g, b, a,
+			string(t.Name), t.Url, t.OffsetX, t.OffsetY, t.Dpi, r, g, b, a, t.Version,
 		)
 		if err != nil {
 			return err
@@ -516,16 +518,20 @@ func (t *Tabula) addTokens(in image.Image) (error) {
 	return nil
 }
 
-var cache = map[string]image.Image{}
+type cacheEntry struct {
+	version int
+	image image.Image
+}
+var cache = map[string]cacheEntry{}
 
 func (t *Tabula) Render(ctxId string) (image.Image, error) {
 	if t.Dpi == 0 {
 		return nil, errors.New("cannot render tabula with zero DPI")
 	}
 
-	var resized image.Image
-	if cached, ok := cache[t.Url]; ok {
-		resized = cached
+	var coord image.Image
+	if cached, ok := cache[t.Url]; ok && cached.version == t.Version {
+		coord = cached.image
 	} else {
 		log.Infof("Cache miss: %s", t.Url)
 		if t.Background == nil {
@@ -536,18 +542,25 @@ func (t *Tabula) Render(ctxId string) (image.Image, error) {
 
 		dx := t.Background.Rect.Dx()
 		dy := t.Background.Rect.Dy()
-		resized = t.Background
+		var resized image.Image = t.Background
 		if dx > 2000 || dy > 2000 {
-			if t.Background.Rect.Dx() > t.Background.Rect.Dy() {
+			if dx > dy {
 				resized = resize.Resize(2000, 0, t.Background, resize.Bilinear)
 			} else {
 				resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
 			}
 		}
-		cache[t.Url] = resized
+		if dx < 2000 && dy < 2000 {
+			if dx > dy {
+				resized = resize.Resize(2000, 0, t.Background, resize.Bilinear)
+			} else {
+				resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
+			}
+		}
+		gridded := t.addGrid(resized)
+		coord = t.addCoordinates(gridded)
+		cache[t.Url] = cacheEntry{t.Version, coord}
 	}
-	gridded := t.addGrid(resized)
-	coord := t.addCoordinates(gridded)
 	err := t.addTokens(coord)
 	if err != nil {
 		return nil, err

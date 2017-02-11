@@ -110,6 +110,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 			h.Error(c, "usage: map set "+processor.Commands["set"].Args)
 			return
 		}
+		t.Version++
 		if err := t.Save(db.Instance); err != nil {
 			h.Error(c, fmt.Sprintf("failed saving updated map: %s", err))
 			return

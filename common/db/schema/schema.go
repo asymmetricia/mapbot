@@ -93,6 +93,11 @@ var schema = []Migration{
 			`)`,
 		`DROP TABLE tabula_tokens`,
 	},
+	Migration{
+		10,
+		`ALTER TABLE tabulas ADD COLUMN version INT NOT NULL DEFAULT 0`,
+		`ALTER TABLE tabula DROP COLUMN version`,
+	},
 }
 
 func Reset(db *sql.DB) error {
