@@ -15,12 +15,12 @@ var log = mbLog.Log
 
 var Instance = &UserStore{
 	Users: map[Id]*User{},
-	Lock: sync.RWMutex{},
+	Lock:  sync.RWMutex{},
 }
 
 type UserStore struct {
 	Users map[Id]*User
-	Lock sync.RWMutex
+	Lock  sync.RWMutex
 }
 
 type User struct {

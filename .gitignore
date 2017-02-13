@@ -5,3 +5,5 @@
 /.copy
 /.docker
 /.push
+/vendor/*
+!/vendor/vendor.json

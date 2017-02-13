@@ -1,9 +1,9 @@
 package databaseContext
 
 import (
+	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/model/types"
-	"fmt"
 )
 
 type DatabaseContext struct {

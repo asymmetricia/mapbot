@@ -92,7 +92,7 @@ var schema = []Migration{
 			`x INT NOT NULL DEFAULT 0,` +
 			`y INT NOT NULL DEFAULT 0,` +
 			`PRIMARY KEY (name, context_id, tabula_id)` +
-		`)`,
+			`)`,
 		`DROP TABLE tabula_tokens`,
 	},
 	Migration{

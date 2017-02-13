@@ -1,8 +1,8 @@
 package types
 
 import (
-	"image/color"
 	"database/sql/driver"
+	"image/color"
 )
 
 type TabulaId int64

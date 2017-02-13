@@ -2,6 +2,7 @@ package token
 
 import (
 	"fmt"
+	"github.com/pdbogen/mapbot/common/colors"
 	"github.com/pdbogen/mapbot/common/conv"
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -35,22 +36,6 @@ func init() {
 			//"remove": cmdproc.Subcommand{"<name>", "removes the named token from the active map", cmdRemove},
 		},
 	}
-}
-
-var colors = map[string]color.RGBA{
-	"red":    {0xE6, 0x33, 0x5F, 0xFF},
-	"green":  {0x01, 0xA3, 0x68, 0xFF},
-	"blue":   {0x00, 0x6A, 0x93, 0xFF},
-	"orange": {0xFF, 0x86, 0x1F, 0xFF},
-	"yellow": {0xFB, 0xE8, 0x70, 0xFF},
-	"purple": {0x83, 0x59, 0xA3, 0xFF},
-	"violet": {0x83, 0x59, 0xA3, 0xFF},
-	"brown":  {0xA3, 0x6F, 0x40, 0xFF},
-	"black":  {0x00, 0x00, 0x00, 0xFF},
-	"white":  {0xFF, 0xFF, 0xFF, 0xFF},
-	"gray":   {0x8B, 0x86, 0x80, 0xFF},
-	"grey":   {0x8B, 0x86, 0x80, 0xFF},
-	"pink":   {0xCD, 0x91, 0x9E, 0xFF},
 }
 
 var hexColorRe = regexp.MustCompile(`^#?[0-9a-fA-F]{6}$`)
@@ -96,7 +81,7 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 
 	var newColor color.Color
 	colorName := args[1]
-	if namedColor, ok := colors[strings.ToLower(colorName)]; ok {
+	if namedColor, ok := colors.Colors[strings.ToLower(colorName)]; ok {
 		newColor = namedColor
 	} else if hexColorRe.MatchString(colorName) {
 		colorName = strings.TrimLeft(colorName, "#")
