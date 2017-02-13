@@ -1,7 +1,7 @@
 SERVER ?= vdr.cernu.us
 
 restart: .push
-	ssh -At vdr.cernu.us sudo systemctl restart mapbot
+	ssh -At vdr.cernu.us docker rm -f mapbot
 
 push: .push
 .push: .docker
@@ -23,3 +23,6 @@ release:
 	GOOS=darwin  GOARCH=amd64 go build -o mapbot.darwin_amd64
 	GOOS=linux   GOARCH=amd64 go build -o mapbot.linux_amd64
 	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
+
+tail:
+	ssh -At vdr.cernu.us docker logs -f mapbot
