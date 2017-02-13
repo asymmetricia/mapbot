@@ -6,7 +6,6 @@ import (
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/controller/cmdproc"
 	"github.com/pdbogen/mapbot/hub"
-	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"image/color"
 	"regexp"
@@ -27,7 +26,7 @@ func init() {
 		Command: "map",
 		Commands: map[string]cmdproc.Subcommand{
 			"add":    cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
-			"show":   cmdproc.Subcommand{"<name>", "show a gridded map", cmdShow},
+			"show":   cmdproc.Subcommand{"[<name>]", "show a the named map; or the active map in this context, if any", cmdShow},
 			"set":    cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
 			"list":   cmdproc.Subcommand{"", "list your maps", cmdList},
 			"select": cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
@@ -138,17 +137,17 @@ func cmdSelect(h *hub.Hub, c *hub.Command) {
 			return
 		}
 
-		ctx, err := context.Load(db.Instance, c.ContextId)
-		if err != nil {
-			log.Errorf("Error loading context %q: %s", c.ContextId, err)
-			h.Error(c, "error loading context")
-			return
-		}
+		//ctx, err := context.Load(db.Instance, c.Context)
+		//if err != nil {
+		//	log.Errorf("Error loading context %q: %s", c.ContextId, err)
+		//	h.Error(c, "error loading context")
+		//	return
+		//}
 
-		ctx.ActiveTabula = t
+		c.Context.SetActiveTabulaId(t.Id)
 
-		if err := ctx.Save(db.Instance); err != nil {
-			log.Errorf("Error saving context %q: %s", c.ContextId, err)
+		if err := c.Context.Save(); err != nil {
+			log.Errorf("Error saving context: %s", err)
 			h.Error(c, "error saving context")
 			return
 		}
@@ -164,19 +163,39 @@ func cmdSelect(h *hub.Hub, c *hub.Command) {
 }
 
 func cmdShow(h *hub.Hub, c *hub.Command) {
-	if args, ok := c.Payload.([]string); ok && len(args) == 1 {
-		t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
-		if ok {
-			h.Publish(&hub.Command{
-				Type:    hub.CommandType(c.From),
-				Payload: t,
-				User:    c.User,
-			})
-		} else {
-			h.Error(c, notFound(tabula.TabulaName(args[0])))
+	if args, ok := c.Payload.([]string); ok {
+		var t *tabula.Tabula
+		switch len(args) {
+		case 0:
+			tabId := c.Context.GetActiveTabulaId()
+			if tabId == nil {
+				h.Error(c, "no active map in this channel, use `map select <name>` first")
+				return
+			}
+
+			var err error
+			t, err = tabula.Get(db.Instance, *tabId)
+			if err != nil {
+				h.Error(c, "error loading active map")
+				log.Errorf("error loading active map %d: %s", tabId, err)
+				return
+			}
+		case 1:
+			var ok bool
+			t, ok = c.User.TabulaByName(tabula.TabulaName(args[0]))
+			if !ok {
+				h.Error(c, notFound(tabula.TabulaName(args[0])))
+				return
+			}
+		default:
+			h.Error(c, "usage: map show <name>")
+			return
 		}
-	} else {
-		h.Error(c, "usage: map show <name>")
+		h.Publish(&hub.Command{
+			Type:    hub.CommandType(c.From),
+			Payload: t,
+			User:    c.User,
+		})
 	}
 }
 

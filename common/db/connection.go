@@ -12,7 +12,7 @@ import (
 
 var Instance *sql.DB
 
-func OpenElephant(key, instance_type string, reset bool) (*sql.DB, error) {
+func OpenElephant(key, instance_type string, reset bool, resetFrom int) (*sql.DB, error) {
 	if key == "" {
 		return nil, errors.New("key cannot be blank")
 	}
@@ -39,10 +39,10 @@ func OpenElephant(key, instance_type string, reset bool) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connecting to instance: %s", err)
 	}
-	return scheme(conn, reset)
+	return scheme(conn, reset, resetFrom)
 }
 
-func Open(host, user, pass, db string, port int, reset bool) (*sql.DB, error) {
+func Open(host, user, pass, db string, port int, reset bool, resetFrom int) (*sql.DB, error) {
 	dbConn, err := sql.Open(
 		"postgres",
 		fmt.Sprintf(
@@ -57,12 +57,16 @@ func Open(host, user, pass, db string, port int, reset bool) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return scheme(dbConn, reset)
+	return scheme(dbConn, reset, resetFrom)
 }
 
-func scheme(dbConn *sql.DB, reset bool) (*sql.DB, error) {
+func scheme(dbConn *sql.DB, reset bool, resetFrom int) (*sql.DB, error) {
 	if reset {
 		if err := schema.Reset(dbConn); err != nil {
+			return nil, err
+		}
+	} else if resetFrom >= 0 {
+		if err := schema.ResetFrom(dbConn, resetFrom); err != nil {
 			return nil, err
 		}
 	}

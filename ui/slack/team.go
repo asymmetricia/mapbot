@@ -6,8 +6,12 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
+	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
+	slackContext "github.com/pdbogen/mapbot/ui/slack/context"
+	"image"
 	"image/png"
 	"io/ioutil"
 	"mime"
@@ -64,7 +68,28 @@ func (s *SlackUi) addTeam(token string, bot_token *BotToken) error {
 		team.Send,
 	)
 
+	go team.updateEmoji()
+
 	return team.Save(s.db)
+}
+
+func (t *Team) updateEmoji() {
+	emoji, err := t.client.GetEmoji()
+	if err != nil {
+		log.Errorf("error getting emoji for %s: %s", t.Info.ID, err)
+		return
+	}
+	if t.EmojiCache == nil {
+		t.EmojiCache = map[string]image.Image{}
+	} else {
+		for name := range t.EmojiCache {
+			if newUrl, ok := emoji[name]; !ok || t.Emoji[name] != newUrl {
+				delete(t.EmojiCache, name)
+			}
+		}
+	}
+	log.Infof("Team %s has %d emoji", t.Info.ID, len(emoji))
+	t.Emoji = emoji
 }
 
 func (t *Team) Save(db *sql.DB) error {
@@ -104,50 +129,64 @@ func (t *Team) manageMessages() {
 			return
 		case event := <-t.rtm.IncomingEvents:
 			switch event.Type {
-			case "message":
-				if msg, ok := event.Data.(*slack.MessageEvent); ok {
-					if msg.User == t.botToken.BotId || msg.User == "" {
-						continue
-					}
-
-					argv := strings.Split(msg.Text, " ")
-					for i, arg := range argv {
-						if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
-							argv[i] = matches[1]
-						}
-					}
-
-					if msg.Channel[0] != 'D' {
-						if len(argv) < 1 || argv[0] != "<@"+t.botToken.BotId+">" {
-							log.Debugf("Skipping non-direct message %q", msg.Text)
+			case "user_typing":
+				go func() {
+					if msg, ok := event.Data.(*slack.UserTypingEvent); ok {
+						_, err := user.Get(db.Instance, user.Id(msg.User))
+						if err != nil {
+							log.Errorf("user preload in response to typing failed: %s", err)
 							return
 						}
-						argv = argv[1:]
 					}
+				}()
+			case "emoji_changed":
+				go t.updateEmoji()
+			case "message":
+				go func() {
+					if msg, ok := event.Data.(*slack.MessageEvent); ok {
+						if msg.User == t.botToken.BotId || msg.User == "" {
+							return
+						}
 
-					log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
+						argv := strings.Split(msg.Text, " ")
+						for i, arg := range argv {
+							if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
+								argv[i] = matches[1]
+							}
+						}
 
-					u, err := user.New(db.Instance, user.Id(msg.User), user.Name(msg.Username))
-					if err != nil {
-						log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
-						continue
+						if msg.Channel[0] != 'D' {
+							if len(argv) < 1 || argv[0] != "<@"+t.botToken.BotId+">" {
+								log.Debugf("Skipping non-direct message %q", msg.Text)
+								return
+							}
+							argv = argv[1:]
+						}
+
+						log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
+
+						u, err := user.Get(db.Instance, user.Id(msg.User))
+						if err != nil {
+							log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
+							return
+						}
+
+						if u == nil {
+							log.Errorf("nil obtaining/creating user %q, but no error?!", msg.User)
+							return
+						}
+
+						t.hub.Publish(&hub.Command{
+							From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
+							Type:    hub.CommandType("user:" + argv[0]),
+							Payload: argv[1:],
+							User:    u,
+							Context: t.Context(msg.Channel),
+						})
+					} else {
+						log.Warningf("Received message, but type was %s", reflect.TypeOf(event.Data))
 					}
-
-					if u == nil {
-						log.Errorf("nil obtaining/creating user %q, but no error?!", msg.User)
-						continue
-					}
-
-					t.hub.Publish(&hub.Command{
-						From:      fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
-						Type:      hub.CommandType("user:" + argv[0]),
-						Payload:   argv[1:],
-						User:      u,
-						ContextId: t.Info.ID + "-" + msg.Channel,
-					})
-				} else {
-					log.Warningf("Received message, but type was %s", reflect.TypeOf(event.Data))
-				}
+				}()
 			default:
 				log.Debugf("unhandled message type %q", event.Type)
 			}
@@ -182,7 +221,7 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 			log.Errorf("%s: error %s image %q: %s", t.Info.ID, ctx, msg.Name, err)
 			t.Send(h, c.WithPayload(fmt.Sprintf("error %s map %q: %s", ctx, msg.Name, err)))
 		}
-		img, err := msg.Render(c.ContextId)
+		img, err := msg.Render(t.Context(channel), func(msg string) { t.Send(h, c.WithPayload(msg)) })
 		if err != nil {
 			repErr("rendering", err)
 			return
@@ -215,22 +254,31 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 	}
 }
 
-type CommandContext struct {
-	UserId  string
-	Team    *Team
-	Channel string
+func (t *Team) Context(SubTeamId string) context.Context {
+	ret := &slackContext.SlackContext{
+		Emoji:      t.Emoji,
+		EmojiCache: t.EmojiCache,
+	}
+	ret.ContextId = types.ContextId(t.Info.ID + "-" + SubTeamId)
+	if err := ret.Load(); err != nil {
+		log.Errorf("failed while hydrating context %s from the db: %s", ret.ContextId, err)
+	}
+
+	return ret
 }
 
 type Team struct {
-	Info      *slack.TeamInfo
-	Channels  []Channel
-	Quit      <-chan bool
-	token     string
-	client    *slack.Client
-	botClient *slack.Client
-	botToken  *BotToken
-	rtm       *slack.RTM
-	hub       *hub.Hub
+	Info       *slack.TeamInfo
+	Channels   []Channel
+	Quit       <-chan bool
+	token      string
+	client     *slack.Client
+	botClient  *slack.Client
+	botToken   *BotToken
+	rtm        *slack.RTM
+	hub        *hub.Hub
+	Emoji      map[string]string
+	EmojiCache map[string]image.Image
 }
 
 type Channel struct {

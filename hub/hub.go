@@ -3,6 +3,7 @@ package hub
 import (
 	"fmt"
 	mbLog "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/ryanuber/go-glob"
 )
@@ -47,10 +48,10 @@ func (h *Hub) Publish(c *Command) {
 
 	if !found && c.From != "" {
 		h.Publish(&Command{
-			Type:      CommandType(c.From),
-			Payload:   fmt.Sprintf("No handler for command '%s'", c.Type),
-			User:      c.User,
-			ContextId: c.ContextId,
+			Type:    CommandType(c.From),
+			Payload: fmt.Sprintf("No handler for command '%s'", c.Type),
+			User:    c.User,
+			Context: c.Context,
 		})
 	}
 }
@@ -66,10 +67,10 @@ func (h *Hub) Reply(trigger *Command, message string) {
 	}
 
 	h.Publish(&Command{
-		Type:      CommandType(trigger.From),
-		Payload:   message,
-		User:      trigger.User,
-		ContextId: trigger.ContextId,
+		Type:    CommandType(trigger.From),
+		Payload: message,
+		User:    trigger.User,
+		Context: trigger.Context,
 	})
 }
 
@@ -79,31 +80,31 @@ func (h *Hub) Reply(trigger *Command, message string) {
 // The ContextId should uniquely identify something like a "room," "channel," or "session" for whatever UI model this
 // command involves.
 type Command struct {
-	Type      CommandType
-	From      string
-	Payload   interface{}
-	User      *user.User
-	ContextId string
+	Type    CommandType
+	From    string
+	Payload interface{}
+	User    *user.User
+	Context context.Context
 }
 
 // WithType returns a copy of the command with the type replaced by the given type. The payload is not deep-copied.
 func (c *Command) WithType(n CommandType) *Command {
 	return &Command{
-		Type:      n,
-		From:      c.From,
-		Payload:   c.Payload,
-		User:      c.User,
-		ContextId: c.ContextId,
+		Type:    n,
+		From:    c.From,
+		Payload: c.Payload,
+		User:    c.User,
+		Context: c.Context,
 	}
 }
 
 func (c *Command) WithPayload(p interface{}) *Command {
 	return &Command{
-		Type:      c.Type,
-		From:      c.From,
-		Payload:   p,
-		User:      c.User,
-		ContextId: c.ContextId,
+		Type:    c.Type,
+		From:    c.From,
+		Payload: p,
+		User:    c.User,
+		Context: c.Context,
 	}
 }
 

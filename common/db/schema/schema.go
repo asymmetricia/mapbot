@@ -87,24 +87,41 @@ var schema = []Migration{
 		9,
 		`CREATE TABLE tabula_tokens(` +
 			`name VARCHAR(128),` +
+			`context_id VARCHAR(128),` +
 			`tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
 			`x INT NOT NULL DEFAULT 0,` +
-			`y INT NOT NULL DEFAULT 0` +
-			`)`,
+			`y INT NOT NULL DEFAULT 0,` +
+			`PRIMARY KEY (name, context_id, tabula_id)` +
+		`)`,
 		`DROP TABLE tabula_tokens`,
 	},
 	Migration{
 		10,
 		`ALTER TABLE tabulas ADD COLUMN version INT NOT NULL DEFAULT 0`,
-		`ALTER TABLE tabula DROP COLUMN version`,
+		`ALTER TABLE tabulas DROP COLUMN version`,
+	},
+	Migration{
+		11,
+		`ALTER TABLE tabula_tokens ` +
+			`ADD COLUMN r SMALLINT NOT NULL DEFAULT 0,` +
+			`ADD COLUMN g SMALLINT NOT NULL DEFAULT 0,` +
+			`ADD COLUMN b SMALLINT NOT NULL DEFAULT 0,` +
+			`ADD COLUMN a SMALLINT NOT NULL DEFAULT 0`,
+		`ALTER TABLE tabula_tokens DROP COLUMN r, DROP COLUMN g, DROP COLUMN b, DROP COLUMN a`,
 	},
 }
 
 func Reset(db *sql.DB) error {
+	return ResetFrom(db, 0)
+}
+
+func ResetFrom(db *sql.DB, migration int) error {
 	sort.Sort(sort.Reverse(SortMigrationById(schema)))
 	for _, m := range schema {
-		if err := m.ApplyDown(db); err != nil {
-			return err
+		if m.Id >= migration {
+			if err := m.ApplyDown(db); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

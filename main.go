@@ -34,14 +34,15 @@ func main() {
 	DbPass := flag.String("db-pass", "postgres", "postgresql pass to use for authentication")
 	DbName := flag.String("db-name", "mapbot", "postgresql database name to use")
 	DbReset := flag.Bool("db-reset", false, "USE WITH CARE: resets the schema by dropping ALL TABLES and re-executing migrations")
+	DbResetFrom := flag.Int("db-reset-from", -1, "if 0 or greater, roll back to just before the given migration and re-apply later migrations")
 	flag.Parse()
 
 	var dbHandle *sql.DB
 	var err error
 	if *ESKey != "" {
-		dbHandle, err = db.OpenElephant(*ESKey, *ESType, *DbReset)
+		dbHandle, err = db.OpenElephant(*ESKey, *ESType, *DbReset, *DbResetFrom)
 	} else {
-		dbHandle, err = db.Open(*DbHost, *DbUser, *DbPass, *DbName, *DbPort, *DbReset)
+		dbHandle, err = db.Open(*DbHost, *DbUser, *DbPass, *DbName, *DbPort, *DbReset, *DbResetFrom)
 	}
 	if err != nil {
 		log.Fatalf("unable to connection to database: %s", err)

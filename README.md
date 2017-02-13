@@ -4,6 +4,8 @@
 
 ### Map
 
+Maps are referred mostly as Tabula in code, since map is a reserved word in golang. :sobbing:
+
 * [X] Background Image
 * [X] Alignment (offset & DPI)
 * [ ] Mask Sets
@@ -16,10 +18,23 @@
 
 ### Token
 
+* [X] Tokens are per _context_, which is a combination of Team and Channel.
+
 * [X] Name
-* [ ] Icon / Glyphicon
+* [X] Icon / Glyphicon
 * [ ] Size
 * [X] Position on map
+* [X] Box color
+* [ ] Stacking of small tokens
+
+Commands:
+
+* [X] List
+* [X] Add
+* [X] Set color
+* [ ] Remove
+* [ ] Clear
+* [ ] Move <direction list>
 
 ## Slack UI
 
@@ -93,3 +108,17 @@ The Font Software may be sold as part of a larger software package but no copy o
 THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL TAVMJONG BAH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.
 
 Except as contained in this notice, the name of Tavmjong Bah shall not be used in advertising or otherwise to promote the sale, use or other dealings in this Font Software without prior written authorization from Tavmjong Bah. For further information, contact: tavmjong @ free . fr. 
+
+## Graphics
+
+### Maps
+
+MapBot uses maps you supply. You are responsible for ensuring that your use of maps is fair use or that you use maps under an appropriate license.
+
+### Custom Emoji
+
+MapBot uses your team's custom emoji. As with maps, ensure your use of any emoji is fair use or that you have an appropriate license.
+
+### Standard Emoji
+
+MapBot uses EmojiOne for standard emoji. Learn more at http://emojione.com/.

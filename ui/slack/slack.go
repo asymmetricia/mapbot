@@ -36,6 +36,7 @@ func New(id string, secret string, db *sql.DB, proto string, domain string, port
 				"files:write:user",
 				"commands",
 				"team:read",
+				"emoji:read",
 			},
 		},
 		csrf: []string{

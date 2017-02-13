@@ -5,14 +5,15 @@ package tabula
 
 import (
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 	"github.com/nfnt/resize"
 	mbLog "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/mask"
+	"github.com/pdbogen/mapbot/model/types"
 	"golang.org/x/image/math/fixed"
 	"image"
 	"image/color"
@@ -30,7 +31,7 @@ var log = mbLog.Log
 type TabulaName string
 
 type Tabula struct {
-	Id         *TabulaId
+	Id         *types.TabulaId
 	Name       TabulaName
 	Url        string
 	Background *image.RGBA
@@ -39,23 +40,32 @@ type Tabula struct {
 	Dpi        float32
 	GridColor  *color.NRGBA
 	Masks      map[string]*mask.Mask
-	Tokens     map[string]image.Point
+	Tokens     map[types.ContextId]map[string]Token
 	Version    int
 }
 
-type TabulaId int64
-
-func (i *TabulaId) Value() (driver.Value, error) {
-	return int64(*i), nil
+type Token struct {
+	Coordinate image.Point
+	TokenColor color.Color
 }
 
-var _ driver.Valuer = (*TabulaId)(nil)
+func (t Token) WithColor(c color.Color) (ret Token) {
+	ret = t
+	ret.TokenColor = c
+	return
+}
 
 func (t *Tabula) String() string {
 	return fmt.Sprintf("Tabula{id=%d,Name=%s,Url=%s,Offset=(%d,%d),Dpi=%f}", t.Id, t.Name, t.Url, t.OffsetX, t.OffsetY, t.Dpi)
 }
 
-func Get(db *sql.DB, id TabulaId) (*Tabula, error) {
+var tabulaeInMemory = map[types.TabulaId]*Tabula{}
+
+func Get(db *sql.DB, id types.TabulaId) (*Tabula, error) {
+	if t, ok := tabulaeInMemory[id]; ok {
+		return t, nil
+	}
+
 	res, err := db.Query("SELECT name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version FROM tabulas WHERE id=$1", int64(id))
 	if err != nil {
 		return nil, err
@@ -67,7 +77,7 @@ func Get(db *sql.DB, id TabulaId) (*Tabula, error) {
 	}
 
 	ret := &Tabula{
-		Id: new(TabulaId),
+		Id: new(types.TabulaId),
 	}
 
 	*ret.Id = id
@@ -84,6 +94,10 @@ func Get(db *sql.DB, id TabulaId) (*Tabula, error) {
 
 	if err := ret.loadMasks(db); err != nil {
 		return nil, fmt.Errorf("loading masks: %s", err)
+	}
+
+	if err := ret.loadTokens(db); err != nil {
+		return nil, fmt.Errorf("loading tokens: %s", err)
 	}
 
 	return ret, nil
@@ -130,6 +144,7 @@ func (t *Tabula) Save(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
+		defer result.Close()
 
 		if !result.Next() {
 			return errors.New("missing tabula ID from query result")
@@ -139,8 +154,8 @@ func (t *Tabula) Save(db *sql.DB) error {
 		if err := result.Scan(&i); err != nil {
 			return err
 		} else {
-			t.Id = new(TabulaId)
-			*t.Id = TabulaId(i)
+			t.Id = new(types.TabulaId)
+			*t.Id = types.TabulaId(i)
 		}
 	} else {
 		_, err := db.Exec(
@@ -169,58 +184,6 @@ func (t *Tabula) Save(db *sql.DB) error {
 		}
 	}
 
-	return nil
-}
-
-func (t *Tabula) saveTokens(db *sql.DB) error {
-	if t.Id == nil {
-		return errors.New("cannot save tokens for tabula with nil ID")
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("preparing transaction: %s", err)
-	}
-	// Read list of existing tokens
-	res, err := tx.Query("SELECT name FROM tabula_tokens WHERE tabula_id=$1", t.Id)
-	if err != nil {
-		return fmt.Errorf("retrieving list to sync: %s", err)
-	}
-	names := []string{}
-	for res.Next() {
-		var name string
-		res.Scan(name)
-		names = append(names, name)
-	}
-
-	// Delete tokens not on tabula
-	del, err := tx.Prepare("DELETE FROM tabula_tokens WHERE tabula_id=$1 AND name=$2")
-	if err != nil {
-		return fmt.Errorf("error preparing DELETE: %s", err)
-	}
-	for _, name := range names {
-		if _, ok := t.Tokens[name]; !ok {
-			_, err := del.Exec(t.Id, name)
-			if err != nil {
-				log.Warningf("error attempting to delete token %q on tabula %d: %s", name, t.Id, err)
-			}
-		}
-	}
-	// Add Or Replace existing tokens
-	add, err := tx.Prepare(
-		"INSERT INTO tabula_tokens (name, tabula_id, x, y) VALUES ($1,$2,$3,$4) " +
-			"ON CONFLICT (name, tabula_id) DO UPDATE SET x=$3, y=$4",
-	)
-	if err != nil {
-		return fmt.Errorf("error preparing ADD: %s", err)
-	}
-	for name, pos := range t.Tokens {
-		if _, err := add.Exec(name, t.Id, pos.X, pos.Y); err != nil {
-			log.Warningf("error saving token %q at pos (%d,%d) on tabula %d: %s", name, pos.X, pos.Y, t.Id, err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing changes: %s", err)
-	}
 	return nil
 }
 
@@ -272,8 +235,8 @@ func (t *Tabula) Hydrate() error {
 }
 
 // BlendAt alters the point (given by (x,y)) in the image i by blending the color there with the color c
-func blendAt(i *image.RGBA, x, y int, c color.Color) {
-	i.Set(x, y, blend(c, i.RGBAAt(x, y)))
+func blendAt(i draw.Image, x, y int, c color.Color) {
+	i.Set(x, y, blend(c, i.At(x, y)))
 }
 
 // blend calculates the result of alpha blending of the two colors
@@ -288,9 +251,9 @@ func blend(a color.Color, b color.Color) color.Color {
 	}
 }
 
-func (t *Tabula) addGrid(i image.Image) image.Image {
+func (t *Tabula) addGrid(i draw.Image) draw.Image {
 	bounds := i.Bounds()
-	gridded := copyImage(i)
+	gridded := i //copyImage(i)
 
 	xOff := float32(t.OffsetX)
 	for xOff > 0 {
@@ -463,6 +426,15 @@ max_x:
 	return result
 }
 
+func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col color.Color) {
+	//inset := int(t.Dpi * (1 - fill) / 2)
+	for x := int(float32(bounds.Min.X)*t.Dpi) + t.OffsetX + inset; x < int(float32(bounds.Max.X)*t.Dpi)+t.OffsetX-inset; x++ {
+		for y := int(float32(bounds.Min.Y)*t.Dpi) + t.OffsetY + inset; y < int(float32(bounds.Max.Y)*t.Dpi)+t.OffsetY-inset; y++ {
+			blendAt(i, x, y, col)
+		}
+	}
+}
+
 // drawAt *modifies* the image given by `i` so that the string given by `what` is printed in the square at tabula
 // coordinates x,y (not image coordinates), scaled so that the string given occupies `size` squares.
 func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, size float32) {
@@ -479,11 +451,11 @@ func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, size f
 	)
 }
 
-func (t *Tabula) addCoordinates(i image.Image) image.Image {
+func (t *Tabula) addCoordinates(i draw.Image) draw.Image {
 	letters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
 		"N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 
-	result := copyImage(i)
+	result := i //copyImage(i)
 
 	rows := int(float32(i.Bounds().Max.Y) / t.Dpi)
 	cols := int(float32(i.Bounds().Max.X) / t.Dpi)
@@ -506,18 +478,6 @@ func (t *Tabula) addCoordinates(i image.Image) image.Image {
 	return result
 }
 
-func (t *Tabula) addTokens(in image.Image) error {
-	drawable, ok := in.(draw.Image)
-	if !ok {
-		return errors.New("image provided could not be used as a draw.Image")
-	}
-	for name, coord := range t.Tokens {
-		log.Debugf("Adding token %s at (%d,%d)", name, coord.X, coord.Y)
-		t.printAt(drawable, name, float32(coord.X), float32(coord.Y), 1)
-	}
-	return nil
-}
-
 type cacheEntry struct {
 	version int
 	image   image.Image
@@ -525,7 +485,10 @@ type cacheEntry struct {
 
 var cache = map[string]cacheEntry{}
 
-func (t *Tabula) Render(ctxId string) (image.Image, error) {
+func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (image.Image, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("render of tabula %d received nil context", t.Id)
+	}
 	if t.Dpi == 0 {
 		return nil, errors.New("cannot render tabula with zero DPI")
 	}
@@ -534,6 +497,7 @@ func (t *Tabula) Render(ctxId string) (image.Image, error) {
 	if cached, ok := cache[t.Url]; ok && cached.version == t.Version {
 		coord = cached.image
 	} else {
+		sendStatusMessage("I have to retrieve the background image; this could take a moment.")
 		log.Infof("Cache miss: %s", t.Url)
 		if t.Background == nil {
 			if err := t.Hydrate(); err != nil {
@@ -558,12 +522,16 @@ func (t *Tabula) Render(ctxId string) (image.Image, error) {
 				resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
 			}
 		}
-		gridded := t.addGrid(resized)
-		coord = t.addCoordinates(gridded)
-		cache[t.Url] = cacheEntry{t.Version, coord}
+		if drawable, ok := resized.(draw.Image); ok {
+			gridded := t.addGrid(drawable)
+			coord = t.addCoordinates(gridded)
+			cache[t.Url] = cacheEntry{t.Version, copyImage(coord)}
+		} else {
+			panic("resize didn't return a drawable image?!")
+		}
 	}
-	err := t.addTokens(coord)
-	if err != nil {
+
+	if err := t.addTokens(coord, ctx); err != nil {
 		return nil, err
 	}
 

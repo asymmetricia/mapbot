@@ -7,20 +7,23 @@ import (
 	"fmt"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/tabula"
+	"github.com/pdbogen/mapbot/model/types"
+	"sync"
 )
 
 var log = mbLog.Log
 
 var Instance = &UserStore{
 	Users: map[Id]*User{},
+	Lock: sync.RWMutex{},
 }
 
 type UserStore struct {
 	Users map[Id]*User
+	Lock sync.RWMutex
 }
 
 type User struct {
-	Name     Name
 	Id       Id
 	Tabulas  []*tabula.Tabula
 	AutoShow bool
@@ -28,10 +31,10 @@ type User struct {
 
 func (u *User) String() string {
 	if u.Tabulas == nil {
-		return fmt.Sprintf("User{Name: %s, Id: %s, Tabulas: nil}", u.Name, u.Id)
+		return fmt.Sprintf("User{Id: %s, Tabulas: nil}", u.Id)
 	}
 
-	return fmt.Sprintf("User{Name: %s, Id: %s, Tabulas: %d}", u.Name, u.Id, len(u.Tabulas))
+	return fmt.Sprintf("User{Id: %s, Tabulas: %d}", u.Id, len(u.Tabulas))
 }
 
 func (u *User) Hydrate(db *sql.DB) error {
@@ -57,12 +60,15 @@ func (u *User) Save(db *sql.DB) error {
 	return err
 }
 
-func New(db *sql.DB, id Id, name Name) (*User, error) {
-	if u, ok := Instance.Users[id]; ok {
-		return u, nil
+func Get(db *sql.DB, id Id) (*User, error) {
+	Instance.Lock.RLock()
+	iUser, iUserOk := Instance.Users[id]
+	Instance.Lock.RUnlock()
+	if iUserOk {
+		return iUser, nil
 	}
 
-	user := &User{Id: id, Name: name, Tabulas: []*tabula.Tabula{}}
+	user := &User{Id: id, Tabulas: []*tabula.Tabula{}}
 
 	res, err := db.Query("SELECT tabula_id FROM user_tabulas WHERE user_id=$1", &id)
 	if err != nil {
@@ -74,7 +80,7 @@ func New(db *sql.DB, id Id, name Name) (*User, error) {
 		return nil, fmt.Errorf("hydrating user: %s", err)
 	}
 
-	var tid tabula.TabulaId
+	var tid types.TabulaId
 	for res.Next() {
 		if err := res.Scan(&tid); err != nil {
 			return nil, fmt.Errorf("retrieving results: %s", err)
@@ -89,6 +95,8 @@ func New(db *sql.DB, id Id, name Name) (*User, error) {
 		user.Tabulas = append(user.Tabulas, tab)
 	}
 
+	Instance.Lock.Lock()
+	defer Instance.Lock.Unlock()
 	Instance.Users[id] = user
 
 	return user, nil

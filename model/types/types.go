@@ -1,31 +1,17 @@
 package types
 
 import (
-	"image"
 	"image/color"
+	"database/sql/driver"
 )
-
-type TabulaName string
-
-type Tabula struct {
-	Id         *TabulaId
-	Name       TabulaName
-	Url        string
-	Background *image.RGBA
-	OffsetX    int
-	OffsetY    int
-	Dpi        float32
-	GridColor  *color.NRGBA
-	Masks      map[string]*Mask
-}
 
 type TabulaId int64
 
-type Context struct {
-	Id           string
-	ActiveTabula *TabulaId
-	Tokens       map[string]image.Point
+func (i *TabulaId) Value() (driver.Value, error) {
+	return int64(*i), nil
 }
+
+var _ driver.Valuer = (*TabulaId)(nil)
 
 type Mask struct {
 	Name   string
@@ -37,3 +23,11 @@ type Mask struct {
 	Height int
 	Clear  bool
 }
+
+type ContextId string
+
+func (c ContextId) Value() (driver.Value, error) {
+	return string(c), nil
+}
+
+var _ driver.Valuer = (*ContextId)(nil)
