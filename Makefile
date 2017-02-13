@@ -16,3 +16,8 @@ push: .push
 
 mapbot: ${shell find -name \*.go}
 	go build -o mapbot
+
+release:
+	GOOS=darwin  GOARCH=amd64 go build -o mapbot.darwin_amd64
+	GOOS=linux   GOARCH=amd64 go build -o mapbot.linux_amd64
+	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
