@@ -1,9 +1,10 @@
 [Unit]
 Description=mapbot service
-After=network.target
 Requires=docker.service
 
 [Service]
+ExecStartPre=/usr/bin/docker ps
+ExecStartPre=-/usr/bin/docker rm -f mapbot
 ExecStart=/usr/bin/docker run \
   -e CLIENT_ID={{client_id}} \
   -e CLIENT_SECRET={{client_secret}} \
@@ -14,6 +15,7 @@ ExecStart=/usr/bin/docker run \
   -e FQDN={{host_name}} \
   -e PORT={{port}} \
   -p {{port}}:{{port}} \
+  --name=mapbot \
   mapbot
 Restart=always
 RestartSec=5
