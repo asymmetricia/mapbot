@@ -2,6 +2,7 @@ package mapController
 
 import (
 	"fmt"
+	"github.com/pdbogen/mapbot/common/colors"
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/controller/cmdproc"
@@ -27,7 +28,7 @@ func init() {
 		Commands: map[string]cmdproc.Subcommand{
 			"add":       cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
 			"show":      cmdproc.Subcommand{"[<name>]", "show a the named map; or the active map in this context, if any", cmdShow},
-			"set":       cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
+			"set":       cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map; offsetX, offsetY, and dpi accepts numbers; color accepts some common color names or a six-digit hex code", cmdSet},
 			"list":      cmdproc.Subcommand{"", "list your maps", cmdList},
 			"select":    cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
 			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
@@ -38,7 +39,8 @@ func init() {
 
 func cmdDpi(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && len(args) == 2 {
-		return cmdSet(h, c.WithPayload([]string{args[0], "dpi", args[1]}))
+		cmdSet(h, c.WithPayload([]string{args[0], "dpi", args[1]}))
+		return
 	} else {
 		h.Error(c, "usage: map dpi "+processor.Commands["dpi"].Args)
 	}
@@ -46,7 +48,8 @@ func cmdDpi(h *hub.Hub, c *hub.Command) {
 
 func cmdGridColor(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && len(args) == 2 {
-		return cmdSet(h, c.WithPayload([]string{args[0], "gridColor", args[1]}))
+		cmdSet(h, c.WithPayload([]string{args[0], "gridColor", args[1]}))
+		return
 	} else {
 		h.Error(c, "usage: map gridcolor "+processor.Commands["gridcolor"].Args)
 	}
@@ -78,7 +81,7 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 	})
 }
 
-var colorRegex = regexp.MustCompile("^#[0-9a-fA-F]{8}$")
+var colorRegex = regexp.MustCompile("^#?[0-9a-fA-F]{6}$")
 
 func cmdSet(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && len(args) == 3 {
@@ -89,15 +92,18 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		}
 		switch strings.ToLower(args[1]) {
 		case "gridcolor":
-			if !colorRegex.MatchString(args[2]) {
-				h.Error(c, "color should be an HTML-style RGB-with-alpha code, i.e., (red) #FF0000FF, (green) #00FF00FF, (blue) #0000FFFF")
+			if col, ok := colors.Colors[strings.ToLower(args[2])]; ok {
+				t.GridColor = &col
+			} else if !colorRegex.MatchString(args[2]) {
+				colCode := strings.TrimLeft(args[2], "#")
+				r, _ := strconv.ParseInt(colCode[0:2], 16, 9)
+				g, _ := strconv.ParseInt(colCode[2:4], 16, 9)
+				b, _ := strconv.ParseInt(colCode[4:6], 16, 9)
+				t.GridColor = &color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 0xFF}
+			} else {
+				h.Error(c, "color should be a common color name; or an HTML-style RGB code, i.e., (red) #FF0000, (green) #00FF00, (blue) #0000FF")
 				return
 			}
-			r, _ := strconv.ParseInt(args[2][1:3], 16, 9)
-			g, _ := strconv.ParseInt(args[2][3:5], 16, 9)
-			b, _ := strconv.ParseInt(args[2][5:7], 16, 9)
-			a, _ := strconv.ParseInt(args[2][7:9], 16, 9)
-			t.GridColor = &color.NRGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: uint8(a)}
 		case "offsetx":
 			n, err := strconv.Atoi(args[2])
 			if err != nil {

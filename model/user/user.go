@@ -88,7 +88,7 @@ func Get(db *sql.DB, id Id) (*User, error) {
 
 		tab, err := tabula.Get(db, tid)
 		if err != nil {
-			log.Errorf("retrieving tabula %f: %s", tid, err)
+			log.Errorf("retrieving tabula %d: %s", tid, err)
 			continue
 		}
 

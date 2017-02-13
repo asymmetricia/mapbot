@@ -38,7 +38,7 @@ type Tabula struct {
 	OffsetX    int
 	OffsetY    int
 	Dpi        float32
-	GridColor  *color.NRGBA
+	GridColor  color.Color
 	Masks      map[string]*mask.Mask
 	Tokens     map[types.ContextId]map[string]Token
 	Version    int
@@ -82,14 +82,21 @@ func Get(db *sql.DB, id types.TabulaId) (*Tabula, error) {
 
 	*ret.Id = id
 
-	ret.GridColor = &color.NRGBA{}
+	var r, g, b, a uint16
 
 	if err := res.Scan(
 		&(ret.Name), &(ret.Url), &(ret.OffsetX), &(ret.OffsetY), &(ret.Dpi),
-		&(ret.GridColor.R), &(ret.GridColor.G), &(ret.GridColor.B), &(ret.GridColor.A),
+		&r, &g, &b, &a,
 		&(ret.Version),
 	); err != nil {
 		return nil, fmt.Errorf("retrieving columns: %s", err)
+	}
+
+	ret.GridColor = &color.RGBA{
+		uint8(r >> 8),
+		uint8(g >> 8),
+		uint8(b >> 8),
+		uint8(a >> 8),
 	}
 
 	if err := ret.loadMasks(db); err != nil {
@@ -132,7 +139,7 @@ func (t *Tabula) Save(db *sql.DB) error {
 	if t.GridColor == nil {
 		t.GridColor = &color.NRGBA{A: 255}
 	}
-	r, g, b, a := t.GridColor.R, t.GridColor.G, t.GridColor.B, t.GridColor.A
+	r, g, b, a := t.GridColor.RGBA()
 
 	if t.Id == nil {
 		result, err := db.Query(
