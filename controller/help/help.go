@@ -16,7 +16,7 @@ func helpAll(h *hub.Hub, cmd *hub.Command) {
 		if strings.HasPrefix(string(k), "user:") {
 			parts := strings.Split(string(k), ":")
 			if parts[1] != "help" && parts[1] != "howdy" {
-				handlers = append(handlers, parts[1])
+				handlers = append(handlers, fmt.Sprintf("`%s`", parts[1]))
 			}
 		}
 	}

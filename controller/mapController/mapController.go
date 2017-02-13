@@ -25,12 +25,30 @@ func init() {
 	processor = &cmdproc.CommandProcessor{
 		Command: "map",
 		Commands: map[string]cmdproc.Subcommand{
-			"add":    cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
-			"show":   cmdproc.Subcommand{"[<name>]", "show a the named map; or the active map in this context, if any", cmdShow},
-			"set":    cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
-			"list":   cmdproc.Subcommand{"", "list your maps", cmdList},
-			"select": cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
+			"add":       cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
+			"show":      cmdproc.Subcommand{"[<name>]", "show a the named map; or the active map in this context, if any", cmdShow},
+			"set":       cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map", cmdSet},
+			"list":      cmdproc.Subcommand{"", "list your maps", cmdList},
+			"select":    cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
+			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
+			"gridcolor": cmdproc.Subcommand{"<name> <value>", "shorthand for set, to set the grid color", cmdGridColor},
 		},
+	}
+}
+
+func cmdDpi(h *hub.Hub, c *hub.Command) {
+	if args, ok := c.Payload.([]string); ok && len(args) == 2 {
+		return cmdSet(h, c.WithPayload([]string{args[0], "dpi", args[1]}))
+	} else {
+		h.Error(c, "usage: map dpi "+processor.Commands["dpi"].Args)
+	}
+}
+
+func cmdGridColor(h *hub.Hub, c *hub.Command) {
+	if args, ok := c.Payload.([]string); ok && len(args) == 2 {
+		return cmdSet(h, c.WithPayload([]string{args[0], "gridColor", args[1]}))
+	} else {
+		h.Error(c, "usage: map gridcolor "+processor.Commands["gridcolor"].Args)
 	}
 }
 
