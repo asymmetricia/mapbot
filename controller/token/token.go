@@ -29,7 +29,7 @@ func init() {
 	processor = &cmdproc.CommandProcessor{
 		Command: "token",
 		Commands: map[string]cmdproc.Subcommand{
-			"add":   cmdproc.Subcommand{"<name> <X> <Y>", "add a token (or change its location) to the currently selected map (see `map select`). Token names should be very short.", cmdAdd},
+			"add":   cmdproc.Subcommand{"<name> <X> <Y> [<name2> <x2> <y2> ... <nameN> <xN> <yN>]", "add a token(s) (or change its location) to the currently selected map (see `map select`). Token names should be emoji! (Or very short words).", cmdAdd},
 			"move":  cmdproc.Subcommand{"<name> <X> <Y>", "synonym for add", cmdAdd},
 			"color": cmdproc.Subcommand{"<name> <color>", "sets the color for the given token, which can be a common name; the world 'clear'; or a 6-digit hex code specifying red, green, and blue. https://en.wikipedia.org/wiki/List_of_Crayola_crayon_colors has a great list of colors.", cmdColor},
 			"list":  cmdproc.Subcommand{"", "list tokens on the active map", cmdList},
@@ -157,8 +157,8 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if len(args) != 3 {
-		h.Error(c, "usage: token add "+processor.Commands["add"].Args)
+	if len(args) < 3 || len(args)%3 != 0 {
+		h.Error(c, "`token add` expects 3 arguments per token; usage: token add "+processor.Commands["add"].Args)
 		return
 	}
 
@@ -168,33 +168,36 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	name := args[0]
-
-	coord, err := conv.CoordsToPoint(args[1], args[2])
-	if err != nil {
-		h.Error(c, fmt.Sprintf("Invalid coordinates: %s", err))
-		return
-	}
-
 	tab, err := tabula.Get(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
 		return
 	}
-	newToken := tabula.Token{coord, color.RGBA{0, 0, 0, 0}}
-	if tab.Tokens == nil {
-		tab.Tokens = map[types.ContextId]map[string]tabula.Token{
-			c.Context.Id(): map[string]tabula.Token{
+
+	for tokN := 0; tokN < len(args); tokN += 3 {
+		name := args[tokN]
+
+		coord, err := conv.CoordsToPoint(args[tokN+1], args[tokN+2])
+		if err != nil {
+			h.Error(c, fmt.Sprintf("Invalid coordinates: %s", err))
+			return
+		}
+
+		newToken := tabula.Token{coord, color.RGBA{0, 0, 0, 0}}
+		if tab.Tokens == nil {
+			tab.Tokens = map[types.ContextId]map[string]tabula.Token{
+				c.Context.Id(): map[string]tabula.Token{
+					name: newToken,
+				},
+			}
+		} else if tab.Tokens[c.Context.Id()] == nil {
+			tab.Tokens[c.Context.Id()] = map[string]tabula.Token{
 				name: newToken,
-			},
+			}
+		} else {
+			tab.Tokens[c.Context.Id()][name] = newToken
 		}
-	} else if tab.Tokens[c.Context.Id()] == nil {
-		tab.Tokens[c.Context.Id()] = map[string]tabula.Token{
-			name: newToken,
-		}
-	} else {
-		tab.Tokens[c.Context.Id()][name] = newToken
 	}
 
 	if err := tab.Save(db.Instance); err != nil {
