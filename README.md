@@ -1,3 +1,99 @@
+# Mapbot
+
+Mapbot is a slack bot that provides tactical mapping to facilitate the play of
+table-top role playing games within Slack- think Pathfinder or D&D. Mapbot
+renders a square grid on top of user-provided images, provides tools to scale
+the grid to line up with a map's existing grid, and allows the placement of
+tokens on the map to repreesnt characters and movement.
+
+Mapbot is in its early stages, but has reached MVP- minimum viable product.
+This means that your humble author believes mapbot is capable of providing
+value and fulfilling its core purpose, though the are definitely some rough
+edges, as-yet unimplemented features, and lurking bugs.
+
+## How do I use it?
+
+If you're interested in running your own instance of mapbot, please see "How
+do I run it?" below. If you've already done that, or someone else has done it
+for you, read on...
+
+### Creating a map
+
+Everything starts with you creating a map. Currently, mapbot requires you to
+provide a URL to the background image for your map. Google image search is a
+great way to find these, or you can create your own. If you're using a map you
+didn't create, please make sure you're respecting the artist's rights and
+staying within the licensing terms.
+
+When you're creating your maps in mapbot, DMing mapbot is best; but you can
+also do it in a channel that mapbot has been invited to. The process goes like
+this:
+
+* Create the map
+* Size the grid
+* Align the grid
+
+#### Create the map
+
+Creating the map is easy; pick a name, and tell mapbot `map add <name> <url>`.
+If you're in a DM, that's all you need to send. If you're working in a
+channel, send `@mapbot map add <name> <url>`- the same command, prefixed with
+`@mapbot`. (Future examples will use the DM version; prepend `@mapbot` if
+you're working in a channel.)
+
+![Map Add Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-add-map.png)
+
+## How do I run it?
+
+Because mapbot uses a fair bit of CPU for its image operations and requires
+persistent storage in the form a SQL database, it's not practical for the
+author to provide mapbot to the public as a free service.
+
+Instead, mapbot is designed for you to easily run your own; but this still
+requires a bit of technical aptitude.
+
+To run mapbot, you'll need the following:
+
+* A mapbot "app" on Slack, which will let your instance of mapbot interact with slack teams. This "app" will be tied to a slack team, so you should consider creating your own.
+* A PostgreSQL server; or an account on ElephantSQL. Mapbot can provision its own database via ElephantSQL, which provides a free tier.
+* A server on which you can run mapbot; you can run this on Amazone's EC2 free tier, but the more horsepower you can provide, the better the experience will be.
+* A domain name, since the process of adding mapbot to a slack team requires visiting a mapbot URL. Mapbot can use Let's Encrypt / ACME to obtain its own SSL certificate, or you can provide your own.
+
+Most of these are free, but unfortunate it's a bit of work to get going. If
+you're interested in donating to the author, he'd be interested in providing
+mapbot as a public service.
+
+Getting all of these set up is currently out of the scope of this document,
+though a full tutorial may come later (and a pull request would be welcome).
+Some information is included below about the parameters of the Slack app
+required, but you're on your own for the rest. Please open a GitHub Issue if
+you run into any problems.
+
+### Slack App
+
+Under "OAuth & Permissions", you'll need to configure a few things. The
+Redirect URLs are URLs that Slack will return users to when they are adding
+Mapbot to a new team. My URLs are:
+
+    https://map.example.com
+    http://localhost
+    http://localhost:8080
+
+The "localhost" URLs are useful for testing; and "map.example.com" is the
+domain name on which I'm hosting mapbot.
+
+Mapbot also requires several Permission Scopes to function:
+
+  * chat:write:bot -- required since mapbot interacts via chat
+  * bot -- as above
+  * files:write:user -- mapbot uploads images of the map in response to map changes and token movements
+  * team:read -- required to retrieve some metadata about the connected team, since data is stored per-team
+  * emoji:read -- required to render your team's custom emoji onto the map as tokens
+
+Under the "Bot Users" tab, make sure you've selected a reasonable default
+username. In public channels, you'll interact with mapbot my starting messages
+with `@<bot name>`, so pick something easy to type.
+
 # Major Features
 
 ## Model
@@ -107,7 +203,7 @@ The Font Software may be sold as part of a larger software package but no copy o
 
 THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL TAVMJONG BAH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.
 
-Except as contained in this notice, the name of Tavmjong Bah shall not be used in advertising or otherwise to promote the sale, use or other dealings in this Font Software without prior written authorization from Tavmjong Bah. For further information, contact: tavmjong @ free . fr. 
+Except as contained in this notice, the name of Tavmjong Bah shall not be used in advertising or otherwise to promote the sale, use or other dealings in this Font Software without prior written authorization from Tavmjong Bah. For further information, contact: tavmjong @ free . fr.
 
 ## Graphics
 
