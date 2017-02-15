@@ -19,15 +19,9 @@ for you, read on...
 
 ### Creating a map
 
-Everything starts with you creating a map. Currently, mapbot requires you to
-provide a URL to the background image for your map. Google image search is a
-great way to find these, or you can create your own. If you're using a map you
-didn't create, please make sure you're respecting the artist's rights and
-staying within the licensing terms.
+Everything starts with you creating a map. Currently, mapbot requires you to provide a URL to the background image for your map. Google image search is a great way to find these, or you can create your own. If you're using a map you didn't create, please make sure you're respecting the artist's rights and staying within the licensing terms.
 
-When you're creating your maps in mapbot, DMing mapbot is best; but you can
-also do it in a channel that mapbot has been invited to. The process goes like
-this:
+When you're creating your maps in mapbot, DMing mapbot is best; but you can also do it in a channel that mapbot has been invited to. The process goes like this:
 
 * Create the map
 * Size the grid
@@ -36,12 +30,52 @@ this:
 #### Create the map
 
 Creating the map is easy; pick a name, and tell mapbot `map add <name> <url>`.
-If you're in a DM, that's all you need to send. If you're working in a
-channel, send `@mapbot map add <name> <url>`- the same command, prefixed with
-`@mapbot`. (Future examples will use the DM version; prepend `@mapbot` if
-you're working in a channel.)
+
+(If you DM mapbot directly, you can send just that comment; if you're working in a channel, send `@mapbot map add <name> <url>`- the same command, prefixed with `@mapbot`.)
+
+Maps are *yours*! Nobody else can use your maps unless you make them active in a channel, and the names you give your maps are yours alone.
 
 ![Map Add Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-add-map.png)
+
+#### Sizing and Aligning the Grid
+
+This is unfortunately the most painful part of the process at present, since it involves a lot of small changes and trial and error.
+
+The grid overlay is required so that mapbot knows where to place tokens. We need to determine the image's DPI and the grid offset. The DPI is the number of pixels of the image that comprise an inch. This is basically determined on how "high resolution" the image is.
+
+When you first create a map, the DPI will be set at the default of 10:
+
+[!Map 10 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-dpi-10.png)
+
+The unfurled map view is fairly small, but clicking on the map will show the full resolution version:
+
+[!Map 10 DPI Zoom](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-10.png)
+
+10 DPI is not fairly useful on this map, but if the actual DPI were closer to 10, we'd be able to count these small squares to arrive at an approximate. Instead, let's try increasing DPI to 50.
+
+[!Map 50 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-set-dpi-50.png)
+
+The zoomed in version of this 50dpi grid is very useful:
+
+[!Map 50 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-50.png)
+
+Simply by examining the top few squares, we can see that a map square is approximately 2.5 50DPI grid squares. This tells us our actual DPI is around 125- 50 * 2.5. To my eyes, it seemed just slightly less, so I next checked 124 DPI:
+
+[!Map 124 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-124.png)
+
+This is pretty close! But there's a problem- as our grid lines march down and to the right, we can see that they are increasingly out of alignment with the map. Specifically, the grid lines are moving LEFT- indicating our DPI is too low. Our grid squares are a little too short, and this error compounds as we move to the right.
+
+It turns out this map was exactly 125 DPI:
+
+[!Map 125 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-125.png)
+
+_Even better_, it turns out that once we get the right DPI, this map's top-left corner is actually a map square, so we don't even need to adjust the offset.
+
+Now that your map's grid is properly aligned, you can adjust the color (if you want):
+
+[!Map Grid Color Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-gridcolor.png)
+
+...but otherwise, you're ready to use it!
 
 ## How do I run it?
 
