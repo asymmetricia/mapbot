@@ -63,7 +63,7 @@ Simply by examining the top few squares, we can see that a map square is approxi
 
 ![Map 124 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-124.png)
 
-This is pretty close! But there's a problem- as our grid lines march down and to the right, we can see that they are increasingly out of alignment with the map. Specifically, the grid lines are moving LEFT- indicating our DPI is too low. Our grid squares are a little too short, and this error compounds as we move to the right.
+This is pretty close! But there's a problem- as our grid lines march down and to the right, we can see that they are increasingly out of alignment with the map. Specifically, the grid lines are moving UP and LEFT- indicating our DPI is too low. (DOWN and/or RIGHT would mean our grid was too high. DOWN and LEFT or UP and RIGHT would mean the map is not square.) Our grid squares are a little too short, and this error compounds as we move to the right.
 
 It turns out this map was exactly 125 DPI:
 
