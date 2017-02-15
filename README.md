@@ -51,7 +51,7 @@ The unfurled map view is fairly small, but clicking on the map will show the ful
 
 ![Map 10 DPI Zoom](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-10.png)
 
-10 DPI is not fairly useful on this map, but if the actual DPI were closer to 10, we'd be able to count these small squares to arrive at an approximate. Instead, let's try increasing DPI to 50.
+10 DPI is not fairly useful on this map, but if the actual DPI were closer to 10, we'd be able to count these small squares to arrive at an approximation of our actual DPI. Instead, let's try increasing DPI to 50.
 
 ![Map 50 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-set-dpi-50.png)
 
