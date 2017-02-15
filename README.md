@@ -45,35 +45,35 @@ The grid overlay is required so that mapbot knows where to place tokens. We need
 
 When you first create a map, the DPI will be set at the default of 10:
 
-[!Map 10 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-dpi-10.png)
+![Map 10 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-dpi-10.png)
 
 The unfurled map view is fairly small, but clicking on the map will show the full resolution version:
 
-[!Map 10 DPI Zoom](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-10.png)
+![Map 10 DPI Zoom](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-10.png)
 
 10 DPI is not fairly useful on this map, but if the actual DPI were closer to 10, we'd be able to count these small squares to arrive at an approximate. Instead, let's try increasing DPI to 50.
 
-[!Map 50 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-set-dpi-50.png)
+![Map 50 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-set-dpi-50.png)
 
 The zoomed in version of this 50dpi grid is very useful:
 
-[!Map 50 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-50.png)
+![Map 50 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-50.png)
 
 Simply by examining the top few squares, we can see that a map square is approximately 2.5 50DPI grid squares. This tells us our actual DPI is around 125- 50 * 2.5. To my eyes, it seemed just slightly less, so I next checked 124 DPI:
 
-[!Map 124 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-124.png)
+![Map 124 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-124.png)
 
 This is pretty close! But there's a problem- as our grid lines march down and to the right, we can see that they are increasingly out of alignment with the map. Specifically, the grid lines are moving LEFT- indicating our DPI is too low. Our grid squares are a little too short, and this error compounds as we move to the right.
 
 It turns out this map was exactly 125 DPI:
 
-[!Map 125 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-125.png)
+![Map 125 DPI Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-zoom-dpi-125.png)
 
 _Even better_, it turns out that once we get the right DPI, this map's top-left corner is actually a map square, so we don't even need to adjust the offset.
 
 Now that your map's grid is properly aligned, you can adjust the color (if you want):
 
-[!Map Grid Color Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-gridcolor.png)
+![Map Grid Color Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-gridcolor.png)
 
 ...but otherwise, you're ready to use it!
 
