@@ -77,6 +77,18 @@ Now that your map's grid is properly aligned, you can adjust the color (if you w
 
 ...but otherwise, you're ready to use it!
 
+#### Playing on a Map
+
+Mapbot assumes play happens in the context of a channel- with you and other people. The first step is to select the active map, using the `map select` command:
+
+![Map Select Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-select-map.png)
+
+Once you've selected the map, you (and anyone else in the channel!) can add tokens to the map:
+
+![Map Place Token](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-place-token.png)
+
+Token names must be unique; but you can use either short words or emoji; an emoji token will be rendered in the full square.
+
 ## How do I run it?
 
 Because mapbot uses a fair bit of CPU for its image operations and requires
