@@ -33,11 +33,17 @@ func OpenElephant(key, instance_type string, reset bool, resetFrom int) (*sql.DB
 		if err != nil {
 			return nil, fmt.Errorf("creating new instance: %s", err)
 		}
+	} else {
+		var err error
+		instance, err = es.Enrich(instance)
+		if err != nil {
+			return nil, fmt.Errorf("enriching found instance: %s", err)
+		}
 	}
 
 	conn, err := instance.Connect()
 	if err != nil {
-		return nil, fmt.Errorf("connecting to instance: %s", err)
+		return nil, fmt.Errorf("connecting to instance %s:%d: %s", instance.DbHost, instance.DbPort, err)
 	}
 	return scheme(conn, reset, resetFrom)
 }
