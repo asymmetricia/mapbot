@@ -1,12 +1,12 @@
 package slack
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/common/rand"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/persist"
 	"golang.org/x/oauth2"
 	SlackOAuth "golang.org/x/oauth2/slack"
 	"sync"
@@ -14,16 +14,18 @@ import (
 
 var log = mbLog.Log
 
-func New(id string, secret string, db *sql.DB, proto string, domain string, port int, botHub *hub.Hub) (*SlackUi, error) {
+func New(id string, secret string, persistMech persist.Persister, proto string, domain string, port int, botHub *hub.Hub) (*SlackUi, error) {
 	if id == "" {
 		return nil, errors.New("client ID must not be blank")
 	}
 	if secret == "" {
 		return nil, errors.New("client secret must not be blank")
 	}
-	if db == nil {
-		return nil, errors.New("db handle must be non-nil")
+
+	if persistMech == nil {
+		return nil, errors.New("persistence mechanism must be non-nil")
 	}
+
 	ret := &SlackUi{
 		Teams: []*Team{},
 		oauth: oauth2.Config{
@@ -42,9 +44,9 @@ func New(id string, secret string, db *sql.DB, proto string, domain string, port
 		csrf: []string{
 			rand.RandHex(32),
 		},
-		db:     db,
-		domain: domain,
-		botHub: botHub,
+		persistMech: persistMech,
+		domain:      domain,
+		botHub:      botHub,
 	}
 
 	log.Info("Slack UI module ready")
@@ -69,7 +71,7 @@ type SlackUi struct {
 	Teams        []*Team
 	oauth        oauth2.Config
 	csrf         []string
-	db           *sql.DB
+	persistMech  persist.Persister
 	domain       string
 	teamWg       sync.WaitGroup
 	botHub       *hub.Hub

@@ -53,7 +53,7 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tabId := c.Context.GetActiveTabulaId()
+	tabId := c.Context.ActiveTabula
 	if tabId == nil {
 		h.Error(c, "no active map in this channel, use `map select <name>` first")
 		return
@@ -68,12 +68,12 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 
 	name := args[0]
 
-	if tab.Tokens == nil || tab.Tokens[c.Context.Id()] == nil {
+	if tab.Tokens == nil || tab.Tokens[c.Context.Id] == nil {
 		h.Error(c, fmt.Sprintf("no token %s is on the active map; try `token list`", name))
 		return
 	}
 
-	token, tokenOk := tab.Tokens[c.Context.Id()][name]
+	token, tokenOk := tab.Tokens[c.Context.Id][name]
 	if !tokenOk {
 		h.Error(c, fmt.Sprintf("no token %s is on the active map; try `token list`", name))
 		return
@@ -107,7 +107,7 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab.Tokens[c.Context.Id()][name] = token.WithColor(newColor)
+	tab.Tokens[c.Context.Id][name] = token.WithColor(newColor)
 
 	if err := tab.Save(db.Instance); err != nil {
 		h.Error(c, "an error occured saving the active map for this channel")
@@ -118,7 +118,7 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 }
 
 func cmdList(h *hub.Hub, c *hub.Command) {
-	tabId := c.Context.GetActiveTabulaId()
+	tabId := c.Context.ActiveTabula
 	if tabId == nil {
 		h.Error(c, "no active map in this channel, use `map select <name>` first")
 		return
@@ -131,7 +131,7 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	ctxId := c.Context.Id()
+	ctxId := c.Context.Id
 	if tab.Tokens == nil || tab.Tokens[ctxId] == nil || len(tab.Tokens[ctxId]) == 0 {
 		h.Reply(c, "There are no tokens on the active map.")
 		return
@@ -162,7 +162,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tabId := c.Context.GetActiveTabulaId()
+	tabId := c.Context.ActiveTabula
 	if tabId == nil {
 		h.Error(c, "no active map in this channel, use `map select <name>` first")
 		return
@@ -187,16 +187,16 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		newToken := tabula.Token{coord, color.RGBA{0, 0, 0, 0}}
 		if tab.Tokens == nil {
 			tab.Tokens = map[types.ContextId]map[string]tabula.Token{
-				c.Context.Id(): map[string]tabula.Token{
+				c.Context.Id: map[string]tabula.Token{
 					name: newToken,
 				},
 			}
-		} else if tab.Tokens[c.Context.Id()] == nil {
-			tab.Tokens[c.Context.Id()] = map[string]tabula.Token{
+		} else if tab.Tokens[c.Context.Id] == nil {
+			tab.Tokens[c.Context.Id] = map[string]tabula.Token{
 				name: newToken,
 			}
 		} else {
-			tab.Tokens[c.Context.Id()][name] = newToken
+			tab.Tokens[c.Context.Id][name] = newToken
 		}
 	}
 

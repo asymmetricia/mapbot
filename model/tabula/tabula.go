@@ -443,7 +443,9 @@ func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col c
 }
 
 // drawAt *modifies* the image given by `i` so that the string given by `what` is printed in the square at tabula
-// coordinates x,y (not image coordinates), scaled so that the string given occupies `size` squares.
+// coordinates x,y (not image coordinates), scaled so that the string given occupies `size` squares. The text is drawn
+// in the top-left corner of the square, so adding fractions can move the text down and right (or subtraction can move
+// it up and left).
 func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, size float32) {
 	g := glyph(what, t.Dpi*size)
 	draw.Draw(
@@ -466,6 +468,10 @@ func (t *Tabula) addCoordinates(i draw.Image) draw.Image {
 
 	rows := int(float32(i.Bounds().Max.Y) / t.Dpi)
 	cols := int(float32(i.Bounds().Max.X) / t.Dpi)
+
+	rowRemainder := i.Bounds().Max.Y - int(float32(rows)*t.Dpi)
+	//colRemainder := i.Bounds().Max.X - int(float32(cols)*t.Dpi)
+
 	// 0 1 2 3 4 ... 25 26 27 28
 	// A B C D E ... Y  Z  AA AB
 	for x := 0; x < cols; x++ {
@@ -482,6 +488,14 @@ func (t *Tabula) addCoordinates(i draw.Image) draw.Image {
 		t.printAt(result, strconv.Itoa(y+1), 0.5, float32(y)+0.5, 0.5)
 	}
 
+	if rowRemainder >= int(t.Dpi/2) {
+		t.printAt(result, strconv.Itoa(rows+1), 0.5, float32(rows)+float32(rowRemainder)-0.5, 0.5)
+	}
+
+	//	if colRemainder >= int(t.Dpi/2) {
+	//		t.printAt(result, strconv.Itoa())
+	//	}
+
 	return result
 }
 
@@ -493,9 +507,6 @@ type cacheEntry struct {
 var cache = map[string]cacheEntry{}
 
 func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (image.Image, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("render of tabula %d received nil context", t.Id)
-	}
 	if t.Dpi == 0 {
 		return nil, errors.New("cannot render tabula with zero DPI")
 	}

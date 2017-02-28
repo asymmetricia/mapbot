@@ -7,6 +7,7 @@ import (
 	"golang.org/x/oauth2"
 	"net/http"
 	"reflect"
+	"time"
 )
 
 func (ui *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
@@ -25,34 +26,10 @@ func (ui *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
 
 func (ui *SlackUi) newNonce() (string, error) {
 	nonce := rand.RandHex(32)
-	_, err := ui.db.Exec("INSERT INTO slack_nonces (nonce, expiry) VALUES ($1,NOW() + '1 hour')", nonce)
-	if err != nil {
+	if err := ui.persistMech.SaveNonce(nonce, time.Now().Add(time.Hour)); err != nil {
 		return "", err
 	}
 	return nonce, nil
-}
-
-func (ui *SlackUi) validateNonce(nonce string) (bool, error) {
-	_, err := ui.db.Exec("DELETE FROM slack_nonces WHERE expiry < NOW()")
-	if err != nil {
-		return false, fmt.Errorf("expiring nonces: %s", err)
-	}
-
-	results, err := ui.db.Query("SELECT FROM slack_nonces WHERE nonce=$1", nonce)
-	if err != nil {
-		return false, fmt.Errorf("querying nonces: %s", err)
-	}
-	defer results.Close()
-
-	return results.Next(), nil
-}
-
-func (ui *SlackUi) invalidateNonce(nonce string) error {
-	if _, err := ui.db.Exec("DELETE FROM slack_nonces WHERE nonce=$1", nonce); err != nil {
-		return fmt.Errorf("invalidating nonce: %s", err)
-	}
-
-	return nil
 }
 
 func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
@@ -69,7 +46,7 @@ func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if ok, err := ui.validateNonce(nonce); err != nil {
+	if ok, err := ui.persistMech.CheckNonce(nonce); err != nil {
 		log.Errorf("%s: error validating nonce %q: %s", req.RemoteAddr, nonce, err)
 		http.Error(rw, "error checking nonce", http.StatusInternalServerError)
 		return
@@ -91,7 +68,7 @@ func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("oauth token did not contain bot authentication data: %s", err)
 	}
 
-	if err := ui.invalidateNonce(nonce); err != nil {
+	if err := ui.persistMech.DeleteNonce(nonce); err != nil {
 		log.Errorf("%s: handling oauth redirect: %s", req.RemoteAddr, err)
 		http.Error(rw, "nonce invalidation failed", http.StatusInternalServerError)
 		return

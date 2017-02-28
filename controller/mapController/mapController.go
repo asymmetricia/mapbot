@@ -161,16 +161,9 @@ func cmdSelect(h *hub.Hub, c *hub.Command) {
 			return
 		}
 
-		//ctx, err := context.Load(db.Instance, c.Context)
-		//if err != nil {
-		//	log.Errorf("Error loading context %q: %s", c.ContextId, err)
-		//	h.Error(c, "error loading context")
-		//	return
-		//}
+		c.Context.ActiveTabula = t.Id
 
-		c.Context.SetActiveTabulaId(t.Id)
-
-		if err := c.Context.Save(); err != nil {
+		if err := h.PersistMech.SaveContext(c.Context); err != nil {
 			log.Errorf("Error saving context: %s", err)
 			h.Error(c, "error saving context")
 			return
@@ -191,17 +184,17 @@ func cmdShow(h *hub.Hub, c *hub.Command) {
 		var t *tabula.Tabula
 		switch len(args) {
 		case 0:
-			tabId := c.Context.GetActiveTabulaId()
-			if tabId == nil {
+			activeTabula := c.Context.ActiveTabula
+			if activeTabula == nil {
 				h.Error(c, "no active map in this channel, use `map select <name>` first")
 				return
 			}
 
 			var err error
-			t, err = tabula.Get(db.Instance, *tabId)
+			t, err = tabula.Get(db.Instance, *activeTabula)
 			if err != nil {
 				h.Error(c, "error loading active map")
-				log.Errorf("error loading active map %d: %s", tabId, err)
+				log.Errorf("error loading active map %d: %s", activeTabula, err)
 				return
 			}
 		case 1:

@@ -155,7 +155,7 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 		return errors.New("image provided could not be used as a draw.Image")
 	}
 
-	for name, token := range t.Tokens[ctx.Id()] {
+	for name, token := range t.Tokens[ctx.Id] {
 		coord := token.Coordinate
 		r, g, b, a := token.TokenColor.RGBA()
 		log.Debugf("Adding token %s (color:%d,%d,%d,%d) at (%d,%d)", name, r, g, b, a, coord.X, coord.Y)

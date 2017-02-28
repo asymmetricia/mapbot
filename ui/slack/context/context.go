@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	mbLog "github.com/pdbogen/mapbot/common/log"
-	contextModel "github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/context/databaseContext"
 	"image"
 	_ "image/png"
@@ -114,4 +113,4 @@ func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
 	return nil, fmt.Errorf("no emoji named %q in this context", name)
 }
 
-var _ contextModel.Context = (*SlackContext)(nil)
+//var _ contextModel.Context = (*SlackContext)(nil)

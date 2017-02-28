@@ -6,12 +6,14 @@ import (
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/ryanuber/go-glob"
+	"github.com/pdbogen/mapbot/persist"
 )
 
 var log = mbLog.Log
 
 type Hub struct {
 	Subscribers map[CommandType][]Subscriber
+	PersistMech persist.Persister
 }
 
 func (h *Hub) Subscribe(c CommandType, s Subscriber) {
@@ -84,7 +86,7 @@ type Command struct {
 	From    string
 	Payload interface{}
 	User    *user.User
-	Context context.Context
+	Context *context.Context
 }
 
 // WithType returns a copy of the command with the type replaced by the given type. The payload is not deep-copied.

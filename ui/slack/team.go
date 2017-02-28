@@ -18,42 +18,32 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"github.com/pdbogen/mapbot/model/team"
 )
 
 func (s *SlackUi) runTeams() error {
-	results, err := s.db.Query("SELECT token, bot_id, bot_token FROM slack_teams")
+	teams, err := s.persistMech.ListTeams()
 	if err != nil {
-		return fmt.Errorf("running query: %s", err)
+		return fmt.Errorf("retrieving list of teams: %s", err)
 	}
-	defer results.Close()
 
-	for results.Next() {
-		var token string
-		var botToken *BotToken = &BotToken{}
-		if err := results.Scan(&token, &botToken.BotId, &botToken.BotToken); err != nil {
-			return fmt.Errorf("loading team row: %s", err)
-		}
-
-		if err := s.addTeam(token, botToken); err != nil {
-			log.Errorf("error adding team with token %s; but will try others", token)
+	for _, team := range teams {
+		if err := s.addTeam(team); err != nil {
+			log.Errorf("error adding team %s; but will try others", team)
 		}
 	}
 	return nil
 }
 
-func (s *SlackUi) addTeam(token string, bot_token *BotToken) error {
-	log.Infof("Adding team with token %s, %s", token, bot_token)
+func (s *SlackUi) addTeam(team *team.Team) error {
+	log.Infof("Adding team with token %s, %s", team.token, team.botToken)
 	if s.Teams == nil {
 		s.Teams = []*Team{}
 	}
-	team := &Team{
-		Channels:  []Channel{},
-		token:     token,
-		client:    slack.New(token),
-		botClient: slack.New(bot_token.BotToken),
-		botToken:  bot_token,
-		hub:       s.botHub,
-	}
+
+	team.client = slack.New(team.token)
+	team.botToken = slack.New(team.botToken)
+	team.hub = s.botHub
 
 	ti, err := team.client.GetTeamInfo()
 	if err != nil {
@@ -70,7 +60,7 @@ func (s *SlackUi) addTeam(token string, bot_token *BotToken) error {
 
 	go team.updateEmoji()
 
-	return team.Save(s.db)
+	return nil
 }
 
 func (t *Team) updateEmoji() {
@@ -268,6 +258,7 @@ func (t *Team) Context(SubTeamId string) context.Context {
 }
 
 type Team struct {
+	team.Team
 	Info       *slack.TeamInfo
 	Channels   []Channel
 	Quit       <-chan bool
