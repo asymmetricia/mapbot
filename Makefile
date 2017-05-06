@@ -1,3 +1,5 @@
+.PHONY: clean
+
 SERVER ?= vdr.cernu.us
 
 restart: .push
@@ -26,3 +28,6 @@ release:
 
 tail:
 	ssh -At vdr.cernu.us docker logs -f mapbot
+
+clean:
+	$(RM) .push .docker mapbot
