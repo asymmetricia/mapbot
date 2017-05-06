@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"database/sql"
 	"fmt"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"sort"
 )
@@ -12,57 +12,51 @@ var log = mbLog.Log
 var schema = []Migration{
 	Migration{
 		0,
-		"CREATE TABLE slack_teams (token VARCHAR(128) UNIQUE, bot_id VARCHAR(64), bot_token VARCHAR(64))",
-		"DROP TABLE IF EXISTS slack_teams",
+		map[string]string{"any": "CREATE TABLE slack_teams (token VARCHAR(128) UNIQUE, bot_id VARCHAR(64), bot_token VARCHAR(64))"},
+		map[string]string{"any": "DROP TABLE IF EXISTS slack_teams"},
 	},
 	Migration{
 		1,
-		"CREATE TABLE slack_nonces (nonce VARCHAR(64), expiry TIMESTAMP)",
-		"DROP TABLE IF EXISTS slack_nonces",
+		map[string]string{"any": "CREATE TABLE slack_nonces (nonce VARCHAR(64), expiry TIMESTAMP)"},
+		map[string]string{"any": "DROP TABLE IF EXISTS slack_nonces"},
 	},
 	Migration{
 		2,
-		"CREATE TABLE tabulas (" +
+		map[string]string{"any": "CREATE TABLE tabulas (" +
 			"id BIGSERIAL PRIMARY KEY, " +
 			"name VARCHAR(128), " +
 			"url VARCHAR(256)," +
 			"offset_x integer default 0," +
 			"offset_y integer default 0," +
 			"dpi real default 0" +
-			")",
-		"DROP TABLE IF EXISTS tabulas",
+			")"},
+		map[string]string{"any": "DROP TABLE IF EXISTS tabulas"},
 	},
 	Migration{
 		3,
-		"CREATE TABLE user_tabulas (" +
-			"user_id VARCHAR(9), " +
-			"tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE, " +
-			"PRIMARY KEY (user_id, tabula_id)" +
-			")",
-		"DROP TABLE IF EXISTS user_tabulas",
+		map[string]string{"any": "CREATE TABLE users (id VARCHAR(9) PRIMARY KEY, prefAutoShow BOOLEAN)"},
+		map[string]string{"any": "DROP TABLE IF EXISTS users"},
 	},
 	Migration{
 		4,
-		"CREATE TABLE users (id VARCHAR(9) PRIMARY KEY, prefAutoShow BOOLEAN)",
-		"DROP TABLE IF EXISTS users",
+		map[string]string{"any": "CREATE TABLE user_tabulas (" +
+			"user_id VARCHAR(9) REFERENCES users (id) ON DELETE CASCADE, " +
+			"tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE, " +
+			"PRIMARY KEY (user_id, tabula_id)" +
+			")"},
+		map[string]string{"any": "DROP TABLE IF EXISTS user_tabulas"},
 	},
 	Migration{
 		5,
-		"ALTER TABLE user_tabulas ADD CONSTRAINT user_id_fk FOREIGN KEY (user_id) REFERENCES users (id)",
-		"ALTER TABLE user_tabulas DROP CONSTRAINT user_id_fk",
+		map[string]string{"any": "ALTER TABLE tabulas ADD COLUMN grid_r INT NOT NULL DEFAULT 0; " +
+			"ALTER TABLE tabulas ADD COLUMN grid_g INT NOT NULL DEFAULT 0; " +
+			"ALTER TABLE tabulas ADD COLUMN grid_b INT NOT NULL DEFAULT 0; " +
+			"ALTER TABLE tabulas ADD COLUMN grid_a INT NOT NULL DEFAULT 0;"},
+		map[string]string{"any": "ALTER TABLE tabulas DROP COLUMN grid_r, DROP COLUMN grid_g, DROP COLUMN grid_b, DROP COLUMN grid_a"},
 	},
 	Migration{
 		6,
-		"ALTER TABLE tabulas " +
-			"ADD COLUMN grid_r INT NOT NULL DEFAULT 0, " +
-			"ADD COLUMN grid_g INT NOT NULL DEFAULT 0, " +
-			"ADD COLUMN grid_b INT NOT NULL DEFAULT 0, " +
-			"ADD COLUMN grid_a INT NOT NULL DEFAULT 0",
-		"ALTER TABLE tabulas DROP COLUMN grid_r, DROP COLUMN grid_g, DROP COLUMN grid_b, DROP COLUMN grid_a",
-	},
-	Migration{
-		7,
-		`CREATE TABLE tabula_masks (` +
+		map[string]string{"any": `CREATE TABLE tabula_masks (` +
 			`name VARCHAR(128),` +
 			`"order" INT NOT NULL DEFAULT 0,` +
 			`tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
@@ -75,47 +69,46 @@ var schema = []Migration{
 			`width INT NOT NULL DEFAULT 0,` +
 			`height INT NOT NULL DEFAULT 0,` +
 			`PRIMARY KEY (tabula_id, name)` +
-			`)`,
-		"DROP TABLE tabula_masks",
+			`)`},
+		map[string]string{"any": "DROP TABLE tabula_masks"},
+	},
+	Migration{
+		7,
+		map[string]string{"any": `CREATE TABLE contexts (context_id VARCHAR(128) PRIMARY KEY, active_tabula BIGSERIAL REFERENCES tabulas (id) ON DELETE SET NULL)`},
+		map[string]string{"any": `DROP TABLE contexts`},
 	},
 	Migration{
 		8,
-		`CREATE TABLE contexts (context_id VARCHAR(128) PRIMARY KEY, active_tabula BIGSERIAL REFERENCES tabulas (id) ON DELETE SET NULL)`,
-		`DROP TABLE contexts`,
-	},
-	Migration{
-		9,
-		`CREATE TABLE tabula_tokens(` +
+		map[string]string{"any": `CREATE TABLE tabula_tokens(` +
 			`name VARCHAR(128),` +
 			`context_id VARCHAR(128),` +
 			`tabula_id BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
 			`x INT NOT NULL DEFAULT 0,` +
 			`y INT NOT NULL DEFAULT 0,` +
 			`PRIMARY KEY (name, context_id, tabula_id)` +
-			`)`,
-		`DROP TABLE tabula_tokens`,
+			`)`},
+		map[string]string{"any": `DROP TABLE tabula_tokens`},
+	},
+	Migration{
+		9,
+		map[string]string{"any": `ALTER TABLE tabulas ADD COLUMN version INT NOT NULL DEFAULT 0`},
+		map[string]string{"any": `ALTER TABLE tabulas DROP COLUMN version`},
 	},
 	Migration{
 		10,
-		`ALTER TABLE tabulas ADD COLUMN version INT NOT NULL DEFAULT 0`,
-		`ALTER TABLE tabulas DROP COLUMN version`,
-	},
-	Migration{
-		11,
-		`ALTER TABLE tabula_tokens ` +
-			`ADD COLUMN r SMALLINT NOT NULL DEFAULT 0,` +
-			`ADD COLUMN g SMALLINT NOT NULL DEFAULT 0,` +
-			`ADD COLUMN b SMALLINT NOT NULL DEFAULT 0,` +
-			`ADD COLUMN a SMALLINT NOT NULL DEFAULT 0`,
-		`ALTER TABLE tabula_tokens DROP COLUMN r, DROP COLUMN g, DROP COLUMN b, DROP COLUMN a`,
+		map[string]string{"any": `ALTER TABLE tabula_tokens ADD COLUMN r SMALLINT NOT NULL DEFAULT 0;` +
+			`ALTER TABLE tabula_tokens ADD COLUMN g SMALLINT NOT NULL DEFAULT 0;` +
+			`ALTER TABLE tabula_tokens ADD COLUMN b SMALLINT NOT NULL DEFAULT 0;` +
+			`ALTER TABLE tabula_tokens ADD COLUMN a SMALLINT NOT NULL DEFAULT 0;`},
+		map[string]string{"any": `ALTER TABLE tabula_tokens DROP COLUMN r, DROP COLUMN g, DROP COLUMN b, DROP COLUMN a`},
 	},
 }
 
-func Reset(db *sql.DB) error {
+func Reset(db anydb.AnyDb) error {
 	return ResetFrom(db, 0)
 }
 
-func ResetFrom(db *sql.DB, migration int) error {
+func ResetFrom(db anydb.AnyDb, migration int) error {
 	sort.Sort(sort.Reverse(SortMigrationById(schema)))
 	for _, m := range schema {
 		if m.Id >= migration {
@@ -147,11 +140,11 @@ var initialized bool = false
 
 type Migration struct {
 	Id   int
-	Up   string
-	Down string
+	Up   map[string]string
+	Down map[string]string
 }
 
-func Apply(db *sql.DB) error {
+func Apply(db anydb.AnyDb) error {
 	sort.Sort(SortMigrationById(schema))
 	for _, m := range schema {
 		if err := m.ApplyUp(db); err != nil {
@@ -161,7 +154,7 @@ func Apply(db *sql.DB) error {
 	return nil
 }
 
-func (m *Migration) ApplyUp(db *sql.DB) error {
+func (m *Migration) ApplyUp(db anydb.AnyDb) error {
 	if err := initSchema(db); err != nil {
 		return err
 	}
@@ -175,7 +168,16 @@ func (m *Migration) ApplyUp(db *sql.DB) error {
 	}
 
 	log.Infof("executing up-migration %d: %s", m.Id, m.Up)
-	_, err = db.Exec(m.Up)
+
+	stmt, ok := m.Up[db.Dialect()]
+	if !ok {
+		stmt, ok = m.Up["any"]
+	}
+	if !ok {
+		return fmt.Errorf("migration %d has no Up statement for dialect %s", m.Id, db.Dialect())
+	}
+
+	_, err = db.Exec(stmt)
 	if err != nil {
 		return err
 	}
@@ -184,7 +186,7 @@ func (m *Migration) ApplyUp(db *sql.DB) error {
 	return err
 }
 
-func (m *Migration) ApplyDown(db *sql.DB) error {
+func (m *Migration) ApplyDown(db anydb.AnyDb) error {
 	if err := initSchema(db); err != nil {
 		return err
 	}
@@ -197,8 +199,17 @@ func (m *Migration) ApplyDown(db *sql.DB) error {
 		return nil
 	}
 
-	log.Infof("executing down-migration %d: %s", m.Id, m.Down)
-	_, err = db.Exec(m.Down)
+	stmt, ok := m.Down[db.Dialect()]
+	if !ok {
+		stmt, ok = m.Down["any"]
+	}
+
+	if !ok {
+		return fmt.Errorf("migration %d has no Down statement for dialect %s", m.Id, db.Dialect())
+	}
+
+	log.Infof("executing down-migration %d: %s", m.Id, stmt)
+	_, err = db.Exec(stmt)
 	if err != nil {
 		return err
 	}
@@ -207,7 +218,7 @@ func (m *Migration) ApplyDown(db *sql.DB) error {
 	return err
 }
 
-func (m *Migration) Applied(db *sql.DB) (bool, error) {
+func (m *Migration) Applied(db anydb.AnyDb) (bool, error) {
 	results, err := db.Query("SELECT * FROM migrations WHERE migration_id=$1", m.Id)
 	if err != nil {
 		return false, err
@@ -218,7 +229,7 @@ func (m *Migration) Applied(db *sql.DB) (bool, error) {
 	return rowsExist, nil
 }
 
-func initSchema(db *sql.DB) error {
+func initSchema(db anydb.AnyDb) error {
 	if initialized {
 		return nil
 	}

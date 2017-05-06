@@ -1,10 +1,10 @@
 package slack
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/nlopes/slack"
 	"github.com/pdbogen/mapbot/common/db"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
@@ -92,15 +92,23 @@ func (t *Team) updateEmoji() {
 	t.Emoji = emoji
 }
 
-func (t *Team) Save(db *sql.DB) error {
+func (t *Team) Save(db anydb.AnyDb) error {
 	if t.botToken == nil {
 		t.botToken = &BotToken{}
 	}
-	_, err := db.Exec(
-		"INSERT INTO slack_teams "+
-			"(token, bot_id, bot_token) "+
-			"VALUES ($1, $2, $3) "+
-			"ON CONFLICT (token) DO UPDATE SET bot_id=$2, bot_token=$3",
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO slack_teams " +
+			"(token, bot_id, bot_token) " +
+			"VALUES ($1, $2, $3) " +
+			"ON CONFLICT (token) DO UPDATE SET bot_id=$2, bot_token=$3"
+	case "sqlite3":
+		query = "REPLACE INTO slack_teams (token, bot_id, bot_token) VALUES ($1, $2, $3)"
+	default:
+		return fmt.Errorf("no Team.Save query for SQL dialect %s", dia)
+	}
+	_, err := db.Exec(query,
 		t.token,
 		t.botToken.BotId,
 		t.botToken.BotToken,

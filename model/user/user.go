@@ -1,10 +1,10 @@
 package user
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
@@ -37,7 +37,7 @@ func (u *User) String() string {
 	return fmt.Sprintf("User{Id: %s, Tabulas: %d}", u.Id, len(u.Tabulas))
 }
 
-func (u *User) Hydrate(db *sql.DB) error {
+func (u *User) Hydrate(db anydb.AnyDb) error {
 	res, err := db.Query("SELECT prefAutoShow FROM users WHERE id=$1", &u.Id)
 	if err != nil {
 		return fmt.Errorf("querying: %s", err)
@@ -52,15 +52,21 @@ func (u *User) Hydrate(db *sql.DB) error {
 	return nil
 }
 
-func (u *User) Save(db *sql.DB) error {
-	_, err := db.Exec(
-		"INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2",
-		&u.Id, u.AutoShow,
-	)
+func (u *User) Save(db anydb.AnyDb) error {
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2"
+	case "sqlite3":
+		query = "REPLACE INTO users (id, prefAutoShow) VALUES ($1, $2)"
+	default:
+		return fmt.Errorf("no User.Save query for SQL dialect %s", dia)
+	}
+	_, err := db.Exec(query, u.Id, u.AutoShow)
 	return err
 }
 
-func Get(db *sql.DB, id Id) (*User, error) {
+func Get(db anydb.AnyDb, id Id) (*User, error) {
 	Instance.Lock.RLock()
 	iUser, iUserOk := Instance.Users[id]
 	Instance.Lock.RUnlock()
@@ -115,7 +121,7 @@ func (u *User) TabulaByName(name tabula.TabulaName) (*tabula.Tabula, bool) {
 	return nil, false
 }
 
-func (u *User) Assign(db *sql.DB, t *tabula.Tabula) error {
+func (u *User) Assign(db anydb.AnyDb, t *tabula.Tabula) error {
 	if u == nil {
 		return errors.New("Assign called on nil User")
 	}
@@ -133,8 +139,19 @@ func (u *User) Assign(db *sql.DB, t *tabula.Tabula) error {
 		u.Tabulas = append(u.Tabulas, t)
 	}
 
+	var usersQuery, userTabulaeQuery string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		usersQuery = "INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2"
+		userTabulaeQuery = "INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+	case "sqlite3":
+		usersQuery = "REPLACE INTO users (id, prefAutoShow) VALUES ($1, $2)"
+		userTabulaeQuery = "INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2)"
+	default:
+		return fmt.Errorf("no User.Assign query for SQL dialect %s", dia)
+	}
 	_, err := db.Exec(
-		"INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2",
+		usersQuery,
 		&u.Id, u.AutoShow,
 	)
 	if err != nil {
@@ -142,7 +159,7 @@ func (u *User) Assign(db *sql.DB, t *tabula.Tabula) error {
 	}
 
 	_, err = db.Exec(
-		"INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+		userTabulaeQuery,
 		&u.Id, t.Id,
 	)
 
