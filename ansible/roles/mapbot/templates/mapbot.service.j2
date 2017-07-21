@@ -17,6 +17,7 @@ ExecStart=/usr/bin/docker run \
   -p {{port}}:{{port}} \
   --name=mapbot \
   mapbot
+ExecStop=/usr/bin/docker stop mapbot
 Restart=always
 RestartSec=5
 
