@@ -15,6 +15,7 @@ import (
 	"image/png"
 	"io/ioutil"
 	"mime"
+	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -235,31 +236,37 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 			return
 		}
 
-		buf, err := ioutil.TempFile("", "")
-		if err != nil {
-			repErr("opeaning tmpfile for", err)
-			return
-		}
-		defer buf.Close()
-
-		err = png.Encode(buf, img)
-		if err != nil {
-			repErr("encoding", err)
-			return
-		}
-
-		_, err = t.botClient.UploadFile(
-			slack.FileUploadParameters{
-				Filetype: mime.TypeByExtension(".png"),
-				Channels: []string{channel},
-				File:     buf.Name(),
-			})
-		if err != nil {
+		if _, err := t.uploadImage(img, []string{channel}); err != nil {
 			repErr("uploading", err)
 			return
 		}
-
 	}
+}
+
+func (t *Team) uploadImage(img image.Image, channels []string) (string, error) {
+	repErr := func(s string, e error) error { return fmt.Errorf("%s: %s", s, e) }
+	buf, err := ioutil.TempFile("", "")
+	if err != nil {
+		return "", repErr("opeaning tmpfile for", err)
+	}
+
+	err = png.Encode(buf, img)
+	buf.Close()
+	if err != nil {
+		return "", repErr("encoding", err)
+	}
+
+	upload, err := t.botClient.UploadFile(
+		slack.FileUploadParameters{
+			Filetype: mime.TypeByExtension(".png"),
+			Channels: channels,
+			File:     buf.Name(),
+		})
+	os.Remove(buf.Name())
+	if err != nil {
+		return "", repErr("uploading", err)
+	}
+	return upload.URLPrivate, nil
 }
 
 func (t *Team) Context(SubTeamId string) context.Context {
