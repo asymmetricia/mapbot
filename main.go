@@ -12,6 +12,7 @@ import (
 	"github.com/pdbogen/mapbot/controller/mapController"
 	maskController "github.com/pdbogen/mapbot/controller/mask"
 	tokenController "github.com/pdbogen/mapbot/controller/token"
+	workflowController "github.com/pdbogen/mapbot/controller/workflow"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
@@ -65,6 +66,7 @@ func main() {
 	maskController.Register(hub)
 	helpController.Register(hub)
 	tokenController.Register(hub)
+	workflowController.Register(hub)
 
 	slackUi, err := slack.New(
 		*SlackClientToken,

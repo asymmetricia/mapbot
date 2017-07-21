@@ -10,6 +10,7 @@ import (
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
+	"github.com/pdbogen/mapbot/model/workflow"
 	slackContext "github.com/pdbogen/mapbot/ui/slack/context"
 	"image"
 	"image/png"
@@ -203,6 +204,60 @@ func (t *Team) manageMessages() {
 	}
 }
 
+func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.WorkflowMessage) {
+	comps := strings.Split(string(c.Type), ":")
+	if len(comps) < 5 {
+		log.Errorf("%s: received but cannot process command %s", t.Info.ID, c.Type)
+		return
+	}
+
+	channel := comps[4]
+
+	params := slack.PostMessageParameters{
+		Text: msg.Text,
+	}
+
+	params.Attachments = []slack.Attachment{}
+	if msg.Choices != nil {
+		attachment := slack.Attachment{
+			CallbackID: msg.Id(),
+			Actions:    make([]slack.AttachmentAction, len(msg.Choices)),
+			Fallback:   "Your client does not support actions. :cry:",
+		}
+		for i, choice := range msg.Choices {
+			log.Debugf("adding choice %q", choice)
+			attachment.Actions[i] = slack.AttachmentAction{
+				Name:  "choice",
+				Text:  choice,
+				Value: choice,
+				Type:  "button",
+			}
+		}
+		params.Attachments = append(params.Attachments, attachment)
+	}
+
+	if msg.Image != nil {
+		url, err := t.uploadImage(msg.Image, nil)
+		if err != nil {
+			log.Errorf("uploading image in workflow message: %s", err)
+		}
+		params.Attachments = append(params.Attachments, slack.Attachment{
+			ImageURL: url,
+		})
+
+	}
+
+	_, _, err := t.botClient.PostMessage(
+		channel,
+		msg.Text,
+		params,
+	)
+
+	if err != nil {
+		log.Errorf("%s: error posting workflow message to channel %q: %s", t.Info.ID, comps[4], err)
+	}
+}
+
 func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 	comps := strings.Split(string(c.Type), ":")
 	if len(comps) < 5 {
@@ -225,6 +280,8 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 		if err != nil {
 			log.Errorf("%s: error posting message %q to channel %q: %s", t.Info.ID, msg, comps[4], err)
 		}
+	case *workflow.WorkflowMessage:
+		t.sendWorkflowMessage(h, c, msg)
 	case *tabula.Tabula:
 		repErr := func(ctx string, err error) {
 			log.Errorf("%s: error %s image %q: %s", t.Info.ID, ctx, msg.Name, err)
