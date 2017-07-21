@@ -102,6 +102,17 @@ var schema = []Migration{
 			`ALTER TABLE tabula_tokens ADD COLUMN a SMALLINT NOT NULL DEFAULT 0;`},
 		map[string]string{"any": `ALTER TABLE tabula_tokens DROP COLUMN r, DROP COLUMN g, DROP COLUMN b, DROP COLUMN a`},
 	},
+	Migration{
+		11,
+		map[string]string{"any": `CREATE TABLE user_workflows(` +
+			`user_id VARCHAR(9) REFERENCES users (id) ON DELETE CASCADE, ` +
+			`name    VARCHAR(32), ` +
+			`state   VARCHAR(32), ` +
+			`opaque  TEXT,` +
+			`PRIMARY KEY (user_id, name)` +
+			`)`},
+		map[string]string{"any": `DROP TABLE user_workflows`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {

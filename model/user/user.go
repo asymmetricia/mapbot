@@ -2,6 +2,7 @@ package user
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db/anydb"
@@ -23,10 +24,16 @@ type UserStore struct {
 	Lock  sync.RWMutex
 }
 
+type WorkflowState struct {
+	State  string
+	Opaque interface{}
+}
+
 type User struct {
-	Id       Id
-	Tabulas  []*tabula.Tabula
-	AutoShow bool
+	Id        Id
+	Tabulas   []*tabula.Tabula
+	AutoShow  bool
+	Workflows map[string]WorkflowState
 }
 
 func (u *User) String() string {
@@ -49,7 +56,52 @@ func (u *User) Hydrate(db anydb.AnyDb) error {
 			return fmt.Errorf("scanning: %s", err)
 		}
 	}
+
+	return u.hydrateWorkflows(db)
+}
+
+func (u *User) hydrateWorkflows(db anydb.AnyDb) error {
+	u.Workflows = map[string]WorkflowState{}
+	wfRes, err := db.Query("SELECT name, state, opaque FROM user_workflows WHERE user_id=$1", &u.Id)
+	if err != nil {
+		return fmt.Errorf("querying user_workflows: %s", err)
+	}
+	defer wfRes.Close()
+	for wfRes.Next() {
+		var name, state, opaque string
+		if err := wfRes.Scan(&name, &state, &opaque); err != nil {
+			return fmt.Errorf("scanning user_workflows: %s", err)
+		}
+		var opaqueObj interface{}
+		if err := json.Unmarshal([]byte(opaque), opaqueObj); err != nil {
+			log.Warningf("user=%s error unmarshaling opaque data %q: %s", u.Id, opaque, err)
+		}
+		u.Workflows[name] = WorkflowState{state, opaqueObj}
+	}
 	return nil
+}
+
+func (u *User) saveWorkflows(db anydb.AnyDb) (last_error error) {
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO user_workflows (user_id, name, state, opaque) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id,name) DO UPDATE SET state=$3, opaque=$4"
+	case "sqlite3":
+		query = "REPLACE INTO user_workflows (user_id, name, state, opaque) VALUES ($1, $2, $3, $4)"
+	}
+	for name, wf_state := range u.Workflows {
+		opaqueJson, err := json.Marshal(wf_state.Opaque)
+		if err != nil {
+			log.Warningf("user=%s workflow=%s error marshaling opaque data: %s", u.Id, name, err)
+			opaqueJson = []byte("{}")
+			last_error = err
+		}
+		if _, err := db.Exec(query, u.Id, name, wf_state.State, opaqueJson); err != nil {
+			log.Warningf("user=%s workflow=%s error saving to database: %s", u.Id, name, err)
+			last_error = err
+		}
+	}
+	return last_error
 }
 
 func (u *User) Save(db anydb.AnyDb) error {
@@ -63,7 +115,10 @@ func (u *User) Save(db anydb.AnyDb) error {
 		return fmt.Errorf("no User.Save query for SQL dialect %s", dia)
 	}
 	_, err := db.Exec(query, u.Id, u.AutoShow)
-	return err
+	if err != nil {
+		return err
+	}
+	return u.saveWorkflows(db)
 }
 
 func Get(db anydb.AnyDb, id Id) (*User, error) {
