@@ -6,3 +6,4 @@ db_name: dfauhblf
 db_pass: "{{vault_db_pass}}"
 host_name: map.haversack.io
 port: 8080
+verification_token: "{{vault_verification_token}}"
