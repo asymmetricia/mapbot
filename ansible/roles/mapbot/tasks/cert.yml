@@ -1,0 +1,25 @@
+---
+- name: certbot package
+  become: true
+  package: name=certbot state=latest
+- name: check certificate
+  become: true
+  command: test -f /etc/letsencrypt/renewal/map.haversack.io.conf
+  ignore_errors: yes
+  register: certificate
+- name: stop nginx
+  become: true
+  service: name=nginx.service state=stopped
+  when: certificate.rc != 0
+- name: run certbot
+  become: true
+  command: certbot certonly -n --standalone -d map.haversack.io
+  when: certificate.rc != 0
+- name: start nginx
+  become: true
+  service: name=nginx.service state=started
+  when: certificate.rc != 0
+- name: write config
+  become: true
+  template: dest=/etc/letsencrypt/renewal/map.haversack.io.conf src=map.haversack.io.conf.j2
+  when: certificate.rc != 0

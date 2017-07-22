@@ -1,0 +1,16 @@
+# renew_before_expiry = 30 days
+version = 0.10.2
+archive_dir = /etc/letsencrypt/archive/map.haversack.io
+cert = /etc/letsencrypt/live/map.haversack.io/cert.pem
+privkey = /etc/letsencrypt/live/map.haversack.io/privkey.pem
+chain = /etc/letsencrypt/live/map.haversack.io/chain.pem
+fullchain = /etc/letsencrypt/live/map.haversack.io/fullchain.pem
+
+# Options used in the renewal process
+[renewalparams]
+authenticator = standalone
+post_hook = /etc/init.d/nginx start
+account = {{letsencrypt_account}}
+pre_hook = /etc/init.d/nginx stop
+installer = None
+
