@@ -28,7 +28,7 @@ func init() {
 		Commands: map[string]cmdproc.Subcommand{
 			"add":       cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
 			"show":      cmdproc.Subcommand{"[<name>]", "show a the named map; or the active map in this context, if any", cmdShow},
-			"set":       cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>", "set a property of an existing map; offsetX, offsetY, and dpi accepts numbers; color accepts some common color names or a six-digit hex code", cmdSet},
+			"set":       cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>[ <key2> <value2> ...]", "set a property of an existing map; offsetX, offsetY, and dpi accepts numbers; color accepts some common color names or a six-digit hex code", cmdSet},
 			"list":      cmdproc.Subcommand{"", "list your maps", cmdList},
 			"select":    cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
 			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
@@ -84,18 +84,29 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 var colorRegex = regexp.MustCompile("^#?[0-9a-fA-F]{6}$")
 
 func cmdSet(h *hub.Hub, c *hub.Command) {
-	if args, ok := c.Payload.([]string); ok && len(args) == 3 {
-		t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
-		if !ok {
-			h.Error(c, notFound(tabula.TabulaName(args[0])))
-			return
-		}
-		switch strings.ToLower(args[1]) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
+		return
+	}
+
+	if len(args) < 3 || (len(args)-1)%2 != 0 {
+		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
+		return
+	}
+
+	t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
+	if !ok {
+		h.Error(c, notFound(tabula.TabulaName(args[0])))
+		return
+	}
+	for i := 1; i < len(args); i += 2 {
+		switch strings.ToLower(args[i]) {
 		case "gridcolor":
-			if col, ok := colors.Colors[strings.ToLower(args[2])]; ok {
+			if col, ok := colors.Colors[strings.ToLower(args[i+1])]; ok {
 				t.GridColor = &col
-			} else if !colorRegex.MatchString(args[2]) {
-				colCode := strings.TrimLeft(args[2], "#")
+			} else if !colorRegex.MatchString(args[i+1]) {
+				colCode := strings.TrimLeft(args[i+1], "#")
 				r, _ := strconv.ParseInt(colCode[0:2], 16, 9)
 				g, _ := strconv.ParseInt(colCode[2:4], 16, 9)
 				b, _ := strconv.ParseInt(colCode[4:6], 16, 9)
@@ -105,23 +116,23 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 				return
 			}
 		case "offsetx":
-			n, err := strconv.Atoi(args[2])
+			n, err := strconv.Atoi(args[i+1])
 			if err != nil {
-				h.Error(c, fmt.Sprintf("value %q was not an integer: %s", args[2], err))
+				h.Error(c, fmt.Sprintf("value %q was not an integer: %s", args[i+1], err))
 				return
 			}
 			t.OffsetX = n
 		case "offsety":
-			n, err := strconv.Atoi(args[2])
+			n, err := strconv.Atoi(args[i+1])
 			if err != nil {
-				h.Error(c, fmt.Sprintf("value %q was not an integer: %s", args[2], err))
+				h.Error(c, fmt.Sprintf("value %q was not an integer: %s", args[i+1], err))
 				return
 			}
 			t.OffsetY = n
 		case "dpi":
-			n, err := strconv.ParseFloat(args[2], 32)
+			n, err := strconv.ParseFloat(args[i+1], 32)
 			if err != nil {
-				h.Error(c, fmt.Sprintf("value %q was not an floating-point number: %s", args[2], err))
+				h.Error(c, fmt.Sprintf("value %q was not an floating-point number: %s", args[i+1], err))
 				return
 			}
 			if n == 0 {
@@ -140,17 +151,15 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		}
 		h.Publish(&hub.Command{
 			Type:    hub.CommandType(c.From),
-			Payload: fmt.Sprintf("map %s %s set to %q", args[0], args[1], args[2]),
+			Payload: fmt.Sprintf("map %s %s set to %q", args[0], args[i], args[i+1]),
 			User:    c.User,
 		})
-		h.Publish(&hub.Command{
-			Type:    hub.CommandType(c.From),
-			Payload: t,
-			User:    c.User,
-		})
-	} else {
-		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
 	}
+	h.Publish(&hub.Command{
+		Type:    hub.CommandType(c.From),
+		Payload: t,
+		User:    c.User,
+	})
 }
 
 func cmdSelect(h *hub.Hub, c *hub.Command) {
