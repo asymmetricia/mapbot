@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	mbLog "github.com/pdbogen/mapbot/common/log"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strings"
 )
+
+var log = mbLog.Log
 
 type ElephantSql struct {
 	//ApiKey is the ElephantSQL API key. You can obtain yours from https://customer.elephantsql.com/team/api
@@ -36,8 +40,7 @@ func (e *ElephantSql) NewInstance(name, instance_type string, regions []string) 
 	if regions == nil || len(regions) == 0 {
 		reg = &[]string{
 			"amazon-web-services::us-east-1",
-			"amazon-web-services::us-west-1",
-			"amazon-web-services::us-west-2",
+			"google-compute-engine::us-central1",
 		}
 	}
 
@@ -64,6 +67,14 @@ func (e *ElephantSql) NewInstance(name, instance_type string, regions []string) 
 	defer res.Body.Close()
 
 	if res.StatusCode/100 != 2 {
+		body, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			log.Debugf("Non-2XX response body during NewInstance")
+			lines := strings.Split(string(body), "\n")
+			for _, line := range lines {
+				log.Debugf("<<< %s", line)
+			}
+		}
 		return nil, fmt.Errorf("server returned non-2XX status %d %q", res.StatusCode, res.Status)
 	}
 
@@ -109,7 +120,7 @@ func (e *ElephantSql) ListInstances() ([]Instance, error) {
 		return nil, fmt.Errorf("reading response body: %s", err)
 	}
 	var instances = []Instance{}
-	if err := json.Unmarshal(jsonBytes, instances); err != nil {
+	if err := json.Unmarshal(jsonBytes, &instances); err != nil {
 		return nil, fmt.Errorf("parsing response body: %s", err)
 	}
 	return instances, nil
@@ -140,19 +151,16 @@ func (e *ElephantSql) Enrich(i *Instance) (*Instance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %s", err)
 	}
-	var instances = []Instance{}
-	if err := json.Unmarshal(jsonBytes, instances); err != nil {
-		return nil, fmt.Errorf("parsing response body: %s", err)
-	}
-	if len(instances) == 0 {
-		return nil, fmt.Errorf("instance with id %d not found", i.Id)
+	var instance = &Instance{}
+	if err := json.Unmarshal(jsonBytes, instance); err != nil {
+		return nil, fmt.Errorf("parsing response body %q: %s", string(jsonBytes), err)
 	}
 
-	if err := instances[0].ParseUrl(); err != nil {
+	if err := instance.ParseUrl(); err != nil {
 		return nil, err
 	}
 
-	return &instances[0], nil
+	return instance, nil
 }
 
 // FindInstance obtains your list of ES instances and returns a hydrated/detailed Instance object for the named

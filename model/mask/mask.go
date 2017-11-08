@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	"image/color"
 )
 
@@ -35,7 +36,7 @@ func (m *Mask) Up(db *sql.DB) error {
 	return nil
 }
 
-func (m *Mask) Save(db *sql.DB, id int64) error {
+func (m *Mask) Save(db anydb.AnyDb, id int64) error {
 	if m.Order == nil {
 		res, err := db.Query(`SELECT MAX("order")+1 FROM tabula_masks WHERE tabula_id=$1`, id)
 		if err != nil {
@@ -51,11 +52,22 @@ func (m *Mask) Save(db *sql.DB, id int64) error {
 		}
 	}
 
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = `INSERT INTO tabula_masks (name, "order", tabula_id, red, green, blue, alpha, top, "left", width, height) ` +
+			`VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ` +
+			`ON CONFLICT (name, tabula_id) DO UPDATE ` +
+			`SET "order"=$2, red=$4, green=$5, blue=$6, alpha=$7, top=$8, "left"=$9, width=$10, height=$11`
+
+	case "sqlite3":
+		query = "REPLACE INTO tabula_masks (name, order, tabula_id, red, green, blue, alpha, top, left, width, height)" +
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11"
+	default:
+		return fmt.Errorf("no Mask.Save query for SQL dialect %s", dia)
+	}
 	_, err := db.Exec(
-		`INSERT INTO tabula_masks (name, "order", tabula_id, red, green, blue, alpha, top, "left", width, height) `+
-			`VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) `+
-			`ON CONFLICT (name, tabula_id) DO UPDATE `+
-			`SET "order"=$2, red=$4, green=$5, blue=$6, alpha=$7, top=$8, "left"=$9, width=$10, height=$11`,
+		query,
 		m.Name, *m.Order, id, m.Color.R, m.Color.G, m.Color.B, m.Color.A, m.Top, m.Left, m.Width, m.Height,
 	)
 	if err != nil {

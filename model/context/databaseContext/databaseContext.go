@@ -29,11 +29,18 @@ func (dc *DatabaseContext) GetActiveTabulaId() *types.TabulaId {
 }
 
 func (dc *DatabaseContext) Save() error {
-	_, err := db.Instance.Exec(
-		"INSERT INTO contexts (context_id, active_tabula) VALUES ($1,$2) "+
-			"ON CONFLICT (context_id) DO UPDATE SET active_tabula=$2",
-		dc.ContextId, int(*dc.ActiveTabulaId),
-	)
+	var query string
+	switch dia := db.Instance.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO contexts (context_id, active_tabula) VALUES ($1,$2) " +
+			"ON CONFLICT (context_id) DO UPDATE SET active_tabula=$2"
+
+	case "sqlite3":
+		query = "REPLACE INTO contexts (context_id, active_tabula) VALUES ($1,$2)"
+	default:
+		return fmt.Errorf("no DatabaseContext.Save query for dialect %s", dia)
+	}
+	_, err := db.Instance.Exec(query, dc.ContextId, int(*dc.ActiveTabulaId))
 	return err
 }
 

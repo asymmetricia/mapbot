@@ -33,14 +33,45 @@ type emoji struct {
 	Image   image.Image `json:"-"`
 }
 
-var emojiOne map[string]*emoji = map[string]*emoji{}
+var EmojiOne map[string]*emoji = map[string]*emoji{}
 
 func init() {
 	start := time.Now()
-	if err := json.Unmarshal([]byte(emojiJson), &emojiOne); err != nil {
+	if err := json.Unmarshal([]byte(emojiJson), &EmojiOne); err != nil {
 		panic(fmt.Sprintf("parsing emoji one JSON: %s", err))
 	}
 	log.Debugf("Parsing emojiOne payload took %0.2fs", time.Now().Sub(start).Seconds())
+}
+
+type EmojiNotFound error
+
+func GetEmojiOne(name string) (image.Image, error) {
+	if e, ok := EmojiOne[name]; ok {
+		if e.Image == nil {
+			emojiUrl := fmt.Sprintf("https://cdnjs.cloudflare.com/ajax/libs/emojione/2.2.7/assets/png/%s.png", e.Unicode)
+			c := http.Client{
+				Timeout: 30 * time.Second,
+			}
+
+			res, err := c.Get(emojiUrl)
+			if err != nil {
+				return nil, fmt.Errorf("retrieving EmojiOne glyph %s (%s): %s", name, e.Unicode, err)
+			}
+			defer res.Body.Close()
+
+			img, _, err := image.Decode(res.Body)
+			if err != nil {
+				return nil, fmt.Errorf("parsing EmojiOne glyph %s (%s): %s", name, e.Unicode, err)
+			}
+			e.Image = img
+
+			return img, nil
+		} else {
+			return e.Image, nil
+		}
+	} else {
+		return nil, EmojiNotFound(errors.New("not found"))
+	}
 }
 
 func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
@@ -86,29 +117,12 @@ func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
 
 	}
 	// OK, this might not be a custom emoji.
-	if e, ok := emojiOne[name]; ok {
-		if e.Image == nil {
-			emojiUrl := fmt.Sprintf("https://cdnjs.cloudflare.com/ajax/libs/emojione/2.2.7/assets/png/%s.png", e.Unicode)
-			c := http.Client{
-				Timeout: 30 * time.Second,
-			}
-
-			res, err := c.Get(emojiUrl)
-			if err != nil {
-				return nil, fmt.Errorf("retrieving EmojiOne glyph %s (%s): %s", baseName, e.Unicode, err)
-			}
-			defer res.Body.Close()
-
-			img, _, err := image.Decode(res.Body)
-			if err != nil {
-				return nil, fmt.Errorf("parsing EmojiOne glyph %s (%s): %s", baseName, e.Unicode, err)
-			}
-			e.Image = img
-
-			return img, nil
-		} else {
-			return e.Image, nil
-		}
+	img, err := GetEmojiOne(name)
+	if _, ok := err.(EmojiNotFound); !ok {
+		return nil, fmt.Errorf("error getting EmojiOne emoji: %s", err)
+	}
+	if img != nil {
+		return img, nil
 	}
 
 	return nil, fmt.Errorf("no emoji named %q in this context", name)

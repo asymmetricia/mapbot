@@ -1,10 +1,11 @@
 package user
 
 import (
-	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
@@ -23,10 +24,16 @@ type UserStore struct {
 	Lock  sync.RWMutex
 }
 
+type WorkflowState struct {
+	State  string
+	Opaque interface{}
+}
+
 type User struct {
-	Id       Id
-	Tabulas  []*tabula.Tabula
-	AutoShow bool
+	Id        Id
+	Tabulas   []*tabula.Tabula
+	AutoShow  bool
+	Workflows map[string]WorkflowState
 }
 
 func (u *User) String() string {
@@ -37,7 +44,7 @@ func (u *User) String() string {
 	return fmt.Sprintf("User{Id: %s, Tabulas: %d}", u.Id, len(u.Tabulas))
 }
 
-func (u *User) Hydrate(db *sql.DB) error {
+func (u *User) Hydrate(db anydb.AnyDb) error {
 	res, err := db.Query("SELECT prefAutoShow FROM users WHERE id=$1", &u.Id)
 	if err != nil {
 		return fmt.Errorf("querying: %s", err)
@@ -49,18 +56,72 @@ func (u *User) Hydrate(db *sql.DB) error {
 			return fmt.Errorf("scanning: %s", err)
 		}
 	}
+
+	return u.hydrateWorkflows(db)
+}
+
+func (u *User) hydrateWorkflows(db anydb.AnyDb) error {
+	u.Workflows = map[string]WorkflowState{}
+	wfRes, err := db.Query("SELECT name, state, opaque FROM user_workflows WHERE user_id=$1", &u.Id)
+	if err != nil {
+		return fmt.Errorf("querying user_workflows: %s", err)
+	}
+	defer wfRes.Close()
+	for wfRes.Next() {
+		var name, state, opaque string
+		if err := wfRes.Scan(&name, &state, &opaque); err != nil {
+			return fmt.Errorf("scanning user_workflows: %s", err)
+		}
+		var opaqueObj interface{}
+		if err := json.Unmarshal([]byte(opaque), opaqueObj); err != nil {
+			log.Warningf("user=%s error unmarshaling opaque data %q: %s", u.Id, opaque, err)
+		}
+		u.Workflows[name] = WorkflowState{state, opaqueObj}
+	}
 	return nil
 }
 
-func (u *User) Save(db *sql.DB) error {
-	_, err := db.Exec(
-		"INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2",
-		&u.Id, u.AutoShow,
-	)
-	return err
+func (u *User) saveWorkflows(db anydb.AnyDb) (last_error error) {
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO user_workflows (user_id, name, state, opaque) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id,name) DO UPDATE SET state=$3, opaque=$4"
+	case "sqlite3":
+		query = "REPLACE INTO user_workflows (user_id, name, state, opaque) VALUES ($1, $2, $3, $4)"
+	}
+	for name, wf_state := range u.Workflows {
+		opaqueJson, err := json.Marshal(wf_state.Opaque)
+		if err != nil {
+			log.Warningf("user=%s workflow=%s error marshaling opaque data: %s", u.Id, name, err)
+			opaqueJson = []byte("{}")
+			last_error = err
+		}
+		if _, err := db.Exec(query, u.Id, name, wf_state.State, opaqueJson); err != nil {
+			log.Warningf("user=%s workflow=%s error saving to database: %s", u.Id, name, err)
+			last_error = err
+		}
+	}
+	return last_error
 }
 
-func Get(db *sql.DB, id Id) (*User, error) {
+func (u *User) Save(db anydb.AnyDb) error {
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2"
+	case "sqlite3":
+		query = "REPLACE INTO users (id, prefAutoShow) VALUES ($1, $2)"
+	default:
+		return fmt.Errorf("no User.Save query for SQL dialect %s", dia)
+	}
+	_, err := db.Exec(query, u.Id, u.AutoShow)
+	if err != nil {
+		return err
+	}
+	return u.saveWorkflows(db)
+}
+
+func Get(db anydb.AnyDb, id Id) (*User, error) {
 	Instance.Lock.RLock()
 	iUser, iUserOk := Instance.Users[id]
 	Instance.Lock.RUnlock()
@@ -115,7 +176,7 @@ func (u *User) TabulaByName(name tabula.TabulaName) (*tabula.Tabula, bool) {
 	return nil, false
 }
 
-func (u *User) Assign(db *sql.DB, t *tabula.Tabula) error {
+func (u *User) Assign(db anydb.AnyDb, t *tabula.Tabula) error {
 	if u == nil {
 		return errors.New("Assign called on nil User")
 	}
@@ -133,8 +194,19 @@ func (u *User) Assign(db *sql.DB, t *tabula.Tabula) error {
 		u.Tabulas = append(u.Tabulas, t)
 	}
 
+	var usersQuery, userTabulaeQuery string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		usersQuery = "INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2"
+		userTabulaeQuery = "INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+	case "sqlite3":
+		usersQuery = "REPLACE INTO users (id, prefAutoShow) VALUES ($1, $2)"
+		userTabulaeQuery = "INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2)"
+	default:
+		return fmt.Errorf("no User.Assign query for SQL dialect %s", dia)
+	}
 	_, err := db.Exec(
-		"INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2",
+		usersQuery,
 		&u.Id, u.AutoShow,
 	)
 	if err != nil {
@@ -142,7 +214,7 @@ func (u *User) Assign(db *sql.DB, t *tabula.Tabula) error {
 	}
 
 	_, err = db.Exec(
-		"INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+		userTabulaeQuery,
 		&u.Id, t.Id,
 	)
 

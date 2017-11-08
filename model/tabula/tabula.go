@@ -4,12 +4,12 @@
 package tabula
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 	"github.com/nfnt/resize"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/mask"
@@ -61,7 +61,7 @@ func (t *Tabula) String() string {
 
 var tabulaeInMemory = map[types.TabulaId]*Tabula{}
 
-func Get(db *sql.DB, id types.TabulaId) (*Tabula, error) {
+func Get(db anydb.AnyDb, id types.TabulaId) (*Tabula, error) {
 	if t, ok := tabulaeInMemory[id]; ok {
 		return t, nil
 	}
@@ -110,7 +110,7 @@ func Get(db *sql.DB, id types.TabulaId) (*Tabula, error) {
 	return ret, nil
 }
 
-func (t *Tabula) loadMasks(db *sql.DB) error {
+func (t *Tabula) loadMasks(db anydb.AnyDb) error {
 	res, err := db.Query(`SELECT name, "order", red, green, blue, alpha, top, "left", width, height `+
 		`FROM tabula_masks WHERE tabula_id=$1 ORDER BY "order"`, int64(*t.Id))
 	if err != nil {
@@ -135,7 +135,7 @@ func (t *Tabula) loadMasks(db *sql.DB) error {
 	return nil
 }
 
-func (t *Tabula) Save(db *sql.DB) error {
+func (t *Tabula) Save(db anydb.AnyDb) error {
 	if t.GridColor == nil {
 		t.GridColor = &color.NRGBA{A: 255}
 	}
@@ -165,11 +165,20 @@ func (t *Tabula) Save(db *sql.DB) error {
 			*t.Id = types.TabulaId(i)
 		}
 	} else {
-		_, err := db.Exec(
-			"INSERT INTO tabulas (id, name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) "+
-				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "+
-				"ON CONFLICT (id) DO UPDATE SET name=$2, url=$3, offset_x=$4, offset_y=$5, dpi=$6, "+
-				"grid_r=$7, grid_g=$8, grid_b=$9, grid_a=$10",
+		var query string
+		switch dia := db.Dialect(); dia {
+		case "postgresql":
+			query = "INSERT INTO tabulas (id, name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) " +
+				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) " +
+				"ON CONFLICT (id) DO UPDATE SET name=$2, url=$3, offset_x=$4, offset_y=$5, dpi=$6, " +
+				"grid_r=$7, grid_g=$8, grid_b=$9, grid_a=$10"
+		case "sqlite3":
+			query = "REPLACE INTO tabula (id, name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) " +
+				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
+		default:
+			return fmt.Errorf("no Tabula.Save query for SQL dialect %s", dia)
+		}
+		_, err := db.Exec(query,
 			int64(*t.Id), string(t.Name), t.Url, t.OffsetX, t.OffsetY, t.Dpi, r, g, b, a,
 		)
 		if err != nil {

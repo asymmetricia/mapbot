@@ -7,6 +7,7 @@ import (
 	"golang.org/x/oauth2"
 	"net/http"
 	"reflect"
+	"time"
 )
 
 func (ui *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
@@ -25,7 +26,7 @@ func (ui *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
 
 func (ui *SlackUi) newNonce() (string, error) {
 	nonce := rand.RandHex(32)
-	_, err := ui.db.Exec("INSERT INTO slack_nonces (nonce, expiry) VALUES ($1,NOW() + '1 hour')", nonce)
+	_, err := ui.db.Exec("INSERT INTO slack_nonces (nonce, expiry) VALUES ($1,$2)", nonce, time.Now().Add(time.Hour))
 	if err != nil {
 		return "", err
 	}
@@ -33,12 +34,12 @@ func (ui *SlackUi) newNonce() (string, error) {
 }
 
 func (ui *SlackUi) validateNonce(nonce string) (bool, error) {
-	_, err := ui.db.Exec("DELETE FROM slack_nonces WHERE expiry < NOW()")
+	_, err := ui.db.Exec("DELETE FROM slack_nonces WHERE expiry < $1", time.Now())
 	if err != nil {
 		return false, fmt.Errorf("expiring nonces: %s", err)
 	}
 
-	results, err := ui.db.Query("SELECT FROM slack_nonces WHERE nonce=$1", nonce)
+	results, err := ui.db.Query("SELECT * FROM slack_nonces WHERE nonce=$1", nonce)
 	if err != nil {
 		return false, fmt.Errorf("querying nonces: %s", err)
 	}
@@ -99,7 +100,7 @@ func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
 
 	// Note that, per https://api.slack.com/docs/oauth, slack access tokens do not currently expire
 	if err := ui.addTeam(token.AccessToken, bot_token); err != nil {
-		log.Errorf("saving to DB: %s", err)
+		log.Errorf("saving team to DB: %s", err)
 		http.Error(rw, "error saving token", http.StatusInternalServerError)
 		return
 	}

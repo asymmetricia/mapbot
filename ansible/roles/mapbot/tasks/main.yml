@@ -15,3 +15,12 @@
   become: true
   service: name=mapbot.service enabled=yes state=started
   when: not service.changed
+- include: cert.yml
+- name: install nginx config
+  become: true
+  template: dest=/etc/nginx/sites-enabled/mapbot.conf src=mapbot.conf
+  register: nginx_config
+- name: reload nginx
+  become: true
+  service: name=nginx.service state=reloaded
+  when: nginx_config.changed

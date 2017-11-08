@@ -1,20 +1,22 @@
 package slack
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/nlopes/slack"
 	"github.com/pdbogen/mapbot/common/db"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
+	"github.com/pdbogen/mapbot/model/workflow"
 	slackContext "github.com/pdbogen/mapbot/ui/slack/context"
 	"image"
 	"image/png"
 	"io/ioutil"
 	"mime"
+	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -92,15 +94,23 @@ func (t *Team) updateEmoji() {
 	t.Emoji = emoji
 }
 
-func (t *Team) Save(db *sql.DB) error {
+func (t *Team) Save(db anydb.AnyDb) error {
 	if t.botToken == nil {
 		t.botToken = &BotToken{}
 	}
-	_, err := db.Exec(
-		"INSERT INTO slack_teams "+
-			"(token, bot_id, bot_token) "+
-			"VALUES ($1, $2, $3) "+
-			"ON CONFLICT (token) DO UPDATE SET bot_id=$2, bot_token=$3",
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO slack_teams " +
+			"(token, bot_id, bot_token) " +
+			"VALUES ($1, $2, $3) " +
+			"ON CONFLICT (token) DO UPDATE SET bot_id=$2, bot_token=$3"
+	case "sqlite3":
+		query = "REPLACE INTO slack_teams (token, bot_id, bot_token) VALUES ($1, $2, $3)"
+	default:
+		return fmt.Errorf("no Team.Save query for SQL dialect %s", dia)
+	}
+	_, err := db.Exec(query,
 		t.token,
 		t.botToken.BotId,
 		t.botToken.BotToken,
@@ -194,6 +204,60 @@ func (t *Team) manageMessages() {
 	}
 }
 
+func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.WorkflowMessage) {
+	comps := strings.Split(string(c.Type), ":")
+	if len(comps) < 5 {
+		log.Errorf("%s: received but cannot process command %s", t.Info.ID, c.Type)
+		return
+	}
+
+	channel := comps[4]
+
+	params := slack.PostMessageParameters{
+		Text: msg.Text,
+	}
+
+	params.Attachments = []slack.Attachment{}
+	if msg.Choices != nil {
+		attachment := slack.Attachment{
+			CallbackID: msg.Id(),
+			Actions:    make([]slack.AttachmentAction, len(msg.Choices)),
+			Fallback:   "Your client does not support actions. :cry:",
+		}
+		for i, choice := range msg.Choices {
+			log.Debugf("adding choice %q", choice)
+			attachment.Actions[i] = slack.AttachmentAction{
+				Name:  "choice",
+				Text:  choice,
+				Value: choice,
+				Type:  "button",
+			}
+		}
+		params.Attachments = append(params.Attachments, attachment)
+	}
+
+	if msg.Image != nil {
+		url, err := t.uploadImage(msg.Image, nil)
+		if err != nil {
+			log.Errorf("uploading image in workflow message: %s", err)
+		}
+		params.Attachments = append(params.Attachments, slack.Attachment{
+			ImageURL: url,
+		})
+
+	}
+
+	_, _, err := t.botClient.PostMessage(
+		channel,
+		msg.Text,
+		params,
+	)
+
+	if err != nil {
+		log.Errorf("%s: error posting workflow message to channel %q: %s", t.Info.ID, comps[4], err)
+	}
+}
+
 func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 	comps := strings.Split(string(c.Type), ":")
 	if len(comps) < 5 {
@@ -216,6 +280,8 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 		if err != nil {
 			log.Errorf("%s: error posting message %q to channel %q: %s", t.Info.ID, msg, comps[4], err)
 		}
+	case *workflow.WorkflowMessage:
+		t.sendWorkflowMessage(h, c, msg)
 	case *tabula.Tabula:
 		repErr := func(ctx string, err error) {
 			log.Errorf("%s: error %s image %q: %s", t.Info.ID, ctx, msg.Name, err)
@@ -227,31 +293,37 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 			return
 		}
 
-		buf, err := ioutil.TempFile("", "")
-		if err != nil {
-			repErr("opeaning tmpfile for", err)
-			return
-		}
-		defer buf.Close()
-
-		err = png.Encode(buf, img)
-		if err != nil {
-			repErr("encoding", err)
-			return
-		}
-
-		_, err = t.botClient.UploadFile(
-			slack.FileUploadParameters{
-				Filetype: mime.TypeByExtension(".png"),
-				Channels: []string{channel},
-				File:     buf.Name(),
-			})
-		if err != nil {
+		if _, err := t.uploadImage(img, []string{channel}); err != nil {
 			repErr("uploading", err)
 			return
 		}
-
 	}
+}
+
+func (t *Team) uploadImage(img image.Image, channels []string) (string, error) {
+	repErr := func(s string, e error) error { return fmt.Errorf("%s: %s", s, e) }
+	buf, err := ioutil.TempFile("", "")
+	if err != nil {
+		return "", repErr("opeaning tmpfile for", err)
+	}
+
+	err = png.Encode(buf, img)
+	buf.Close()
+	if err != nil {
+		return "", repErr("encoding", err)
+	}
+
+	upload, err := t.botClient.UploadFile(
+		slack.FileUploadParameters{
+			Filetype: mime.TypeByExtension(".png"),
+			Channels: channels,
+			File:     buf.Name(),
+		})
+	os.Remove(buf.Name())
+	if err != nil {
+		return "", repErr("uploading", err)
+	}
+	return upload.URLPrivate, nil
 }
 
 func (t *Team) Context(SubTeamId string) context.Context {

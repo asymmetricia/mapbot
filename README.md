@@ -4,7 +4,7 @@ Mapbot is a slack bot that provides tactical mapping to facilitate the play of
 table-top role playing games within Slack- think Pathfinder or D&D. Mapbot
 renders a square grid on top of user-provided images, provides tools to scale
 the grid to line up with a map's existing grid, and allows the placement of
-tokens on the map to repreesnt characters and movement.
+tokens on the map to represent characters and movement.
 
 Mapbot is in its early stages, but has reached MVP- minimum viable product.
 This means that your humble author believes mapbot is capable of providing

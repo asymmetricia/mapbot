@@ -1,10 +1,10 @@
 package tabula
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/nfnt/resize"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/types"
 	"image"
@@ -12,7 +12,7 @@ import (
 	"image/draw"
 )
 
-func (t *Tabula) loadTokens(db *sql.DB) error {
+func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 	if t.Id == nil {
 		return errors.New("cannot load tokens for tabula with nil ID")
 	}
@@ -48,7 +48,7 @@ func (t *Tabula) loadTokens(db *sql.DB) error {
 	return nil
 }
 
-func (t *Tabula) saveTokens(db *sql.DB) error {
+func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 	if t.Id == nil {
 		return errors.New("cannot save tokens for tabula with nil ID")
 	}
@@ -103,10 +103,18 @@ func (t *Tabula) saveTokens(db *sql.DB) error {
 	}
 
 	// Add Or Replace existing tokens
-	add, err := tx.Prepare(
-		"INSERT INTO tabula_tokens (name, context_id, tabula_id, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) " +
-			"ON CONFLICT (name, context_id, tabula_id) DO UPDATE SET x=$4, y=$5, r=$6, g=$7, b=$8, a=$9",
-	)
+	var query string
+	switch dia := db.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO tabula_tokens (name, context_id, tabula_id, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) " +
+			"ON CONFLICT (name, context_id, tabula_id) DO UPDATE SET x=$4, y=$5, r=$6, g=$7, b=$8, a=$9"
+	case "sqlite3":
+		query = "REPLACE INTO tabula_tokens (name, context_id, tabula_id, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)"
+	default:
+		return fmt.Errorf("no Tabula.saveTokens query for SQL dialect %s", dia)
+	}
+
+	add, err := tx.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("error preparing ADD: %s", err)
 	}

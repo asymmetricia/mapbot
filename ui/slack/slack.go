@@ -1,9 +1,9 @@
 package slack
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/common/rand"
 	"github.com/pdbogen/mapbot/hub"
@@ -14,7 +14,7 @@ import (
 
 var log = mbLog.Log
 
-func New(id string, secret string, db *sql.DB, proto string, domain string, port int, botHub *hub.Hub) (*SlackUi, error) {
+func New(id string, secret string, db anydb.AnyDb, proto string, domain string, port int, botHub *hub.Hub) (*SlackUi, error) {
 	if id == "" {
 		return nil, errors.New("client ID must not be blank")
 	}
@@ -69,7 +69,7 @@ type SlackUi struct {
 	Teams        []*Team
 	oauth        oauth2.Config
 	csrf         []string
-	db           *sql.DB
+	db           anydb.AnyDb
 	domain       string
 	teamWg       sync.WaitGroup
 	botHub       *hub.Hub
