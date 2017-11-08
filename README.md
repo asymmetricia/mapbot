@@ -175,7 +175,7 @@ Commands:
 * [X] Add
 * [X] Set color
 * [ ] Remove
-* [ ] Clear
+* [X] Clear
 * [ ] Move <direction list>
 
 ## Slack UI
