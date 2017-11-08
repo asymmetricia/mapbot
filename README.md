@@ -83,7 +83,7 @@ Mapbot assumes play happens in the context of a channel- with you and other peop
 
 ![Map Select Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-select-map.png)
 
-Once you've selected the map, you (and anyone else in the channel!) can add tokens to the map:
+Once you've selected the map, you (and anyone else in the channel!) can add tokens to the map using the `token add` command:
 
 ![Map Place Token](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-place-token.png)
 
