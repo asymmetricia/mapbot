@@ -118,7 +118,7 @@ func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
 	}
 	// OK, this might not be a custom emoji.
 	img, err := GetEmojiOne(name)
-	if _, ok := err.(EmojiNotFound); !ok {
+	if _, ok := err.(EmojiNotFound); err != nil && !ok {
 		return nil, fmt.Errorf("error getting EmojiOne emoji: %s", err)
 	}
 	if img != nil {
