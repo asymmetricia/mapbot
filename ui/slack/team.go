@@ -197,6 +197,9 @@ func (t *Team) manageMessages() {
 						log.Warningf("Received message, but type was %s", reflect.TypeOf(event.Data))
 					}
 				}()
+			case "latency_report":
+			case "reconnect_url":
+			case "presence_change":
 			default:
 				log.Debugf("unhandled message type %q", event.Type)
 			}
