@@ -21,6 +21,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -366,7 +367,7 @@ func glyph(s string, dpi float32) *image.RGBA {
 	ctx.SetSrc(image.White)
 	ctx.DrawString(s, fixed.Point26_6{X: fixed.I(50), Y: fixed.I(50)})
 
-	img = center(crop(img), int(dpi))
+	img = center(autocrop(img), int(dpi))
 	coordCache[dpi][s] = img
 	return img
 }
@@ -383,7 +384,7 @@ func center(i *image.RGBA, dim int) *image.RGBA {
 	return result
 }
 
-func crop(i *image.RGBA) *image.RGBA {
+func autocrop(i *image.RGBA) *image.RGBA {
 	min_x := i.Bounds().Min.X
 	min_y := i.Bounds().Min.Y
 	max_x := i.Bounds().Max.X
@@ -433,6 +434,10 @@ max_x:
 		}
 	}
 
+	return crop(i, min_x, min_y, max_x, max_y)
+}
+
+func crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
 	result := image.NewRGBA(image.Rect(0, 0, max_x-min_x, max_y-min_y))
 	for x := min_x; x < max_x; x++ {
 		for y := min_y; y < max_y; y++ {
@@ -549,6 +554,17 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 
 	if err := t.addTokens(coord, ctx); err != nil {
 		return nil, err
+	}
+
+	minx, miny, maxx, maxy := ctx.GetZoom()
+	if maxx > minx && maxy > miny {
+		coord = crop(
+			coord,
+			int(float64(minx)*float64(t.Dpi))+t.OffsetX,
+			int(float64(miny)*float64(t.Dpi))+t.OffsetY,
+			int(math.Ceil(float64(maxx+1)*float64(t.Dpi)))+t.OffsetX,
+			int(math.Ceil(float64(maxy+1)*float64(t.Dpi)))+t.OffsetY,
+		)
 	}
 
 	return coord, nil

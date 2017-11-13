@@ -113,6 +113,15 @@ var schema = []Migration{
 			`)`},
 		map[string]string{"any": `DROP TABLE user_workflows`},
 	},
+	Migration{
+		12,
+		map[string]string{"any": `ALTER TABLE contexts ADD COLUMN MinX SMALLINT NOT NULL DEFAULT 0;` +
+			`ALTER TABLE contexts ADD COLUMN MinY SMALLINT NOT NULL DEFAULT 0;` +
+			`ALTER TABLE contexts ADD COLUMN MaxX SMALLINT NOT NULL DEFAULT 0;` +
+			`ALTER TABLE contexts ADD COLUMN MaxY SMALLINT NOT NULL DEFAULT 0`,
+		},
+		map[string]string{"any": `ALTER TABLE contexts DROP COLUMN MinX, DROP COLUMN MinY, DROP COLUMN MaxX, DROP COLUMN MaxY`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {

@@ -3,6 +3,7 @@ package mapController
 import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/colors"
+	"github.com/pdbogen/mapbot/common/conv"
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/controller/cmdproc"
@@ -33,8 +34,53 @@ func init() {
 			"select":    cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
 			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
 			"gridcolor": cmdproc.Subcommand{"<name> <value>", "shorthand for set, to set the grid color", cmdGridColor},
+			"zoom":      cmdproc.Subcommand{"<min X> <min Y> <max X> <max Y>", "requests that mapbot display only a portion of the map; useful for larger maps where the action is in a small area. requires an active map.", cmdZoom},
 		},
 	}
+}
+
+func cmdZoom(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok || len(args) != 4 {
+		h.Error(c, "usage: map zoom "+processor.Commands["zoom"].Args)
+		return
+	}
+
+	minCoord, err := conv.CoordsToPoint(args[0], args[1])
+	if err != nil {
+		h.Error(c, fmt.Sprintf("Invalid coordinates (`%s,%s`): %s", args[0], args[1], err))
+		return
+	}
+
+	maxCoord, err := conv.CoordsToPoint(args[2], args[3])
+	if err != nil {
+		h.Error(c, fmt.Sprintf("Invalid coordinates (`%s,%s`): %s", args[2], args[3], err))
+		return
+	}
+
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "there is no active map; use `map select <mapName>` to pick one")
+		return
+	}
+
+	t, err := tabula.Get(db.Instance, *tabId)
+	if err != nil {
+		h.Error(c, "error loading active map")
+		log.Errorf("error loading active map %d: %s", tabId, err)
+		return
+	}
+
+	c.Context.SetZoom(minCoord.X, minCoord.Y, maxCoord.X, maxCoord.Y)
+	if err := c.Context.Save(); err != nil {
+		h.Error(c, fmt.Sprintf("Something went wrong while saving your change: %s", err))
+	}
+
+	h.Publish(&hub.Command{
+		Type:    hub.CommandType(c.From),
+		Payload: t,
+		User:    c.User,
+	})
 }
 
 func cmdDpi(h *hub.Hub, c *hub.Command) {
@@ -151,7 +197,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		}
 		h.Publish(&hub.Command{
 			Type:    hub.CommandType(c.From),
-			Payload: fmt.Sprintf("map %s %s set to %q", args[0], args[i], args[i+1]),
+			Payload: fmt.Sprintf("map `%s` %s set to `%s`", args[0], args[i], args[i+1]),
 			User:    c.User,
 		})
 	}
@@ -202,7 +248,7 @@ func cmdShow(h *hub.Hub, c *hub.Command) {
 		case 0:
 			tabId := c.Context.GetActiveTabulaId()
 			if tabId == nil {
-				h.Error(c, "no active map in this channel, use `map select <name>` first")
+				h.Error(c, "no active map in this channel, use `map select <name>` to pick one, or provide a map name directly")
 				return
 			}
 
