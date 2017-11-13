@@ -46,6 +46,9 @@ func init() {
 type EmojiNotFound error
 
 func GetEmojiOne(name string) (image.Image, error) {
+	if len(name) == 7 && name[0:5] == "flag-" {
+		name = "flag_" + name[5:]
+	}
 	if e, ok := EmojiOne[name]; ok {
 		if e.Image == nil {
 			emojiUrl := fmt.Sprintf("https://cdnjs.cloudflare.com/ajax/libs/emojione/2.2.7/assets/png/%s.png", e.Unicode)
