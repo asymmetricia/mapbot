@@ -34,7 +34,7 @@ func init() {
 			"select":    cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
 			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
 			"gridcolor": cmdproc.Subcommand{"<name> <value>", "shorthand for set, to set the grid color", cmdGridColor},
-			"zoom":      cmdproc.Subcommand{"<min X> <min Y> <max X> <max Y>", "requests that mapbot display only a portion of the map; useful for larger maps where the action is in a small area. requires an active map.", cmdZoom},
+			"zoom":      cmdproc.Subcommand{"<min X> <min Y> <max X> <max Y>", "requests that mapbot display only a portion of the map; useful for larger maps where the action is in a small area. requires an active map. Set to `a 1 a 1` to disable zoom.", cmdZoom},
 		},
 	}
 }
@@ -99,10 +99,6 @@ func cmdGridColor(h *hub.Hub, c *hub.Command) {
 	} else {
 		h.Error(c, "usage: map gridcolor "+processor.Commands["gridcolor"].Args)
 	}
-}
-
-func notFound(n tabula.TabulaName) string {
-	return fmt.Sprintf("you don't have a map named %q", string(n))
 }
 
 func cmdList(h *hub.Hub, c *hub.Command) {
@@ -313,4 +309,8 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 	} else {
 		h.Error(c, "usage: map add <name> <url>")
 	}
+}
+
+func notFound(n tabula.TabulaName) string {
+	return fmt.Sprintf("you don't have a map named %q", string(n))
 }
