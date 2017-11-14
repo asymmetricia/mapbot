@@ -1,14 +1,17 @@
 .PHONY: clean
 
 SERVER ?= vdr.cernu.us
+PUSH ?= 1
 
 restart: .push
 	ssh -At vdr.cernu.us docker rm -f mapbot
 
 push: .push
 .push: .docker
-	SIZE=$$(docker inspect -s mapbot | jq '.[0].Size'); \
-	docker save mapbot | pv -s $$SIZE | ssh -C vdr.cernu.us docker load
+	@ set -e; \
+	[ "${PUSH}" -eq 0 ] && exit 0 && \
+	SIZE=$$(docker inspect -s mapbot | jq '.[0].Size') && \
+	docker save mapbot | pv -s $$SIZE | ssh -C vdr.cernu.us docker load && \
 	touch .push
 
 .docker: mapbot Dockerfile run.sh

@@ -8,6 +8,7 @@ ExecStartPre=-/usr/bin/docker rm -f mapbot
 ExecStart=/usr/bin/docker run \
   -e CLIENT_ID={{client_id}} \
   -e CLIENT_SECRET={{client_secret}} \
+  -e VERIFICATION_TOKEN={{verification_token}} \
   -e DB_HOST={{db_host}} \
   -e DB_USER={{db_user}} \
   -e DB_PASS={{db_pass}} \

@@ -24,6 +24,7 @@ var log = mbLog.Log
 func main() {
 	SlackClientToken := flag.String("slack-client-id", "", "slack Client ID")
 	SlackClientSecret := flag.String("slack-client-secret", "", "slack Client Secret")
+	SlackVerificationToken := flag.String("slack-verification-token", "", "slack verification token; if unset or incorrect, message actions will not work")
 	Domain := flag.String("domain", "map.haversack.io", "domain name to receive redirects, construct URLs, and request ACME certs")
 	Port := flag.Int("port", 8443, "port to listen on for web requests and slack aotuh responses")
 	Tls := flag.Bool("tls", false, "if set, mapbot will use ACME to obtain a cert from Let's Encrypt for the above-configured domain")
@@ -75,6 +76,7 @@ func main() {
 		proto,
 		*Domain,
 		*Port,
+		*SlackVerificationToken,
 		hub,
 	)
 	if err != nil {
@@ -86,6 +88,7 @@ func main() {
 		HostPolicy: autocert.HostWhitelist(*Domain),
 	}
 	router := mux.NewRouter()
+	router.HandleFunc("/action", slackUi.Action)
 	router.HandleFunc("/oauth", slackUi.OAuthPost)
 	router.HandleFunc("/", slackUi.OAuthGet)
 	server := &http.Server{
