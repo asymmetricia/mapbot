@@ -441,8 +441,8 @@ func crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
 
 func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col color.Color) {
 	//inset := int(t.Dpi * (1 - fill) / 2)
-	for x := int(float32(bounds.Min.X)*t.Dpi) + t.OffsetX + inset; x < int(float32(bounds.Max.X)*t.Dpi)+t.OffsetX-inset; x++ {
-		for y := int(float32(bounds.Min.Y)*t.Dpi) + t.OffsetY + inset; y < int(float32(bounds.Max.Y)*t.Dpi)+t.OffsetY-inset; y++ {
+	for x := int(float32(bounds.Min.X)*t.Dpi) + t.OffsetX + inset; x <= int(float32(bounds.Max.X)*t.Dpi)+t.OffsetX-inset; x++ {
+		for y := int(float32(bounds.Min.Y)*t.Dpi) + t.OffsetY + inset; y <= int(float32(bounds.Max.Y)*t.Dpi)+t.OffsetY-inset; y++ {
 			blendAt(i, x, y, col)
 		}
 	}
