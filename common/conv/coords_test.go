@@ -16,10 +16,10 @@ func TestCoordsToPoint(t *testing.T) {
 		resY int
 	}
 	tests := []Test{
-		Test{"a", "5", 1, 5},
-		Test{"Aa", "55", 27, 55},
-		Test{"Z", "999", 26, 999},
-		Test{"ZZ", "1", 702, 1},
+		Test{"a", "5", 0, 4},
+		Test{"Aa", "55", 26, 54},
+		Test{"Z", "999", 25, 998},
+		Test{"ZZ", "1", 701, 0},
 	}
 
 	for _, test := range tests {
