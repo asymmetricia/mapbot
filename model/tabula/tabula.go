@@ -45,17 +45,6 @@ type Tabula struct {
 	Version    int
 }
 
-type Token struct {
-	Coordinate image.Point
-	TokenColor color.Color
-}
-
-func (t Token) WithColor(c color.Color) (ret Token) {
-	ret = t
-	ret.TokenColor = c
-	return
-}
-
 func (t *Tabula) String() string {
 	return fmt.Sprintf("Tabula{id=%d,Name=%s,Url=%s,Offset=(%d,%d),Dpi=%f}", t.Id, t.Name, t.Url, t.OffsetX, t.OffsetY, t.Dpi)
 }

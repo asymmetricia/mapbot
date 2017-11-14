@@ -12,6 +12,23 @@ import (
 	"image/draw"
 )
 
+type Token struct {
+	Coordinate image.Point
+	TokenColor color.Color
+}
+
+func (t Token) WithColor(c color.Color) (ret Token) {
+	ret = t
+	ret.TokenColor = c
+	return
+}
+
+func (t Token) WithCoords(p image.Point) (ret Token) {
+	ret = t
+	ret.Coordinate = p
+	return
+}
+
 func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 	if t.Id == nil {
 		return errors.New("cannot load tokens for tabula with nil ID")
