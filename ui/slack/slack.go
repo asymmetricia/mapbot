@@ -14,7 +14,7 @@ import (
 
 var log = mbLog.Log
 
-func New(id string, secret string, db anydb.AnyDb, proto string, domain string, port int, botHub *hub.Hub) (*SlackUi, error) {
+func New(id string, secret string, db anydb.AnyDb, proto string, domain string, port int, verificationToken string, botHub *hub.Hub) (*SlackUi, error) {
 	if id == "" {
 		return nil, errors.New("client ID must not be blank")
 	}
@@ -42,9 +42,10 @@ func New(id string, secret string, db anydb.AnyDb, proto string, domain string, 
 		csrf: []string{
 			rand.RandHex(32),
 		},
-		db:     db,
-		domain: domain,
-		botHub: botHub,
+		db:                db,
+		domain:            domain,
+		botHub:            botHub,
+		verificationToken: verificationToken,
 	}
 
 	log.Info("Slack UI module ready")
@@ -64,13 +65,14 @@ func CmdHowdy(h *hub.Hub, c *hub.Command) {
 }
 
 type SlackUi struct {
-	clientId     string
-	clientSecret string
-	Teams        []*Team
-	oauth        oauth2.Config
-	csrf         []string
-	db           anydb.AnyDb
-	domain       string
-	teamWg       sync.WaitGroup
-	botHub       *hub.Hub
+	clientId          string
+	clientSecret      string
+	Teams             []*Team
+	oauth             oauth2.Config
+	csrf              []string
+	db                anydb.AnyDb
+	domain            string
+	teamWg            sync.WaitGroup
+	botHub            *hub.Hub
+	verificationToken string
 }

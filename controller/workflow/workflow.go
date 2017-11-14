@@ -24,9 +24,10 @@ func init() {
 	processor = &cmdproc.CommandProcessor{
 		Command: "workflow",
 		Commands: map[string]cmdproc.Subcommand{
-			"list":  cmdproc.Subcommand{"", "lists known workflows", cmdList},
-			"start": cmdproc.Subcommand{"<workflow name> <choice>", "primarily for debugging; manually initiates the named workflow with the given <choice> as the `enter` choice", cmdStart},
-			"clear": cmdproc.Subcommand{"", "cancels any workflow associated with your user", cmdClear},
+			"list":    cmdproc.Subcommand{"", "lists known workflows", cmdList},
+			"start":   cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; manually initiates the named workflow with the given <choice> as the `enter` choice", cmdStart},
+			"respond": cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; calls the named workflow's current state's Resopnd function with the given choice.", cmdRespond},
+			"clear":   cmdproc.Subcommand{"", "cancels any workflow associated with your user", cmdClear},
 		},
 	}
 }
@@ -52,7 +53,7 @@ func cmdStart(h *hub.Hub, c *hub.Command) {
 	}
 
 	if len(args) < 1 {
-		h.Error(c, "usage: workflow start <workflow name> <opaque JSON>")
+		h.Error(c, "usage: workflow start <workflow name> <choice>")
 		return
 	}
 
@@ -66,6 +67,47 @@ func cmdStart(h *hub.Hub, c *hub.Command) {
 	state, opaque, err := wf.Response("enter", nil, &choice)
 	if err != nil {
 		h.Error(c, fmt.Sprintf("error initiating workflow %q: %s", args[0], err))
+		return
+	}
+	c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}
+	c.User.Save(db.Instance)
+
+	msg := wf.Challenge(state, opaque)
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(msg))
+}
+
+func cmdRespond(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "unexpected payload")
+		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
+		return
+	}
+
+	if len(args) < 1 {
+		h.Error(c, "usage: workflow respond <workflow name> <choice>")
+		return
+	}
+
+	wf, ok := workflow.Workflows[strings.ToLower(args[0])]
+	if !ok {
+		h.Error(c, fmt.Sprintf("error: workflow %q does not exist", args[0]))
+		return
+	}
+
+	wfState, ok := c.User.Workflows[strings.ToLower(args[0])]
+	if !ok {
+		h.Error(c, fmt.Sprintf(
+			"error: you don't have an active workflow %q; try `workflow start %s %s`?",
+			args[0], args[1], strings.Join(args[1:], " "),
+		))
+		return
+	}
+
+	choice := strings.Join(args[1:], " ")
+	state, opaque, err := wf.Response(wfState.State, wfState.Opaque, &choice)
+	if err != nil {
+		h.Error(c, fmt.Sprintf("action not accepted: %s", err))
 		return
 	}
 	c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}

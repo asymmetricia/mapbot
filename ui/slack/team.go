@@ -69,6 +69,10 @@ func (s *SlackUi) addTeam(token string, bot_token *BotToken) error {
 		hub.CommandType(fmt.Sprintf("internal:send:slack:%s:*", team.Info.ID)),
 		team.Send,
 	)
+	s.botHub.Subscribe(
+		hub.CommandType(fmt.Sprintf("internal:updateAction:slack:%s:*", team.Info.ID)),
+		team.updateAction,
+	)
 
 	go team.updateEmoji()
 
@@ -204,15 +208,7 @@ func (t *Team) manageMessages() {
 	}
 }
 
-func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.WorkflowMessage) {
-	comps := strings.Split(string(c.Type), ":")
-	if len(comps) < 5 {
-		log.Errorf("%s: received but cannot process command %s", t.Info.ID, c.Type)
-		return
-	}
-
-	channel := comps[4]
-
+func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) slack.PostMessageParameters {
 	params := slack.PostMessageParameters{
 		Text: msg.Text,
 	}
@@ -247,10 +243,22 @@ func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.Wor
 
 	}
 
+	return params
+}
+
+func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.WorkflowMessage) {
+	comps := strings.Split(string(c.Type), ":")
+	if len(comps) < 5 {
+		log.Errorf("%s: received but cannot process command %s", t.Info.ID, c.Type)
+		return
+	}
+
+	channel := comps[4]
+
 	_, _, err := t.botClient.PostMessage(
 		channel,
 		msg.Text,
-		params,
+		t.renderWorkflowMessage(msg),
 	)
 
 	if err != nil {
