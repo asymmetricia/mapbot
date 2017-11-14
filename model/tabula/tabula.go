@@ -516,7 +516,7 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 
 	var coord image.Image
 	if cached, ok := cache[t.Url]; ok && cached.version == t.Version {
-		coord = cached.image
+		coord = copyImage(cached.image)
 	} else {
 		log.Infof("Cache miss: %s", t.Url)
 		if t.Background == nil {
