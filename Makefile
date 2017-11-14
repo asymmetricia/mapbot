@@ -30,7 +30,7 @@ release:
 	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
 
 tail:
-	ssh -At vdr.cernu.us docker logs -f mapbot
+	ssh -At vdr.cernu.us docker logs -f --tail 100 mapbot
 
 clean:
 	$(RM) .push .docker mapbot
