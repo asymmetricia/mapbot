@@ -29,17 +29,17 @@ func init() {
 	processor = &cmdproc.CommandProcessor{
 		Command: "token",
 		Commands: map[string]cmdproc.Subcommand{
-			"add":   cmdproc.Subcommand{"<name> <X> <Y> [<name2> <x2> <y2> ... <nameN> <xN> <yN>]", "add a token(s) (or change its location) to the currently selected map (see `map select`). Token names should be emoji! (Or very short words).", cmdAdd},
-			"move":  cmdproc.Subcommand{"<name> <X> <Y>", "synonym for add", cmdAdd},
-			"color": cmdproc.Subcommand{"<name> <color>", "sets the color for the given token, which can be a common name; the world 'clear'; or a 6-digit hex code specifying red, green, and blue. https://en.wikipedia.org/wiki/List_of_Crayola_crayon_colors has a great list of colors.", cmdColor},
-			"list":  cmdproc.Subcommand{"", "list tokens on the active map", cmdList},
-			"clear": cmdproc.Subcommand{"", "clear tokens from the field", cmdClear},
-			//"remove": cmdproc.Subcommand{"<name>", "removes the named token from the active map", cmdRemove},
+			"add":    cmdproc.Subcommand{"<name> <X> <Y> [<name2> <x2> <y2> ... <nameN> <xN> <yN>]", "add a token(s) (or change its location) to the currently selected map (see `map select`). Token names should be emoji! (Or very short words).", cmdAdd},
+			"move":   cmdproc.Subcommand{"<name> <X> <Y>", "synonym for add", cmdAdd},
+			"color":  cmdproc.Subcommand{"<name> <color>", "sets the color for the given token, which can be a common name; the world 'clear'; a 6-digit hex code specifying red, green, and blue (optionally with two more digits specifying Alpha); https://en.wikipedia.org/wiki/List_of_Crayola_crayon_colors has a great list of colors.", cmdColor},
+			"list":   cmdproc.Subcommand{"", "list tokens on the active map", cmdList},
+			"clear":  cmdproc.Subcommand{"", "clear tokens from the field", cmdClear},
+			"remove": cmdproc.Subcommand{"<name>", "removes the named token from the active map", cmdRemove},
 		},
 	}
 }
 
-var hexColorRe = regexp.MustCompile(`^#?[0-9a-fA-F]{6}$`)
+var hexColorRe = regexp.MustCompile(`^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$`)
 
 func cmdColor(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
@@ -87,22 +87,29 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 	} else if hexColorRe.MatchString(colorName) {
 		colorName = strings.TrimLeft(colorName, "#")
 
-		r, err := strconv.ParseInt(colorName[0:2], 16, 8)
-		if err != nil {
-			log.Errorf("Parsing what should be hex string %q failed: %s", colorName[0:2], err)
+		var r, g, b, a uint64
+		var err error
+
+		r, err = strconv.ParseUint(colorName[0:2], 16, 8)
+
+		if err == nil {
+			g, err = strconv.ParseUint(colorName[2:4], 16, 8)
 		}
 
-		g, err := strconv.ParseInt(colorName[2:4], 16, 8)
-		if err != nil {
-			log.Errorf("Parsing what should be hex string %q failed: %s", colorName[2:4], err)
+		if err == nil {
+			b, err = strconv.ParseUint(colorName[4:6], 16, 8)
 		}
 
-		b, err := strconv.ParseInt(colorName[4:6], 16, 8)
-		if err != nil {
-			log.Errorf("Parsing what should be hex string %q failed: %s", colorName[4:6], err)
+		a = 0xFF
+		if len(colorName) == 8 && err == nil {
+			a, err = strconv.ParseUint(colorName[6:8], 16, 8)
 		}
 
-		newColor = color.RGBA{uint8(r), uint8(g), uint8(b), 0xFF}
+		if err != nil {
+			h.Error(c, fmt.Sprintf("`%s` looks like a hex color, but I can't parse it: %s", colorName, err))
+			return
+		}
+		newColor = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
 	} else {
 		h.Error(c, fmt.Sprintf("I don't know of a color named %q, and that doesn't look like a hex color code", colorName))
 		return
@@ -150,6 +157,45 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 	return
 }
 
+func cmdRemove(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "unexpected payload")
+		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
+		return
+	}
+
+	if len(args) == 0 {
+		h.Error(c, "`token remove` expects a list of tokens to clear. usage: `token clear "+processor.Commands["remove"].Args+"`")
+		return
+	}
+
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "no active map in this channel, use `map select <name>` first")
+		return
+	}
+
+	tab, err := tabula.Get(db.Instance, *tabId)
+	if err != nil {
+		h.Error(c, "an error occured loading the active map for this channel")
+		log.Errorf("error loading tabula %d: %s", *tabId, err)
+		return
+	}
+
+	for _, token := range args {
+		log.Debugf("removing token %s", token)
+		delete(tab.Tokens[c.Context.Id()], token)
+	}
+
+	if err := tab.Save(db.Instance); err != nil {
+		h.Error(c, "an error occured saving the active map for this channel")
+		log.Errorf("error saving tabula %d: %s", tab.Id, err)
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+}
+
 func cmdClear(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
 	if !ok {
@@ -176,9 +222,7 @@ func cmdClear(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab.Tokens = map[types.ContextId]map[string]tabula.Token{
-		c.Context.Id(): map[string]tabula.Token{},
-	}
+	tab.Tokens[c.Context.Id()] = map[string]tabula.Token{}
 
 	if err := tab.Save(db.Instance); err != nil {
 		h.Error(c, "an error occured saving the active map for this channel")

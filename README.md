@@ -174,7 +174,7 @@ Commands:
 * [X] List
 * [X] Add
 * [X] Set color
-* [ ] Remove
+* [X] Remove
 * [X] Clear
 * [ ] Move <direction list>
 
