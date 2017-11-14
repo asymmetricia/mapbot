@@ -310,7 +310,10 @@ func init() {
 	path := "fonts/DejaVuSerif.ttf"
 	fontData, err := ioutil.ReadFile(path)
 	if err != nil {
-		panic(fmt.Sprintf("reading %s: %s", path, err))
+		fontData, err = ioutil.ReadFile("../../" + path)
+		if err != nil {
+			panic(fmt.Sprintf("reading %s: %s", path, err))
+		}
 	}
 
 	font, err = freetype.ParseFont(fontData)
