@@ -86,6 +86,7 @@ func (t *Team) updateEmoji() {
 		return
 	}
 	if t.EmojiCache == nil {
+		log.Debugf("initializing emoji cache for team %s", t)
 		t.EmojiCache = map[string]image.Image{}
 	} else {
 		for name := range t.EmojiCache {
