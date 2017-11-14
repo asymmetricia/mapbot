@@ -267,19 +267,18 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 			return
 		}
 
-		newToken := tabula.Token{coord, color.RGBA{0, 0, 0, 0}}
 		if tab.Tokens == nil {
-			tab.Tokens = map[types.ContextId]map[string]tabula.Token{
-				c.Context.Id(): map[string]tabula.Token{
-					name: newToken,
-				},
-			}
-		} else if tab.Tokens[c.Context.Id()] == nil {
-			tab.Tokens[c.Context.Id()] = map[string]tabula.Token{
-				name: newToken,
-			}
+			tab.Tokens = map[types.ContextId]map[string]tabula.Token{}
+		}
+
+		if tab.Tokens[c.Context.Id()] == nil {
+			tab.Tokens[c.Context.Id()] = map[string]tabula.Token{}
+		}
+
+		if tok, ok := tab.Tokens[c.Context.Id()][name]; !ok {
+			tab.Tokens[c.Context.Id()][name] = tabula.Token{coord, color.RGBA{0, 0, 0, 0}}
 		} else {
-			tab.Tokens[c.Context.Id()][name] = newToken
+			tab.Tokens[c.Context.Id()][name] = tok.WithCoords(coord)
 		}
 	}
 
