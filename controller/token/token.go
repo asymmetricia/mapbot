@@ -109,7 +109,7 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 			h.Error(c, fmt.Sprintf("`%s` looks like a hex color, but I can't parse it: %s", colorName, err))
 			return
 		}
-		newColor = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
+		newColor = color.NRGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
 	} else {
 		h.Error(c, fmt.Sprintf("I don't know of a color named %q, and that doesn't look like a hex color code", colorName))
 		return
