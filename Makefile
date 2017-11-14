@@ -9,7 +9,7 @@ restart: .push
 push: .push
 .push: .docker
 	@ set -e; \
-	[ "${PUSH}" -eq 0 ] && exit 0 && \
+	[ "${PUSH}" -eq 0 ] && exit 0; \
 	SIZE=$$(docker inspect -s mapbot | jq '.[0].Size') && \
 	docker save mapbot | pv -s $$SIZE | ssh -C vdr.cernu.us docker load && \
 	touch .push
