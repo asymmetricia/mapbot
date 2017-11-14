@@ -24,10 +24,23 @@ func init() {
 	processor = &cmdproc.CommandProcessor{
 		Command: "workflow",
 		Commands: map[string]cmdproc.Subcommand{
+			"list":  cmdproc.Subcommand{"", "lists known workflows", cmdList},
 			"start": cmdproc.Subcommand{"<workflow name> <choice>", "primarily for debugging; manually initiates the named workflow with the given <choice> as the `enter` choice", cmdStart},
 			"clear": cmdproc.Subcommand{"", "cancels any workflow associated with your user", cmdClear},
 		},
 	}
+}
+
+func cmdList(h *hub.Hub, c *hub.Command) {
+	response := []string{
+		"Known workflows:",
+	}
+
+	for wf := range workflow.Workflows {
+		response = append(response, fmt.Sprintf("- %s", wf))
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(strings.Join(response, "\n")))
 }
 
 func cmdStart(h *hub.Hub, c *hub.Command) {

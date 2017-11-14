@@ -33,6 +33,7 @@ func init() {
 			"move":  cmdproc.Subcommand{"<name> <X> <Y>", "synonym for add", cmdAdd},
 			"color": cmdproc.Subcommand{"<name> <color>", "sets the color for the given token, which can be a common name; the world 'clear'; or a 6-digit hex code specifying red, green, and blue. https://en.wikipedia.org/wiki/List_of_Crayola_crayon_colors has a great list of colors.", cmdColor},
 			"list":  cmdproc.Subcommand{"", "list tokens on the active map", cmdList},
+			"clear": cmdproc.Subcommand{"", "clear tokens from the field", cmdClear},
 			//"remove": cmdproc.Subcommand{"<name>", "removes the named token from the active map", cmdRemove},
 		},
 	}
@@ -147,6 +148,44 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 	}
 	h.Reply(c, rep)
 	return
+}
+
+func cmdClear(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "unexpected payload")
+		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
+		return
+	}
+
+	if len(args) > 0 {
+		h.Error(c, "`token clear` expects no arguments; usage: token clear")
+		return
+	}
+
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "no active map in this channel, use `map select <name>` first")
+		return
+	}
+
+	tab, err := tabula.Get(db.Instance, *tabId)
+	if err != nil {
+		h.Error(c, "an error occured loading the active map for this channel")
+		log.Errorf("error loading tabula %d: %s", *tabId, err)
+		return
+	}
+
+	tab.Tokens = map[types.ContextId]map[string]tabula.Token{
+		c.Context.Id(): map[string]tabula.Token{},
+	}
+
+	if err := tab.Save(db.Instance); err != nil {
+		h.Error(c, "an error occured saving the active map for this channel")
+		log.Errorf("error saving tabula %d: %s", tab.Id, err)
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
 }
 
 func cmdAdd(h *hub.Hub, c *hub.Command) {
