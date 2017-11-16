@@ -4,7 +4,7 @@ SERVER ?= vdr.cernu.us
 PUSH ?= 1
 
 restart: .push
-	ssh -At vdr.cernu.us docker rm -f mapbot
+	ssh -At vdr.cernu.us docker rm -f mapbot || true
 
 push: .push
 .push: .docker
