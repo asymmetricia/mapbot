@@ -464,7 +464,7 @@ func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, size f
 	)
 }
 
-func (t *Tabula) addCoordinates(i draw.Image) draw.Image {
+func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int) draw.Image {
 	letters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
 		"N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 
@@ -474,18 +474,18 @@ func (t *Tabula) addCoordinates(i draw.Image) draw.Image {
 	cols := int(float32(i.Bounds().Max.X) / t.Dpi)
 	// 0 1 2 3 4 ... 25 26 27 28
 	// A B C D E ... Y  Z  AA AB
-	for x := 0; x < cols; x++ {
+	for x := first_x; x < cols; x++ {
 		c := letters[x%26] // 0..25
 		tmp := x
 		for tmp > 25 {
 			tmp = int(tmp/26) - 1
 			c = letters[tmp%26] + c
 		}
-		t.printAt(result, c, float32(x), 0, 0.5)
+		t.printAt(result, c, float32(x), float32(first_y), 0.5)
 	}
 
-	for y := 0; y < rows; y++ {
-		t.printAt(result, strconv.Itoa(y+1), 0.5, float32(y)+0.5, 0.5)
+	for y := first_y; y < rows; y++ {
+		t.printAt(result, strconv.Itoa(y+1), float32(first_x)+0.5, float32(y)+0.5, 0.5)
 	}
 
 	return result
@@ -506,9 +506,9 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		return nil, errors.New("cannot render tabula with zero DPI")
 	}
 
-	var coord image.Image
+	var gridded image.Image
 	if cached, ok := cache[t.Url]; ok && cached.version == t.Version {
-		coord = copyImage(cached.image)
+		gridded = copyImage(cached.image)
 	} else {
 		log.Infof("Cache miss: %s", t.Url)
 		if t.Background == nil {
@@ -536,19 +536,26 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 			}
 		}
 		if drawable, ok := resized.(draw.Image); ok {
-			gridded := t.addGrid(drawable)
-			coord = t.addCoordinates(gridded)
-			cache[t.Url] = cacheEntry{t.Version, copyImage(coord)}
+			gridded = t.addGrid(drawable)
+			cache[t.Url] = cacheEntry{t.Version, copyImage(gridded)}
 		} else {
 			panic("resize didn't return a drawable image?!")
 		}
 	}
 
-	if err := t.addTokens(coord, ctx); err != nil {
+	if err := t.addTokens(gridded, ctx); err != nil {
 		return nil, err
 	}
 
 	minx, miny, maxx, maxy := ctx.GetZoom()
+
+	var coord image.Image
+	if drawable, ok := gridded.(draw.Image); ok {
+		coord = t.addCoordinates(drawable, minx, miny)
+	} else {
+		panic("resize didn't return a drawable image?!")
+	}
+
 	if maxx > minx && maxy > miny {
 		coord = crop(
 			coord,
