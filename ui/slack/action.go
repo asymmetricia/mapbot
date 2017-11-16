@@ -11,6 +11,7 @@ import (
 	"github.com/pdbogen/mapbot/model/workflow"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 )
 
@@ -85,12 +86,14 @@ func (t *Team) Action(payload *slack.AttachmentActionCallback, rw http.ResponseW
 
 	writeResponse(rw, "Okay, hold on...")
 
+	log.Debug(payload)
+
 	t.hub.Publish(&hub.Command{
 		User:    userObj,
 		From:    fmt.Sprintf("internal:updateAction:slack:%s:%s", t.Info.ID, payload.ResponseURL),
-		Context: nil,
-		Payload: payload.Actions[0].Value,
-		Type:    "user:workflow:respond",
+		Context: t.Context(payload.Channel.ID),
+		Payload: []string{"respond", payload.CallbackID, payload.Actions[0].Value},
+		Type:    "user:workflow",
 	})
 }
 
@@ -104,6 +107,23 @@ func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
 
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
+
+	switch msg := c.Payload.(type) {
+	case *workflow.WorkflowMessage:
+		err := enc.Encode(t.renderWorkflowMessage(msg))
+		if err != nil {
+			log.Errorf("marshaling %q: %s", msg, err)
+		}
+	case string:
+		err := enc.Encode(slack.Msg{Text: msg})
+		if err != nil {
+			log.Errorf("marshaling %q: %s", msg, err)
+		}
+	default:
+		log.Errorf("uh, no clue how to handle a %T payload", c.Payload)
+		return
+	}
+
 	req, err := http.NewRequest("POST", responseUrl, body)
 	if err != nil {
 		log.Errorf("creating request: %s", err)
@@ -111,15 +131,9 @@ func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
 	}
 	req.Header.Add("content-type", "application/json")
 
-	switch msg := c.Payload.(type) {
-	case *workflow.WorkflowMessage:
-		enc.Encode(t.renderWorkflowMessage(msg))
-	case string:
-		enc.Encode(slack.Msg{Text: msg})
-	default:
-		log.Errorf("uh, no clue how to handle a %T payload", c.Payload)
-		return
-	}
+	bs, _ := httputil.DumpRequest(req, false)
+	log.Debug(string(bs))
+	log.Debug(body.String())
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

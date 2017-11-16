@@ -69,10 +69,14 @@ func cmdStart(h *hub.Hub, c *hub.Command) {
 		h.Error(c, fmt.Sprintf("error initiating workflow %q: %s", args[0], err))
 		return
 	}
-	c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}
+	if state == "exit" {
+		delete(c.User.Workflows, strings.ToLower(args[0]))
+	} else {
+		c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}
+	}
 	c.User.Save(db.Instance)
 
-	msg := wf.Challenge(state, opaque)
+	msg := wf.Challenge(args[0], state, opaque)
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(msg))
 }
 
@@ -110,11 +114,14 @@ func cmdRespond(h *hub.Hub, c *hub.Command) {
 		h.Error(c, fmt.Sprintf("action not accepted: %s", err))
 		return
 	}
-	c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}
-	c.User.Save(db.Instance)
-
-	msg := wf.Challenge(state, opaque)
+	if state == "exit" {
+		delete(c.User.Workflows, strings.ToLower(args[0]))
+	} else {
+		c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}
+	}
+	msg := wf.Challenge(args[0], state, opaque)
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(msg))
+	c.User.Save(db.Instance)
 }
 
 func cmdClear(h *hub.Hub, c *hub.Command) {}

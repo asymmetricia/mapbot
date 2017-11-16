@@ -2,7 +2,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"fmt"
 	. "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/ui/slack/context"
@@ -22,24 +21,30 @@ type Workflow struct {
 	States map[string]WorkflowState
 }
 
-// Challenge looks up the state by name, and if a state is found and it has a challenge, returns the result of calling
-// that state's Challenge.
+// Challenge is called upon entering a state; the state issues a challenge to
+// the user. Challenge looks up the state by name, and if a state is found and
+// it has a challenge, returns the result of calling that state's Challenge.
 // If the state cannot be found or it does not have a defined Challenge, a non-nil WorkflowMessage will provide a
 // message for the user describing the problem (but this typically indicates misuse of a debugging utility or a
 // programming error).
 // A nil WorkflowMessage is not an error, but indicates that there is no response for the user.
-func (wf *Workflow) Challenge(state string, opaque interface{}) *WorkflowMessage {
+
+func (wf *Workflow) Challenge(key string, state string, opaque interface{}) *WorkflowMessage {
 	stateObj, ok := wf.States[strings.ToLower(state)]
 	if !ok {
-		return &WorkflowMessage{Text: fmt.Sprintf("invalid state %q", state)}
+		return &WorkflowMessage{Workflow: key, Text: fmt.Sprintf("invalid state %q", state)}
 	}
 	if stateObj.Challenge == nil {
-		return &WorkflowMessage{Text: fmt.Sprintf("no challenge associated with state %q", state)}
+		return &WorkflowMessage{Workflow: key, Text: fmt.Sprintf("no challenge associated with state %q", state)}
 	}
-	return stateObj.Challenge(opaque)
+	msg := stateObj.Challenge(opaque)
+	msg.Workflow = key
+	return msg
 }
 
-// Response looks up the state by name, and if a state is found and it has a Response, returns the result of calling
+// Response is called when a user responds to a challenge, either via a message
+// action or via debugging commands. Response looks up the state by name, and
+// if a state is found and it has a Response, returns the result of calling
 // that state's Response.
 // Error will be non-nil if the state cannot be found or it does not have a Response.
 func (wf *Workflow) Response(state string, opaque interface{}, choice *string) (string, interface{}, error) {
@@ -78,11 +83,12 @@ type WorkflowMessage struct {
 }
 
 func (wfm *WorkflowMessage) Id() string {
-	jsonBytes, err := json.Marshal([]string{wfm.Workflow, wfm.State})
-	if err != nil {
-		panic(fmt.Errorf("This was real simple, what happened? %s", err))
-	}
-	return string(jsonBytes)
+	/*	jsonBytes, err := json.Marshal([]string{wfm.Workflow, wfm.State})
+		if err != nil {
+			panic(fmt.Errorf("This was real simple, what happened? %s", err))
+		}
+		return string(jsonBytes)*/
+	return wfm.Workflow
 }
 
 var Workflows = map[string]Workflow{
@@ -107,6 +113,13 @@ var Workflows = map[string]Workflow{
 				},
 				Response: func(interface{}, *string) (string, interface{}) {
 					return "exit", nil
+				},
+			},
+			"exit": {
+				Challenge: func(interface{}) *WorkflowMessage {
+					return &WorkflowMessage{
+						Text: "All done.",
+					}
 				},
 			},
 		},
