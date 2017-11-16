@@ -79,7 +79,7 @@ func GetEmojiOne(name string) (image.Image, error) {
 
 func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
 	if baseName[0] != ':' || baseName[len(baseName)-1] != ':' {
-		return nil, errors.New("slack emoji are bounded with colons (:)")
+		return nil, fmt.Errorf("slack emoji are bounded with colons (:), not %q and %q", baseName[0], baseName[len(baseName)-1])
 	}
 	name := baseName[1 : len(baseName)-1]
 	if i, ok := sc.EmojiCache[name]; ok {
@@ -93,7 +93,8 @@ func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
 		}
 
 		if emojiUrl.Scheme == "alias" {
-			return sc.GetEmoji(emojiUrl.Opaque)
+			log.Debugf("emoji %q is alias for %q, let's try that...", baseName, emojiUrl.Opaque)
+			return sc.GetEmoji(":" + emojiUrl.Opaque + ":")
 		}
 
 		c := http.Client{
