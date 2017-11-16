@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"regexp"
 )
 
 type Token struct {
@@ -174,16 +175,30 @@ func (t *Tabula) drawAt(i draw.Image, obj image.Image, x float32, y float32, siz
 	)
 }
 
+var emojiRe = regexp.MustCompile(`^(:[^:]+:)(.*)$`)
+
 func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
 		return errors.New("image provided could not be used as a draw.Image")
 	}
 
-	for name, token := range t.Tokens[ctx.Id()] {
+	for tokenName, token := range t.Tokens[ctx.Id()] {
 		coord := token.Coordinate
 		r, g, b, a := token.TokenColor.RGBA()
-		log.Debugf("Adding token %s (color:%d,%d,%d,%d) at (%d,%d)", name, r, g, b, a, coord.X, coord.Y)
+
+		var name, label string
+
+		comps := emojiRe.FindStringSubmatch(tokenName)
+		if comps == nil {
+			name = tokenName
+		} else {
+			name = comps[1]
+			label = comps[2]
+		}
+
+		log.Debugf("Adding token (name=%q) (label=%q) (color:%d,%d,%d,%d) at (%d,%d)", name, label, r, g, b, a, coord.X, coord.Y)
+
 		if ctx.IsEmoji(name) {
 			e, err := ctx.GetEmoji(name)
 			if err != nil {
@@ -192,12 +207,15 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 			} else {
 				t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+1, coord.Y+1), 1, token.TokenColor)
 				t.drawAt(drawable, e, float32(coord.X), float32(coord.Y), 1, 2)
+				if label != "" {
+					t.printAt(drawable, label, float32(coord.X), float32(coord.Y)+.5, 1, .5, Bottom, Center)
+				}
 				continue
 			}
 		}
 		//e, err := ctx.
 		t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+1, coord.Y+1), 1, token.TokenColor)
-		t.printAt(drawable, name, float32(coord.X), float32(coord.Y), 1)
+		t.printAt(drawable, name, float32(coord.X), float32(coord.Y), 1, 1, Middle, Center)
 	}
 	return nil
 }

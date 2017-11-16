@@ -322,23 +322,43 @@ func init() {
 	}
 }
 
-var coordCache map[float32]map[string]*image.RGBA
+type dimension struct{ w, h float32 }
 
-func glyph(s string, dpi float32) *image.RGBA {
+var coordCache map[dimension]map[string]*image.RGBA
+
+type VerticalAlignment float32
+
+const (
+	Top    VerticalAlignment = 0
+	Middle                   = 0.5
+	Bottom                   = 1.0
+)
+
+type HorizontalAlignment float32
+
+const (
+	Left   HorizontalAlignment = 0
+	Center                     = 0.5
+	Right                      = 1.0
+)
+
+// glyph renders the string given by `s` so that it fits horizontally in the rectangle given by (width,height)
+func glyph(s string, width float32, height float32, valign VerticalAlignment, halign HorizontalAlignment) *image.RGBA {
+	dim := dimension{width, height}
 	if coordCache == nil {
-		coordCache = map[float32]map[string]*image.RGBA{}
+		coordCache = map[dimension]map[string]*image.RGBA{}
 	}
 
-	if _, ok := coordCache[dpi]; !ok {
-		coordCache[dpi] = map[string]*image.RGBA{}
+	if _, ok := coordCache[dim]; !ok {
+		coordCache[dim] = map[string]*image.RGBA{}
 	}
 
-	if i, ok := coordCache[dpi][s]; ok {
+	if i, ok := coordCache[dim][s]; ok {
 		return i
 	}
 
-	w := 100 + (len(s)+1)*int(dpi)
-	h := 100 + int(dpi)
+	w := 100 + (len(s)+1)*int(width)
+	h := 100 + int(height)
 
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 
@@ -346,8 +366,16 @@ func glyph(s string, dpi float32) *image.RGBA {
 	ctx.SetClip(img.Bounds())
 	ctx.SetDst(img)
 	ctx.SetFont(font)
-	ctx.SetDPI(float64(dpi))
-	ctx.SetFontSize(70 / float64(len(s)))
+	if width > height {
+		ctx.SetDPI(float64(width))
+	} else {
+		ctx.SetDPI(float64(height))
+	}
+	if 70/float32(len(s)) < height {
+		ctx.SetFontSize(70 / float64(len(s)))
+	} else {
+		ctx.SetFontSize(float64(height) - 5)
+	}
 	ctx.SetSrc(image.Black)
 
 	for _, x := range []int{-2, 0, 2} {
@@ -359,15 +387,15 @@ func glyph(s string, dpi float32) *image.RGBA {
 	ctx.SetSrc(image.White)
 	ctx.DrawString(s, fixed.Point26_6{X: fixed.I(50), Y: fixed.I(50)})
 
-	img = center(autocrop(img), int(dpi))
-	coordCache[dpi][s] = img
+	img = align(autocrop(img), int(width), int(height), float32(halign), float32(valign))
+	coordCache[dim][s] = img
 	return img
 }
 
-func center(i *image.RGBA, dim int) *image.RGBA {
-	offsetX := (dim - i.Bounds().Dx()) / 2
-	offsetY := (dim - i.Bounds().Dy()) / 2
-	result := image.NewRGBA(image.Rect(0, 0, dim, dim))
+func align(i *image.RGBA, width int, height int, xFactor float32, yFactor float32) *image.RGBA {
+	offsetX := int(float32(width-i.Bounds().Dx()) * xFactor)
+	offsetY := int(float32(height-i.Bounds().Dy()) * yFactor)
+	result := image.NewRGBA(image.Rect(0, 0, width, height))
 	for x := i.Bounds().Min.X; x < i.Bounds().Max.X; x++ {
 		for y := i.Bounds().Min.Y; y < i.Bounds().Max.Y; y++ {
 			result.Set(x+offsetX, y+offsetY, i.At(x, y))
@@ -449,9 +477,9 @@ func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col c
 }
 
 // drawAt *modifies* the image given by `i` so that the string given by `what` is printed in the square at tabula
-// coordinates x,y (not image coordinates), scaled so that the string given occupies `size` squares.
-func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, size float32) {
-	g := glyph(what, t.Dpi*size)
+// coordinates x,y (not image coordinates), scaled so that the string occupies a rectangle described by (width,height) tabula squares
+func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, width float32, height float32, valign VerticalAlignment, halign HorizontalAlignment) {
+	g := glyph(what, t.Dpi*width, t.Dpi*height, valign, halign)
 	draw.Draw(
 		i,
 		image.Rect(
@@ -481,11 +509,11 @@ func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int) draw.Image {
 			tmp = int(tmp/26) - 1
 			c = letters[tmp%26] + c
 		}
-		t.printAt(result, c, float32(x), float32(first_y), 0.5)
+		t.printAt(result, c, float32(x), float32(first_y), 1, 0.5, Middle, Left)
 	}
 
 	for y := first_y; y < rows; y++ {
-		t.printAt(result, strconv.Itoa(y+1), float32(first_x)+0.5, float32(y)+0.5, 0.5)
+		t.printAt(result, strconv.Itoa(y+1), float32(first_x), float32(y)+0.5, 1, 0.5, Middle, Right)
 	}
 
 	return result
