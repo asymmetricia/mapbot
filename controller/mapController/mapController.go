@@ -85,7 +85,12 @@ func cmdZoom(h *hub.Hub, c *hub.Command) {
 
 func cmdDpi(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && (len(args) == 1 || len(args) == 2) {
-		cmdSet(h, c.WithPayload([]string{args[0], "dpi", args[1]}))
+		if len(args) == 1 {
+			args = []string{"dpi", args[0]}
+		} else {
+			args = []string{args[0], "dpi", args[1]}
+		}
+		cmdSet(h, c.WithPayload(args))
 		return
 	} else {
 		h.Error(c, "usage: map dpi "+processor.Commands["dpi"].Args)
@@ -94,7 +99,12 @@ func cmdDpi(h *hub.Hub, c *hub.Command) {
 
 func cmdGridColor(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && (len(args) == 1 || len(args) == 2) {
-		cmdSet(h, c.WithPayload([]string{args[0], "gridColor", args[1]}))
+		if len(args) == 1 {
+			args = []string{"gridColor", args[0]}
+		} else {
+			args = []string{args[0], "gridColor", args[1]}
+		}
+		cmdSet(h, c.WithPayload(args))
 		return
 	} else {
 		h.Error(c, "usage: map gridcolor "+processor.Commands["gridcolor"].Args)
@@ -206,7 +216,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 			}
 			t.Dpi = float32(n)
 		default:
-			h.Error(c, fmt.Sprintf("hmmm, I don't know how to set %s. Please try: map set %s", args[0], processor.Command["set"].Args))
+			h.Error(c, fmt.Sprintf("hmmm, I don't know how to set %s. Please try: map set %s", args[i], processor.Commands["set"].Args))
 			return
 		}
 		t.Version++
