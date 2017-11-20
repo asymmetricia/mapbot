@@ -534,11 +534,13 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		return nil, errors.New("cannot render tabula with zero DPI")
 	}
 
+	cacheKey := fmt.Sprintf("%s|%fdpi+%dx%d", t.Url, t.Dpi, t.OffsetX, t.OffsetY)
+
 	var gridded image.Image
-	if cached, ok := cache[t.Url]; ok && cached.version == t.Version {
+	if cached, ok := cache[cacheKey]; ok && cached.version == t.Version {
 		gridded = copyImage(cached.image)
 	} else {
-		log.Infof("Cache miss: %s", t.Url)
+		log.Infof("Cache miss: %s", cacheKey)
 		if t.Background == nil {
 			sendStatusMessage("I have to retrieve the background image; this could take a moment.")
 			if err := t.Hydrate(); err != nil {
@@ -565,7 +567,7 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		}
 		if drawable, ok := resized.(draw.Image); ok {
 			gridded = t.addGrid(drawable)
-			cache[t.Url] = cacheEntry{t.Version, copyImage(gridded)}
+			cache[cacheKey] = cacheEntry{t.Version, copyImage(gridded)}
 		} else {
 			panic("resize didn't return a drawable image?!")
 		}
