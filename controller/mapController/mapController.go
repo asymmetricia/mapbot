@@ -29,7 +29,7 @@ func init() {
 		Commands: map[string]cmdproc.Subcommand{
 			"add":       cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
 			"show":      cmdproc.Subcommand{"[<name>]", "show a the named map; or the active map in this context, if any", cmdShow},
-			"set":       cmdproc.Subcommand{"<name> {offsetX|offsetY|dpi|gridColor} <value>[ <key2> <value2> ...]", "set a property of an existing map; offsetX, offsetY, and dpi accepts numbers; color accepts some common color names or a six-digit hex code", cmdSet},
+			"set":       cmdproc.Subcommand{"[<name>] {offsetX|offsetY|dpi|gridColor} <value>[ <key2> <value2> ...]", "set a property of an existing map; offsetX, offsetY, and dpi accepts numbers; color accepts some common color names or a six-digit hex code. If no map is specified, selected map is used.", cmdSet},
 			"list":      cmdproc.Subcommand{"", "list your maps", cmdList},
 			"select":    cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
 			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
@@ -132,16 +132,37 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if len(args) < 3 || (len(args)-1)%2 != 0 {
+	var t *tabula.Tabula
+
+	if len(args) < 2 {
 		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
 		return
 	}
 
-	t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
-	if !ok {
-		h.Error(c, notFound(tabula.TabulaName(args[0])))
-		return
+	// We just have pairs, so assume we're using active map
+	if len(args)%2 == 0 {
+		tabId := c.Context.GetActiveTabulaId()
+		if tabId == nil {
+			h.Error(c, "no active map in this channel, use `map select <name>` to pick one, or provide a map name")
+			return
+		}
+
+		var err error
+		t, err = tabula.Get(db.Instance, *tabId)
+		if err != nil {
+			h.Error(c, "error loading active map")
+			log.Errorf("error loading active map %d: %s", tabId, err)
+			return
+		}
+	} else {
+		var ok bool
+		t, ok = c.User.TabulaByName(tabula.TabulaName(args[0]))
+		if !ok {
+			h.Error(c, notFound(tabula.TabulaName(args[0])))
+			return
+		}
 	}
+
 	for i := 1; i < len(args); i += 2 {
 		switch strings.ToLower(args[i]) {
 		case "gridcolor":
