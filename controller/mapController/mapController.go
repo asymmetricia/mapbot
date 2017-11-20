@@ -84,7 +84,7 @@ func cmdZoom(h *hub.Hub, c *hub.Command) {
 }
 
 func cmdDpi(h *hub.Hub, c *hub.Command) {
-	if args, ok := c.Payload.([]string); ok && len(args) == 2 {
+	if args, ok := c.Payload.([]string); ok && (len(args) == 1 || len(args) == 2) {
 		cmdSet(h, c.WithPayload([]string{args[0], "dpi", args[1]}))
 		return
 	} else {
@@ -93,7 +93,7 @@ func cmdDpi(h *hub.Hub, c *hub.Command) {
 }
 
 func cmdGridColor(h *hub.Hub, c *hub.Command) {
-	if args, ok := c.Payload.([]string); ok && len(args) == 2 {
+	if args, ok := c.Payload.([]string); ok && (len(args) == 1 || len(args) == 2) {
 		cmdSet(h, c.WithPayload([]string{args[0], "gridColor", args[1]}))
 		return
 	} else {
@@ -128,17 +128,18 @@ var colorRegex = regexp.MustCompile("^#?[0-9a-fA-F]{6}$")
 func cmdSet(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
 	if !ok {
+		log.Debugf("received non-[]string payload %T", c.Payload)
+		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
+		return
+	}
+
+	if len(args) < 2 {
+		log.Debugf("received %d args, expected at least 2", len(args))
 		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
 		return
 	}
 
 	var t *tabula.Tabula
-
-	if len(args) < 2 {
-		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
-		return
-	}
-
 	// We just have pairs, so assume we're using active map
 	if len(args)%2 == 0 {
 		tabId := c.Context.GetActiveTabulaId()
@@ -161,9 +162,10 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 			h.Error(c, notFound(tabula.TabulaName(args[0])))
 			return
 		}
+		args = args[1:]
 	}
 
-	for i := 1; i < len(args); i += 2 {
+	for i := 0; i < len(args); i += 2 {
 		switch strings.ToLower(args[i]) {
 		case "gridcolor":
 			if col, ok := colors.Colors[strings.ToLower(args[i+1])]; ok {
@@ -204,7 +206,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 			}
 			t.Dpi = float32(n)
 		default:
-			h.Error(c, "usage: map set "+processor.Commands["set"].Args)
+			h.Error(c, fmt.Sprintf("hmmm, I don't know how to set %s. Please try: map set %s", args[0], processor.Command["set"].Args))
 			return
 		}
 		t.Version++
