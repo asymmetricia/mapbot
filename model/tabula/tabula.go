@@ -542,9 +542,15 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 	} else {
 		log.Infof("Cache miss: %s", cacheKey)
 		if t.Background == nil {
-			sendStatusMessage("I have to retrieve the background image; this could take a moment.")
-			if err := t.Hydrate(); err != nil {
-				return nil, fmt.Errorf("retrieving background: %s", err)
+			bg, ok := cache[t.Url]
+			if ok && bg.version == t.Version {
+				t.Background = copyImage(bg.image)
+			} else {
+				sendStatusMessage("I have to retrieve the background image; this could take a moment.")
+				if err := t.Hydrate(); err != nil {
+					return nil, fmt.Errorf("retrieving background: %s", err)
+				}
+				cache[t.Url] = cacheEntry{t.Version, copyImage(t.Background)}
 			}
 		}
 
