@@ -168,6 +168,7 @@ Maps are referred mostly as Tabula in code, since map is a reserved word in gola
 * [X] Position on map
 * [X] Box color
 * [ ] Stacking of small tokens
+* [ ] opened/closed door tokens
 
 Commands:
 
