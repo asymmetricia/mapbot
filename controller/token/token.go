@@ -35,11 +35,62 @@ func init() {
 			"list":   cmdproc.Subcommand{"", "list tokens on the active map", cmdList},
 			"clear":  cmdproc.Subcommand{"", "clear tokens from the field", cmdClear},
 			"remove": cmdproc.Subcommand{"<name>", "removes the named token from the active map", cmdRemove},
+			"swap":   cmdproc.Subcommand{"<old> <new>", "replace an old token with a new token, retaining other settings (location/color)", cmdSwap},
 		},
 	}
 }
 
 var hexColorRe = regexp.MustCompile(`^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$`)
+
+func cmdSwap(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "unexpected payload")
+		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
+		return
+	}
+
+	if len(args) != 2 {
+		h.Error(c, "usage: token swap "+processor.Commands["swap"].Args)
+		return
+	}
+
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "no active map in this channel, use `map select <name>` first")
+		return
+	}
+
+	tab, err := tabula.Get(db.Instance, *tabId)
+	if err != nil {
+		h.Error(c, "an error occured loading the active map for this channel")
+		log.Errorf("error loading tabula %d: %s", *tabId, err)
+		return
+	}
+
+	name := args[0]
+
+	if tab.Tokens == nil || tab.Tokens[c.Context.Id()] == nil {
+		h.Error(c, fmt.Sprintf("no token %s is on the active map; try `token list`", name))
+		return
+	}
+
+	token, tokenOk := tab.Tokens[c.Context.Id()][name]
+	if !tokenOk {
+		h.Error(c, fmt.Sprintf("no token %s is on the active map; try `token list`", name))
+		return
+	}
+
+	tab.Tokens[c.Context.Id()][args[1]] = token
+	delete(tab.Tokens[c.Context.Id()], name)
+
+	if err := tab.Save(db.Instance); err != nil {
+		h.Error(c, "an error occured saving the active map for this channel")
+		log.Errorf("error saving tabula %d: %s", tab.Id, err)
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+}
 
 func cmdColor(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
