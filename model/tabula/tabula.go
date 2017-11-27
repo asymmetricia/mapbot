@@ -322,7 +322,11 @@ func init() {
 	}
 }
 
-type dimension struct{ w, h float32 }
+type dimension struct {
+	w, h   float32
+	valign VerticalAlignment
+	halign HorizontalAlignment
+}
 
 var coordCache map[dimension]map[string]*image.RGBA
 
@@ -344,7 +348,7 @@ const (
 
 // glyph renders the string given by `s` so that it fits horizontally in the rectangle given by (width,height)
 func glyph(s string, width float32, height float32, valign VerticalAlignment, halign HorizontalAlignment) *image.RGBA {
-	dim := dimension{width, height}
+	dim := dimension{width, height, valign, halign}
 	if coordCache == nil {
 		coordCache = map[dimension]map[string]*image.RGBA{}
 	}
