@@ -1,6 +1,7 @@
 package tabula
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"testing"
@@ -41,5 +42,59 @@ func TestBlendAt(t *testing.T) {
 	}
 	if a != 255<<8|255 {
 		t.Fatalf("blended-at a was %d, not %d", a, 255<<8|255)
+	}
+}
+
+func TestAlign(t *testing.T) {
+	type test struct {
+		h      float32
+		v      float32
+		points map[int]map[int]bool
+	}
+
+	glyph := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	glyph.Set(0, 0, color.White)
+
+	for _, size := range []int{3, 19, 50} {
+		max := size - 1
+		half := max / 2
+
+		tests := []test{
+			{0, 0, map[int]map[int]bool{0: map[int]bool{0: true}}},
+			{.5, 0, map[int]map[int]bool{half: map[int]bool{0: true}}},
+			{1, 0, map[int]map[int]bool{max: map[int]bool{0: true}}},
+			{0, .5, map[int]map[int]bool{0: map[int]bool{half: true}}},
+			{.5, .5, map[int]map[int]bool{half: map[int]bool{half: true}}},
+			{1, .5, map[int]map[int]bool{max: map[int]bool{half: true}}},
+			{0, 1, map[int]map[int]bool{0: map[int]bool{max: true}}},
+			{.5, 1, map[int]map[int]bool{half: map[int]bool{max: true}}},
+			{1, 1, map[int]map[int]bool{max: map[int]bool{max: true}}},
+		}
+
+		for n, test := range tests {
+			aligned := align(glyph, size, size, test.h, test.v)
+			for y := 0; y < size; y++ {
+				for x := 0; x < size; x++ {
+					if aligned.At(x, y) == (color.RGBA{0, 0, 0, 0}) {
+						fmt.Print(".")
+					} else {
+						fmt.Print("#")
+					}
+				}
+				fmt.Print("\n")
+			}
+			fmt.Print("\n")
+			for x := 0; x < size; x++ {
+				for y := 0; y < size; y++ {
+					should := color.RGBA{0, 0, 0, 0}
+					if test.points[x][y] {
+						should = color.RGBA{255, 255, 255, 255}
+					}
+					if aligned.At(x, y) != should {
+						t.Fatalf("aligned-at #%d (v=%f, h=%f) (%d,%d) was %v, not %v", n, test.v, test.h, x, y, aligned.At(x, y), should)
+					}
+				}
+			}
+		}
 	}
 }
