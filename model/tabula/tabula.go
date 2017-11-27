@@ -326,20 +326,20 @@ type dimension struct{ w, h float32 }
 
 var coordCache map[dimension]map[string]*image.RGBA
 
-type VerticalAlignment float32
+type VerticalAlignment int
 
 const (
-	Top    VerticalAlignment = 0
-	Middle                   = 0.5
-	Bottom                   = 1.0
+	Top VerticalAlignment = iota
+	Middle
+	Bottom
 )
 
-type HorizontalAlignment float32
+type HorizontalAlignment int
 
 const (
-	Left   HorizontalAlignment = 0
-	Center                     = 0.5
-	Right                      = 1.0
+	Left HorizontalAlignment = iota
+	Center
+	Right
 )
 
 // glyph renders the string given by `s` so that it fits horizontally in the rectangle given by (width,height)
@@ -387,14 +387,30 @@ func glyph(s string, width float32, height float32, valign VerticalAlignment, ha
 	ctx.SetSrc(image.White)
 	ctx.DrawString(s, fixed.Point26_6{X: fixed.I(50), Y: fixed.I(50)})
 
-	img = align(autocrop(img), int(width), int(height), float32(halign), float32(valign))
+	img = align(autocrop(img), int(width), int(height), halign, valign)
 	coordCache[dim][s] = img
 	return img
 }
 
-func align(i *image.RGBA, width int, height int, xFactor float32, yFactor float32) *image.RGBA {
-	offsetX := int(float32(width-i.Bounds().Dx()) * xFactor)
-	offsetY := int(float32(height-i.Bounds().Dy()) * yFactor)
+// align aligns the given image within a larger image, with bounds described
+// by (width,height), according to the requested alignment. width and height
+// describe the numbers of pixels, i.e., a value one greater than the right- or
+// bottom-most pixel's index.
+func align(i *image.RGBA, width int, height int, halign HorizontalAlignment, valign VerticalAlignment) *image.RGBA {
+	var offsetX, offsetY int
+	switch halign {
+	case Center:
+		offsetX = width/2 - (i.Bounds().Dx())/2
+	case Right:
+		offsetX = width - i.Bounds().Dx()
+	}
+	switch valign {
+	case Middle:
+		offsetY = height/2 - (i.Bounds().Dy())/2
+	case Bottom:
+		offsetY = height - i.Bounds().Dy()
+	}
+
 	result := image.NewRGBA(image.Rect(0, 0, width, height))
 	for x := i.Bounds().Min.X; x < i.Bounds().Max.X; x++ {
 		for y := i.Bounds().Min.Y; y < i.Bounds().Max.Y; y++ {

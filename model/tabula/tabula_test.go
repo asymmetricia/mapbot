@@ -47,28 +47,42 @@ func TestBlendAt(t *testing.T) {
 
 func TestAlign(t *testing.T) {
 	type test struct {
-		h      float32
-		v      float32
+		h      HorizontalAlignment
+		v      VerticalAlignment
 		points map[int]map[int]bool
 	}
 
-	glyph := image.NewRGBA(image.Rect(0, 0, 1, 1))
-	glyph.Set(0, 0, color.White)
+	const gsize = 2
+	glyph := image.NewRGBA(image.Rect(0, 0, gsize, gsize))
+	for i := 0; i < gsize; i++ {
+		glyph.Set(i, i, color.White)
+	}
 
-	for _, size := range []int{3, 19, 50} {
+	for y := 0; y < glyph.Bounds().Max.Y; y++ {
+		for x := 0; x < glyph.Bounds().Max.X; x++ {
+			if glyph.At(x, y) == (color.RGBA{0, 0, 0, 0}) {
+				fmt.Print(".")
+			} else {
+				fmt.Print("#")
+			}
+		}
+		fmt.Print("\n")
+	}
+
+	for _, size := range []int{3, 4, 19, 50} {
+		half := size/2 - 1
 		max := size - 1
-		half := max / 2
 
 		tests := []test{
-			{0, 0, map[int]map[int]bool{0: map[int]bool{0: true}}},
-			{.5, 0, map[int]map[int]bool{half: map[int]bool{0: true}}},
-			{1, 0, map[int]map[int]bool{max: map[int]bool{0: true}}},
-			{0, .5, map[int]map[int]bool{0: map[int]bool{half: true}}},
-			{.5, .5, map[int]map[int]bool{half: map[int]bool{half: true}}},
-			{1, .5, map[int]map[int]bool{max: map[int]bool{half: true}}},
-			{0, 1, map[int]map[int]bool{0: map[int]bool{max: true}}},
-			{.5, 1, map[int]map[int]bool{half: map[int]bool{max: true}}},
-			{1, 1, map[int]map[int]bool{max: map[int]bool{max: true}}},
+			{Left, Top, map[int]map[int]bool{0: map[int]bool{0: true}, 1: map[int]bool{1: true}}},
+			{Center, Top, map[int]map[int]bool{half: map[int]bool{0: true}, half + 1: map[int]bool{1: true}}},
+			{Right, Top, map[int]map[int]bool{max - 1: map[int]bool{0: true}, max: map[int]bool{1: true}}},
+			{Left, Middle, map[int]map[int]bool{0: map[int]bool{half: true}, 1: map[int]bool{half + 1: true}}},
+			{Center, Middle, map[int]map[int]bool{half: map[int]bool{half: true}, half + 1: map[int]bool{half + 1: true}}},
+			{Right, Middle, map[int]map[int]bool{max - 1: map[int]bool{half: true}, max: map[int]bool{half + 1: true}}},
+			{Left, Bottom, map[int]map[int]bool{0: map[int]bool{max - 1: true}, 1: map[int]bool{max: true}}},
+			{Center, Bottom, map[int]map[int]bool{half: map[int]bool{max - 1: true}, half + 1: map[int]bool{max: true}}},
+			{Right, Bottom, map[int]map[int]bool{max - 1: map[int]bool{max - 1: true}, max: map[int]bool{max: true}}},
 		}
 
 		for n, test := range tests {
@@ -81,6 +95,14 @@ func TestAlign(t *testing.T) {
 						fmt.Print("#")
 					}
 				}
+				fmt.Print("    ")
+				for x := 0; x < size; x++ {
+					if test.points[x][y] {
+						fmt.Print("#")
+					} else {
+						fmt.Print(".")
+					}
+				}
 				fmt.Print("\n")
 			}
 			fmt.Print("\n")
@@ -91,7 +113,7 @@ func TestAlign(t *testing.T) {
 						should = color.RGBA{255, 255, 255, 255}
 					}
 					if aligned.At(x, y) != should {
-						t.Fatalf("aligned-at #%d (v=%f, h=%f) (%d,%d) was %v, not %v", n, test.v, test.h, x, y, aligned.At(x, y), should)
+						t.Fatalf("aligned-at #%d (v=%v, h=%v) (%d,%d) was %v, not %v", n, test.v, test.h, x, y, aligned.At(x, y), should)
 					}
 				}
 			}
