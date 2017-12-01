@@ -10,6 +10,7 @@ import (
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	helpController "github.com/pdbogen/mapbot/controller/help"
 	"github.com/pdbogen/mapbot/controller/mapController"
+	markCtrl "github.com/pdbogen/mapbot/controller/mark"
 	maskController "github.com/pdbogen/mapbot/controller/mask"
 	tokenController "github.com/pdbogen/mapbot/controller/token"
 	workflowController "github.com/pdbogen/mapbot/controller/workflow"
@@ -68,6 +69,7 @@ func main() {
 	helpController.Register(hub)
 	tokenController.Register(hub)
 	workflowController.Register(hub)
+	markCtrl.Register(hub)
 
 	slackUi, err := slack.New(
 		*SlackClientToken,
