@@ -11,6 +11,7 @@ import (
 	_ "image/png"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -46,9 +47,6 @@ func init() {
 type EmojiNotFound error
 
 func GetEmojiOne(name string) (image.Image, error) {
-	if len(name) == 7 && name[0:5] == "flag-" {
-		name = "flag_" + name[5:]
-	}
 	if e, ok := EmojiOne[name]; ok {
 		if e.Image == nil {
 			emojiUrl := fmt.Sprintf("https://cdnjs.cloudflare.com/ajax/libs/emojione/2.2.7/assets/png/%s.png", e.Unicode)
@@ -72,6 +70,8 @@ func GetEmojiOne(name string) (image.Image, error) {
 		} else {
 			return e.Image, nil
 		}
+	} else if strings.Contains(name, "_") {
+		return GetEmojiOne(strings.Replace(name, "_", "-", -1))
 	} else {
 		return nil, EmojiNotFound(errors.New("not found"))
 	}
