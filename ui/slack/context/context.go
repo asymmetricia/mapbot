@@ -32,6 +32,7 @@ var emojiJson = `{"grinning":{"unicode":"1f600","unicode_alt":"","code_decimal":
 type emoji struct {
 	Unicode string      `json:"unicode"`
 	Image   image.Image `json:"-"`
+	Aliases []string    `json:"aliases"`
 }
 
 var EmojiOne map[string]*emoji = map[string]*emoji{}
@@ -41,13 +42,34 @@ func init() {
 	if err := json.Unmarshal([]byte(emojiJson), &EmojiOne); err != nil {
 		panic(fmt.Sprintf("parsing emoji one JSON: %s", err))
 	}
+
+	expanded := map[string]bool{}
+	for n, e := range EmojiOne {
+		if _, ok := expanded[n]; ok {
+			continue
+		}
+		for _, a := range e.Aliases {
+			EmojiOne[a] = e
+			expanded[a] = true
+		}
+		expanded[n] = true
+	}
+
 	log.Debugf("Parsing emojiOne payload took %0.2fs", time.Now().Sub(start).Seconds())
 }
 
 type EmojiNotFound error
 
 func GetEmojiOne(name string) (image.Image, error) {
-	if e, ok := EmojiOne[name]; ok {
+	e, ok := EmojiOne[name]
+	if !ok {
+		e, ok = EmojiOne[strings.Replace(name, "_", "-", -1)]
+	}
+	if !ok {
+		e, ok = EmojiOne[strings.Replace(name, "-", "_", -1)]
+	}
+
+	if ok {
 		if e.Image == nil {
 			emojiUrl := fmt.Sprintf("https://cdnjs.cloudflare.com/ajax/libs/emojione/2.2.7/assets/png/%s.png", e.Unicode)
 			c := http.Client{
@@ -70,8 +92,6 @@ func GetEmojiOne(name string) (image.Image, error) {
 		} else {
 			return e.Image, nil
 		}
-	} else if strings.Contains(name, "_") {
-		return GetEmojiOne(strings.Replace(name, "_", "-", -1))
 	} else {
 		return nil, EmojiNotFound(errors.New("not found"))
 	}
