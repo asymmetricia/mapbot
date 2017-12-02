@@ -12,9 +12,6 @@ import (
 	"github.com/pdbogen/mapbot/model/types"
 	"image/color"
 	"reflect"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 var log = mbLog.Log
@@ -39,8 +36,6 @@ func init() {
 		},
 	}
 }
-
-var hexColorRe = regexp.MustCompile(`^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$`)
 
 func cmdSwap(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
@@ -131,38 +126,9 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	var newColor color.Color
-	colorName := args[1]
-	if namedColor, ok := colors.Colors[strings.ToLower(colorName)]; ok {
-		newColor = namedColor
-	} else if hexColorRe.MatchString(colorName) {
-		colorName = strings.TrimLeft(colorName, "#")
-
-		var r, g, b, a uint64
-		var err error
-
-		r, err = strconv.ParseUint(colorName[0:2], 16, 8)
-
-		if err == nil {
-			g, err = strconv.ParseUint(colorName[2:4], 16, 8)
-		}
-
-		if err == nil {
-			b, err = strconv.ParseUint(colorName[4:6], 16, 8)
-		}
-
-		a = 0xFF
-		if len(colorName) == 8 && err == nil {
-			a, err = strconv.ParseUint(colorName[6:8], 16, 8)
-		}
-
-		if err != nil {
-			h.Error(c, fmt.Sprintf("`%s` looks like a hex color, but I can't parse it: %s", colorName, err))
-			return
-		}
-		newColor = color.NRGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
-	} else {
-		h.Error(c, fmt.Sprintf("I don't know of a color named %q, and that doesn't look like a hex color code", colorName))
+	newColor, err := colors.ToColor(args[1])
+	if err != nil {
+		h.Error(c, err.Error())
 		return
 	}
 
