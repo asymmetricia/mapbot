@@ -43,7 +43,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			}
 		}
 
-		if _, err := colors.ToColor(a); err != nil {
+		if _, err := colors.ToColor(a); err == nil {
 			// FIXME paint the squares the color
 			// reset the list of squares
 			squares = []image.Point{}
