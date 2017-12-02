@@ -14,7 +14,7 @@ var yCoordRe = regexp.MustCompile(`^[0-9]+$`)
 var coordRe = regexp.MustCompile(`^([a-zA-Z]+)([0-9]+)$`)
 
 func RCToPoint(rc string) (image.Point, error) {
-	if matches := coordRe.FindStringSubmatch(rc); matches != nil || len(matches) < 3 {
+	if matches := coordRe.FindStringSubmatch(rc); matches != nil && len(matches) >= 3 {
 		return CoordsToPoint(matches[1], matches[2])
 	} else {
 		return image.Point{}, errors.New("not an RC coordinate")
