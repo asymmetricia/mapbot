@@ -215,7 +215,7 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 				t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+token.Size, coord.Y+token.Size), 1, token.TokenColor)
 				t.drawAt(drawable, emoji, float32(coord.X), float32(coord.Y), float32(token.Size), 2)
 				if label != "" {
-					t.printAt(drawable, label, float32(coord.X), float32(coord.Y)+.5, float32(token.Size), float32(token.Size)/2, Bottom, Center)
+					t.printAt(drawable, label, float32(coord.X), float32(coord.Y)+float32(token.Size)/2, float32(token.Size), float32(token.Size)/2, Bottom, Center)
 				}
 				continue
 			}
