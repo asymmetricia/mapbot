@@ -17,7 +17,7 @@ push: .push
 	ssh ${SERVER} $$(aws ecr get-login) && \
 	ssh ${SERVER} docker pull ${IMAGE_URL} && \
 	ssh ${SERVER} docker tag ${IMAGE_URL} mapbot && \
-	touch .push
+	touch .pull
 
 .docker: mapbot Dockerfile run.sh
 	docker build -t mapbot .
