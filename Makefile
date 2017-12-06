@@ -1,21 +1,27 @@
 .PHONY: clean
 
 SERVER ?= vdr.cernu.us
-PUSH ?= 1
+IMAGE_URL ?= 248174752766.dkr.ecr.us-west-1.amazonaws.com/mapbot
 
-restart: .push
+restart: .pull
 	ssh -At vdr.cernu.us docker rm -f mapbot || true
 
 push: .push
 .push: .docker
 	@ set -e; \
-	[ "${PUSH}" -eq 0 ] && exit 0; \
-	SIZE=$$(docker inspect -s mapbot | jq '.[0].Size') && \
-	docker save mapbot | pv -s $$SIZE | ssh -C vdr.cernu.us docker load && \
+	eval "$$(aws ecr get-login)" && \
+	docker push ${IMAGE_URL} && \
+	touch .push
+
+.pull: .push
+	ssh ${SERVER} $$(aws ecr get-login) && \
+	ssh ${SERVER} docker pull ${IMAGE_URL} && \
+	ssh ${SERVER} docker tag ${IMAGE_URL} mapbot && \
 	touch .push
 
 .docker: mapbot Dockerfile run.sh
 	docker build -t mapbot .
+	docker tag mapbot ${IMAGE_URL}
 	touch .docker
 
 

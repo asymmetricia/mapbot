@@ -16,6 +16,7 @@ import (
 type Token struct {
 	Coordinate image.Point
 	TokenColor color.Color
+	Size       int
 }
 
 func (t Token) WithColor(c color.Color) (ret Token) {
@@ -30,12 +31,18 @@ func (t Token) WithCoords(p image.Point) (ret Token) {
 	return
 }
 
+func (t Token) WithSize(s int) (ret Token) {
+	ret = t
+	ret.Size = s
+	return
+}
+
 func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 	if t.Id == nil {
 		return errors.New("cannot load tokens for tabula with nil ID")
 	}
 	// Read list of existing tokens
-	res, err := db.Query("SELECT context_id, name, x, y, r, g, b, a FROM tabula_tokens WHERE tabula_id=$1", t.Id)
+	res, err := db.Query("SELECT context_id, name, size, x, y, r, g, b, a FROM tabula_tokens WHERE tabula_id=$1", t.Id)
 	if err != nil {
 		return fmt.Errorf("retrieving list to sync: %s", err)
 	}
@@ -45,21 +52,21 @@ func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 	for res.Next() {
 		var ctxId types.ContextId
 		var name string
-		var x, y int
+		var x, y, size int
 		var r, g, b, a uint8
-		if err := res.Scan(&ctxId, &name, &x, &y, &r, &g, &b, &a); err != nil {
+		if err := res.Scan(&ctxId, &name, &size, &x, &y, &r, &g, &b, &a); err != nil {
 			log.Warningf("scanning row: %s", err)
 			continue
 		}
-		if ctxTokens, ok := t.Tokens[ctxId]; !ok {
-			t.Tokens[ctxId] = map[string]Token{
-				name: {image.Point{x, y}, color.RGBA{r, g, b, a}},
-			}
-		} else {
-			ctxTokens[name] = Token{
-				image.Point{x, y},
-				color.RGBA{r, g, b, a},
-			}
+
+		if _, ok := t.Tokens[ctxId]; !ok {
+			t.Tokens[ctxId] = map[string]Token{}
+		}
+
+		t.Tokens[ctxId][name] = Token{
+			image.Point{x, y},
+			color.RGBA{r, g, b, a},
+			size,
 		}
 	}
 
@@ -124,10 +131,10 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 	var query string
 	switch dia := db.Dialect(); dia {
 	case "postgresql":
-		query = "INSERT INTO tabula_tokens (name, context_id, tabula_id, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) " +
-			"ON CONFLICT (name, context_id, tabula_id) DO UPDATE SET x=$4, y=$5, r=$6, g=$7, b=$8, a=$9"
+		query = "INSERT INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) " +
+			"ON CONFLICT (name, context_id, tabula_id) DO UPDATE SET size=$4, x=$5, y=$6, r=$7, g=$8, b=$9, a=$10"
 	case "sqlite3":
-		query = "REPLACE INTO tabula_tokens (name, context_id, tabula_id, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)"
+		query = "REPLACE INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"
 	default:
 		return fmt.Errorf("no Tabula.saveTokens query for SQL dialect %s", dia)
 	}
@@ -140,7 +147,7 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 		for name, token := range ctxTokens {
 			pos := token.Coordinate
 			r, g, b, a := token.TokenColor.RGBA()
-			if _, err := add.Exec(name, ctxId, t.Id, pos.X, pos.Y, r>>8, g>>8, b>>8, a>>8); err != nil {
+			if _, err := add.Exec(name, ctxId, t.Id, token.Size, pos.X, pos.Y, r>>8, g>>8, b>>8, a>>8); err != nil {
 				log.Warningf("error saving token %q at pos (%d,%d) on tabula %d, context ID %q: %s", name, pos.X, pos.Y, t.Id, ctxId, err)
 			}
 		}
@@ -167,7 +174,7 @@ func (t *Tabula) drawAt(i draw.Image, obj image.Image, x float32, y float32, siz
 		i,
 		image.Rect(
 			int(x*t.Dpi)+t.OffsetX+int(inset), int(y*t.Dpi)+t.OffsetY+int(inset),
-			int((x+1)*t.Dpi)+t.OffsetX-int(inset), int((y+1)*t.Dpi)+t.OffsetY-int(inset),
+			int((x+1)*t.Dpi*size)+t.OffsetX-int(inset), int((y+1)*t.Dpi*size)+t.OffsetY-int(inset),
 		),
 		scaled,
 		image.Pt(0, 0),
@@ -200,22 +207,21 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 		log.Debugf("Adding token (name=%q) (label=%q) (color:%d,%d,%d,%d) at (%d,%d)", name, label, r, g, b, a, coord.X, coord.Y)
 
 		if ctx.IsEmoji(name) {
-			e, err := ctx.GetEmoji(name)
+			emoji, err := ctx.GetEmoji(name)
 			if err != nil {
 				log.Warningf("error obtaining emoji %q: %s", name, err)
 				// no return here, we'll fall through to rendering token name
 			} else {
-				t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+1, coord.Y+1), 1, token.TokenColor)
-				t.drawAt(drawable, e, float32(coord.X), float32(coord.Y), 1, 2)
+				t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+token.Size, coord.Y+token.Size), 1, token.TokenColor)
+				t.drawAt(drawable, emoji, float32(coord.X), float32(coord.Y), float32(token.Size), 2)
 				if label != "" {
-					t.printAt(drawable, label, float32(coord.X), float32(coord.Y)+.5, 1, .5, Bottom, Center)
+					t.printAt(drawable, label, float32(coord.X), float32(coord.Y)+.5, float32(token.Size), float32(token.Size)/2, Bottom, Center)
 				}
 				continue
 			}
 		}
-		//e, err := ctx.
-		t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+1, coord.Y+1), 1, token.TokenColor)
-		t.printAt(drawable, name, float32(coord.X), float32(coord.Y), 1, 1, Middle, Center)
+		t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+token.Size, coord.Y+token.Size), 1, token.TokenColor)
+		t.printAt(drawable, name, float32(coord.X), float32(coord.Y), float32(token.Size), float32(token.Size), Middle, Center)
 	}
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/pdbogen/mapbot/model/types"
 	"image/color"
 	"reflect"
+	"strconv"
 )
 
 var log = mbLog.Log
@@ -33,8 +34,64 @@ func init() {
 			"clear":  cmdproc.Subcommand{"", "clear tokens from the field", cmdClear},
 			"remove": cmdproc.Subcommand{"<name>", "removes the named token from the active map", cmdRemove},
 			"swap":   cmdproc.Subcommand{"<old> <new>", "replace an old token with a new token, retaining other settings (location/color)", cmdSwap},
+			"size":   cmdproc.Subcommand{"<name> <size>", "sets the named token to be <size> squares big; medium creatures at 1, large are 2, etc.", cmdSize},
 		},
 	}
+}
+
+func cmdSize(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "unexpected payload")
+		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
+		return
+	}
+
+	if len(args) != 2 {
+		h.Error(c, "usage: token size "+processor.Commands["size"].Args)
+		return
+	}
+
+	size, err := strconv.Atoi(args[1])
+	if err != nil {
+		h.Error(c, fmt.Sprintf("%q is not an integer: %s\nusage: token size %s", args[1], err, processor.Commands["size"].Args))
+		return
+	}
+
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "no active map in this channel, use `map select <name>` first")
+		return
+	}
+
+	tab, err := tabula.Get(db.Instance, *tabId)
+	if err != nil {
+		h.Error(c, "an error occured loading the active map for this channel")
+		log.Errorf("error loading tabula %d: %s", *tabId, err)
+		return
+	}
+
+	name := args[0]
+
+	if tab.Tokens == nil || tab.Tokens[c.Context.Id()] == nil {
+		h.Error(c, fmt.Sprintf("no token %s is on the active map; try `token list`", name))
+		return
+	}
+
+	token, tokenOk := tab.Tokens[c.Context.Id()][name]
+	if !tokenOk {
+		h.Error(c, fmt.Sprintf("no token %s is on the active map; try `token list`", name))
+		return
+	}
+
+	tab.Tokens[c.Context.Id()][name] = token.WithSize(size)
+
+	if err := tab.Save(db.Instance); err != nil {
+		h.Error(c, "an error occured saving the active map for this channel")
+		log.Errorf("error saving tabula %d: %s", tab.Id, err)
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
 }
 
 func cmdSwap(h *hub.Hub, c *hub.Command) {
@@ -293,7 +350,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		}
 
 		if tok, ok := tab.Tokens[c.Context.Id()][name]; !ok {
-			tab.Tokens[c.Context.Id()][name] = tabula.Token{coord, color.RGBA{0, 0, 0, 0}}
+			tab.Tokens[c.Context.Id()][name] = tabula.Token{coord, color.RGBA{0, 0, 0, 0}, 1}
 		} else {
 			tab.Tokens[c.Context.Id()][name] = tok.WithCoords(coord)
 		}

@@ -122,6 +122,11 @@ var schema = []Migration{
 		},
 		map[string]string{"any": `ALTER TABLE contexts DROP COLUMN MinX, DROP COLUMN MinY, DROP COLUMN MaxX, DROP COLUMN MaxY`},
 	},
+	Migration{
+		13,
+		map[string]string{"any": `ALTER TABLE tabula_tokens ADD COLUMN size SMALLINT NOT NULL DEFAULT 1`},
+		map[string]string{"any": `ALTER TABLE tabula_tokens DROP COLUMN size`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {
