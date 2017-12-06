@@ -361,7 +361,7 @@ func glyph(s string, width float32, height float32, valign VerticalAlignment, ha
 		return i
 	}
 
-	w := 100 + (len(s)+1)*int(width)
+	w := 100 + len(s)*int(height)
 	h := 100 + int(height)
 
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -370,28 +370,32 @@ func glyph(s string, width float32, height float32, valign VerticalAlignment, ha
 	ctx.SetClip(img.Bounds())
 	ctx.SetDst(img)
 	ctx.SetFont(font)
-	if width > height {
-		ctx.SetDPI(float64(width))
-	} else {
-		ctx.SetDPI(float64(height))
-	}
-	if 70/float32(len(s)) < height {
-		ctx.SetFontSize(70 / float64(len(s)))
-	} else {
-		ctx.SetFontSize(float64(height) - 5)
-	}
+	ctx.SetDPI(72.0)
+	ctx.SetFontSize(float64(height))
 	ctx.SetSrc(image.Black)
 
 	for _, x := range []int{-2, 0, 2} {
 		for _, y := range []int{-2, 0, 3} {
-			ctx.DrawString(s, fixed.Point26_6{X: fixed.I(50 + x), Y: fixed.I(50 + y)})
+			ctx.DrawString(s, fixed.Point26_6{X: fixed.I(50 + x), Y: fixed.I(50 + int(height) + y)})
 		}
 	}
 
 	ctx.SetSrc(image.White)
-	ctx.DrawString(s, fixed.Point26_6{X: fixed.I(50), Y: fixed.I(50)})
+	ctx.DrawString(s, fixed.Point26_6{X: fixed.I(50), Y: fixed.I(50 + int(height))})
 
-	img = align(autocrop(img), int(width), int(height), halign, valign)
+	img = autocrop(img)
+
+	var resized image.Image
+
+	// If the resized image would be too tall, resize to height; otherwise to width
+	aspect_ratio := float32(img.Bounds().Dx()) / float32(img.Bounds().Dy())
+	if width/aspect_ratio > height {
+		resized = resize.Resize(0, uint(height), img, resize.Bilinear)
+	} else {
+		resized = resize.Resize(uint(width), 0, img, resize.Bilinear)
+	}
+
+	img = align(resized, int(width), int(height), halign, valign)
 	coordCache[dim][s] = img
 	return img
 }
@@ -400,7 +404,7 @@ func glyph(s string, width float32, height float32, valign VerticalAlignment, ha
 // by (width,height), according to the requested alignment. width and height
 // describe the numbers of pixels, i.e., a value one greater than the right- or
 // bottom-most pixel's index.
-func align(i *image.RGBA, width int, height int, halign HorizontalAlignment, valign VerticalAlignment) *image.RGBA {
+func align(i image.Image, width int, height int, halign HorizontalAlignment, valign VerticalAlignment) *image.RGBA {
 	var offsetX, offsetY int
 	switch halign {
 	case Center:
@@ -424,7 +428,7 @@ func align(i *image.RGBA, width int, height int, halign HorizontalAlignment, val
 	return result
 }
 
-func autocrop(i *image.RGBA) *image.RGBA {
+func autocrop(i image.Image) *image.RGBA {
 	min_x := i.Bounds().Min.X
 	min_y := i.Bounds().Min.Y
 	max_x := i.Bounds().Max.X
@@ -504,7 +508,7 @@ func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, width 
 		i,
 		image.Rect(
 			int(x*t.Dpi)+t.OffsetX, int(y*t.Dpi)+t.OffsetY,
-			int((x+1)*t.Dpi)+t.OffsetX, int((y+1)*t.Dpi)+t.OffsetY,
+			int((x+width)*t.Dpi)+t.OffsetX, int((y+height)*t.Dpi)+t.OffsetY,
 		),
 		g,
 		image.Pt(0, 0),
