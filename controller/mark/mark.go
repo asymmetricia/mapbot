@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/colors"
 	"github.com/pdbogen/mapbot/common/conv"
+	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/tabula"
 	"image"
 )
 
@@ -21,6 +23,12 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
 	if !ok || len(args) == 0 {
 		h.Error(c, usage)
+		return
+	}
+
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "no active map in this channel, use `map select <name>` first")
 		return
 	}
 
@@ -43,8 +51,11 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			}
 		}
 
-		if _, err := colors.ToColor(a); err == nil {
-			// FIXME paint the squares the color
+		if color, err := colors.ToColor(a); err == nil {
+			// paint the squares the color
+			for _, s := range squares {
+				c.Context.Mark(tabId, s, color)
+			}
 			// reset the list of squares
 			squares = []image.Point{}
 			continue

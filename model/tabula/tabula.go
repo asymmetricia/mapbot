@@ -603,7 +603,7 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		return nil, err
 	}
 
-	minx, miny, maxx, maxy := ctx.GetZoom()
+	minx, miny, maxx, maxy := ctx.GetZoom(t.Id)
 
 	var coord image.Image
 	if drawable, ok := gridded.(draw.Image); ok {

@@ -71,7 +71,7 @@ func cmdZoom(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	c.Context.SetZoom(minCoord.X, minCoord.Y, maxCoord.X, maxCoord.Y)
+	c.Context.SetZoom(tabId, minCoord.X, minCoord.Y, maxCoord.X, maxCoord.Y)
 	if err := c.Context.Save(); err != nil {
 		h.Error(c, fmt.Sprintf("Something went wrong while saving your change: %s", err))
 	}
