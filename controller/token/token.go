@@ -10,6 +10,7 @@ import (
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
+	"image"
 	"image/color"
 	"reflect"
 	"strconv"
@@ -27,7 +28,7 @@ func init() {
 	processor = &cmdproc.CommandProcessor{
 		Command: "token",
 		Commands: map[string]cmdproc.Subcommand{
-			"add":    cmdproc.Subcommand{"<name> <X> <Y> [<name2> <x2> <y2> ... <nameN> <xN> <yN>]", "add a token(s) (or change its location) to the currently selected map (see `map select`). Token names should be emoji! (Or very short words).", cmdAdd},
+			"add":    cmdproc.Subcommand{"<name> <X> <Y> [<name2> <x2> <y2> ... <nameN> <xN> <yN>]", "add a token(s) (or change its location) to the currently selected map (see `map select`). Token names should be emoji! (Or very short words). Space between coordinate pairs is optional.", cmdAdd},
 			"move":   cmdproc.Subcommand{"<name> <X> <Y>", "synonym for add", cmdAdd},
 			"color":  cmdproc.Subcommand{"<name> <color>", "sets the color for the given token, which can be a common name; the world 'clear'; a 6-digit hex code specifying red, green, and blue (optionally with two more digits specifying Alpha); https://en.wikipedia.org/wiki/List_of_Crayola_crayon_colors has a great list of colors.", cmdColor},
 			"list":   cmdproc.Subcommand{"", "list tokens on the active map", cmdList},
@@ -314,8 +315,36 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if len(args) < 3 || len(args)%3 != 0 {
-		h.Error(c, "`token add` expects 3 arguments per token; usage: token add "+processor.Commands["add"].Args)
+	tokens := map[string]image.Point{}
+
+	// Walk through the arguments; we have to get a token name first, and then a coordinate pair, space-separated or not.
+	curToken := ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if curToken == "" {
+			curToken = a
+			continue
+		}
+		if pt, err := conv.RCToPoint(a); err == nil {
+			tokens[curToken] = pt
+			curToken = ""
+			continue
+		}
+
+		if i+1 < len(args) {
+			if pt, err := conv.CoordsToPoint(a, args[i+1]); err == nil {
+				tokens[curToken] = pt
+				curToken = ""
+				i++
+				continue
+			}
+		}
+		tokens = map[string]image.Point{}
+		break
+	}
+
+	if len(tokens) == 0 {
+		h.Error(c, "`token add` expects at least a token name and coordinate pair; usage: token add "+processor.Commands["add"].Args)
 		return
 	}
 
@@ -332,15 +361,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	for tokN := 0; tokN < len(args); tokN += 3 {
-		name := args[tokN]
-
-		coord, err := conv.CoordsToPoint(args[tokN+1], args[tokN+2])
-		if err != nil {
-			h.Error(c, fmt.Sprintf("Invalid coordinates: %s", err))
-			return
-		}
-
+	for name, coord := range tokens {
 		if tab.Tokens == nil {
 			tab.Tokens = map[types.ContextId]map[string]tabula.Token{}
 		}
