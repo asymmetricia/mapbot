@@ -12,7 +12,7 @@ type DatabaseContext struct {
 	ContextId              types.ContextId
 	ActiveTabulaId         *types.TabulaId
 	MinX, MinY, MaxX, MaxY int
-	Marks                  map[types.TabulaId]map[image.Point]image.Color
+	Marks                  map[types.TabulaId]map[image.Point]color.Color
 }
 
 func (dc *DatabaseContext) Id() types.ContextId {
@@ -55,7 +55,7 @@ func (dc *DatabaseContext) saveMarks() error {
 	switch dia := db.Instance.Dialect(); dia {
 	case "postgresql":
 		query = "INSERT INTO context_marks (context_id, tabula_id, square_x, square_y, red, green, blue, alpha) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) " +
-			"ON CONFLICT (context_id) DO UPDATE SET square_x=$3, square_y=$4, red=$5, green=$6, blue=$7, alpha=$8"
+			"ON CONFLICT (context_id) DO UPDATE SET red=$5, green=$6, blue=$7, alpha=$8"
 	case "sqlite3":
 		query = "REPLACE INTO context_marks (context_id, tabula_id, square_x, square_y, red, green, blue, alpha) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)"
 	default:
@@ -67,7 +67,7 @@ func (dc *DatabaseContext) saveMarks() error {
 	}
 	for tabId, tabMarks := range dc.Marks {
 		for pt, col := range tabMarks {
-			r, g, b, a := col.Color()
+			r, g, b, a := col.RGBA()
 			if _, err := stmt.Exec(dc.ContextId, tabId, pt.X, pt.Y, r, g, b, a); err != nil {
 				return fmt.Errorf("executing DatabaseContext.saveMarks for (%v,%v,%v,%v): %s", dc.ContextId, tabId, pt, col, err)
 			}
@@ -108,13 +108,16 @@ func (dc *DatabaseContext) SetZoom(MinX, MinY, MaxX, MaxY int) {
 }
 
 func (dc *DatabaseContext) Mark(tid types.TabulaId, point image.Point, col color.Color) {
+	if dc.Marks == nil {
+		dc.Marks = map[types.TabulaId]map[image.Point]color.Color{}
+	}
 	if _, ok := dc.Marks[tid]; !ok {
-		dc.Marks[tid] = map[image.Point]image.Color{}
+		dc.Marks[tid] = map[image.Point]color.Color{}
 	}
 	dc.Marks[tid][point] = col
 }
 
-func (dc *DatabaseContext) GetMarks(tid types.TabulaId) map[image.Point]image.color {
+func (dc *DatabaseContext) GetMarks(tid types.TabulaId) map[image.Point]color.Color {
 	return dc.Marks[tid]
 }
 

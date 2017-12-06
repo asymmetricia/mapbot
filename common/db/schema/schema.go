@@ -127,6 +127,21 @@ var schema = []Migration{
 		map[string]string{"any": `ALTER TABLE tabula_tokens ADD COLUMN size SMALLINT NOT NULL DEFAULT 1`},
 		map[string]string{"any": `ALTER TABLE tabula_tokens DROP COLUMN size`},
 	},
+	Migration{
+		14,
+		map[string]string{"any": `CREATE TABLE context_marks (` +
+			`context_id VARCHAR(128) REFERENCES contexts(context_id) ON DELETE CASCADE, ` +
+			`tabula_id  BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
+			`square_x   SMALLINT,` +
+			`square_y   SMALLINT,` +
+			`red        SMALLINT,` +
+			`green      SMALLINT,` +
+			`blue       SMALLINT,` +
+			`alpha      SMALLINT,` +
+			`PRIMARY KEY (context_id, tabula_id, square_x, square_y)` +
+			`)`},
+		map[string]string{"any": `DROP TABLE context_marks`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {

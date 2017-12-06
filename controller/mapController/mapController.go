@@ -71,7 +71,7 @@ func cmdZoom(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	c.Context.SetZoom(tabId, minCoord.X, minCoord.Y, maxCoord.X, maxCoord.Y)
+	c.Context.SetZoom(minCoord.X, minCoord.Y, maxCoord.X, maxCoord.Y)
 	if err := c.Context.Save(); err != nil {
 		h.Error(c, fmt.Sprintf("Something went wrong while saving your change: %s", err))
 	}
@@ -244,13 +244,6 @@ func cmdSelect(h *hub.Hub, c *hub.Command) {
 			h.Error(c, notFound(tabula.TabulaName(args[0])))
 			return
 		}
-
-		//ctx, err := context.Load(db.Instance, c.Context)
-		//if err != nil {
-		//	log.Errorf("Error loading context %q: %s", c.ContextId, err)
-		//	h.Error(c, "error loading context")
-		//	return
-		//}
 
 		c.Context.SetActiveTabulaId(t.Id)
 

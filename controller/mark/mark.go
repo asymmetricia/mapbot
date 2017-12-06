@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/colors"
 	"github.com/pdbogen/mapbot/common/conv"
-	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/hub"
-	"github.com/pdbogen/mapbot/model/tabula"
 	"image"
 )
 
@@ -54,7 +52,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 		if color, err := colors.ToColor(a); err == nil {
 			// paint the squares the color
 			for _, s := range squares {
-				c.Context.Mark(tabId, s, color)
+				c.Context.Mark(*tabId, s, color)
 			}
 			// reset the list of squares
 			squares = []image.Point{}
