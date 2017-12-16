@@ -603,6 +603,10 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		}
 	}
 
+	if err := t.addMarks(gridded, ctx); err != nil {
+		return nil, err
+	}
+
 	if err := t.addTokens(gridded, ctx); err != nil {
 		return nil, err
 	}
