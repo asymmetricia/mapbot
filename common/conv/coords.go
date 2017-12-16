@@ -9,11 +9,12 @@ import (
 	"strings"
 )
 
-var xCoordRe = regexp.MustCompile(`^[a-zA-Z]+$`)
+var xCoordRe = regexp.MustCompile(`^[a-z]+$`)
 var yCoordRe = regexp.MustCompile(`^[0-9]+$`)
-var coordRe = regexp.MustCompile(`^([a-zA-Z]+)([0-9]+)(n|ne|e|se|s|sw|w|nw)?$`)
+var coordRe = regexp.MustCompile(`^([a-z]+)([0-9]+)(n|ne|e|se|s|sw|w|nw)?$`)
 
 func RCToPoint(rc string, directionAllowed bool) (point image.Point, direction string, err error) {
+	rc = strings.ToLower(rc)
 	if matches := coordRe.FindStringSubmatch(rc); matches != nil && len(matches) >= 3 {
 		if !directionAllowed && len(matches) > 3 && matches[3] != "" {
 			return image.Point{}, "", errors.New("direction not allowed in this context")
@@ -30,18 +31,19 @@ func RCToPoint(rc string, directionAllowed bool) (point image.Point, direction s
 }
 
 func CoordsToPoint(x, y string) (image.Point, error) {
+	x = strings.ToLower(x)
 	if !xCoordRe.MatchString(x) {
 		return image.Point{}, errors.New("X coordinate must be a column letter")
 	}
 
+	y = strings.ToLower(y)
 	if !yCoordRe.MatchString(y) {
 		return image.Point{}, errors.New("Y coordinate must be a number")
 	}
 
 	accumX := 0
-	x = strings.ToUpper(x)
 	for i := 0; i < len(x); i++ {
-		accumX = accumX*26 + int(x[i]) - int('A') + 1
+		accumX = accumX*26 + int(x[i]) - int('a') + 1
 	}
 
 	accumY, err := strconv.Atoi(y)

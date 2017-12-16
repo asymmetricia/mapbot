@@ -53,6 +53,7 @@ func TestRCToPoint(t *testing.T) {
 		{"z25", true, false, 25, 25, ""},
 		{"b2n", true, false, 1, 1, "n"},
 		{"a2sw", true, false, 0, 1, "sw"},
+		{"a2SW", true, false, 0, 1, "sw"},
 		{"a1", false, false, 0, 0, ""},
 		{"z25", false, false, 25, 25, ""},
 		{"b2n", false, true, 0, 0, ""},
