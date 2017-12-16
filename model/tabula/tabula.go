@@ -491,13 +491,16 @@ func crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
 	return result
 }
 
-func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col color.Color) {
-	//inset := int(t.Dpi * (1 - fill) / 2)
-	for x := int(float32(bounds.Min.X)*t.Dpi) + t.OffsetX + inset; x <= int(float32(bounds.Max.X)*t.Dpi)+t.OffsetX-inset; x++ {
-		for y := int(float32(bounds.Min.Y)*t.Dpi) + t.OffsetY + inset; y <= int(float32(bounds.Max.Y)*t.Dpi)+t.OffsetY-inset; y++ {
+func (t *Tabula) squareAtFloat(i draw.Image, minX, minY, maxX, maxY float32, inset int, col color.Color) {
+	for x := int(minX*t.Dpi) + t.OffsetX + inset; x < int(maxX*t.Dpi)+t.OffsetX-inset; x++ {
+		for y := int(minY*t.Dpi) + t.OffsetY + inset; y < int(maxY*t.Dpi)+t.OffsetY-inset; y++ {
 			blendAt(i, x, y, col)
 		}
 	}
+}
+
+func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col color.Color) {
+	t.squareAtFloat(i, float32(bounds.Min.X), float32(bounds.Min.Y), float32(bounds.Max.X), float32(bounds.Max.Y), inset, col)
 }
 
 // drawAt *modifies* the image given by `i` so that the string given by `what` is printed in the square at tabula
