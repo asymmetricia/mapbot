@@ -325,7 +325,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 			curToken = a
 			continue
 		}
-		if pt, err := conv.RCToPoint(a); err == nil {
+		if pt, _, err := conv.RCToPoint(a, false); err == nil {
 			tokens[curToken] = pt
 			curToken = ""
 			continue

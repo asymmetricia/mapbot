@@ -142,6 +142,15 @@ var schema = []Migration{
 			`)`},
 		map[string]string{"any": `DROP TABLE context_marks`},
 	},
+	Migration{
+		15,
+		map[string]string{"any": `ALTER TABLE context_marks ADD COLUMN direction VARCHAR(2) NOT NULL DEFAULT '';` +
+			`ALTER TABLE context_marks DROP CONSTRAINT context_marks_pkey;` +
+			`ALTER TABLE context_marks ADD PRIMARY KEY (context_id, tabula_id, square_x, square_y, direction);`},
+		map[string]string{"any": `ALTER TABLE context_marks DROP CONSTRAINT context_marks_pkey;` +
+			`ALTER TABLE context_marks DROP COLUMN direction;` +
+			`ALTER TABLE context_marks ADD PRIMARY KEY (context_id, tabula_id, square_x, square_y);`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {

@@ -1,6 +1,7 @@
 package mapController
 
 import (
+	"errors"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/colors"
 	"github.com/pdbogen/mapbot/common/conv"
@@ -9,6 +10,7 @@ import (
 	"github.com/pdbogen/mapbot/controller/cmdproc"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/tabula"
+	"image"
 	"image/color"
 	"regexp"
 	"strconv"
@@ -34,27 +36,47 @@ func init() {
 			"select":    cmdproc.Subcommand{"<name>", "selects the map active in this channel. active tokens will be cleared.", cmdSelect},
 			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
 			"gridcolor": cmdproc.Subcommand{"<name> <value>", "shorthand for set, to set the grid color", cmdGridColor},
-			"zoom":      cmdproc.Subcommand{"<min X> <min Y> <max X> <max Y>", "requests that mapbot display only a portion of the map; useful for larger maps where the action is in a small area. requires an active map. Set to `a 1 a 1` to disable zoom.", cmdZoom},
+			"zoom":      cmdproc.Subcommand{"<min X> <min Y> <max X> <max Y>", "requests that mapbot display only a portion of the map; useful for larger maps where the action is in a small area. requires an active map. Set to `a 1 a 1` to disable zoom. The space between column and row is optional (i.e., `a1` is OK).", cmdZoom},
 		},
 	}
 }
 
 func cmdZoom(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
-	if !ok || len(args) != 4 {
+	if !ok || len(args) > 4 || len(args) < 2 {
 		h.Error(c, "usage: map zoom "+processor.Commands["zoom"].Args)
 		return
 	}
 
-	minCoord, err := conv.CoordsToPoint(args[0], args[1])
-	if err != nil {
-		h.Error(c, fmt.Sprintf("Invalid coordinates (`%s,%s`): %s", args[0], args[1], err))
-		return
+	var minCoord, maxCoord image.Point
+	var err error
+	var state int
+loop:
+	for i := 0; i < len(args); i++ {
+		var c image.Point
+		a := args[i]
+		c, _, err = conv.RCToPoint(a, false)
+		if err != nil && i+1 < len(args) {
+			c, err = conv.CoordsToPoint(a, args[i+1])
+			i++
+		}
+		if err != nil {
+			break
+		}
+		switch state {
+		case 0:
+			minCoord = c
+		case 1:
+			maxCoord = c
+		case 2:
+			err = errors.New("extra arguments found")
+			break loop
+		}
+		state++
 	}
 
-	maxCoord, err := conv.CoordsToPoint(args[2], args[3])
 	if err != nil {
-		h.Error(c, fmt.Sprintf("Invalid coordinates (`%s,%s`): %s", args[2], args[3], err))
+		h.Error(c, fmt.Sprintf("invalid coordinates %s: %s", strings.Join(args, " "), err))
 		return
 	}
 
