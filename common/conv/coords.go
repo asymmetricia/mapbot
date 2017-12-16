@@ -11,13 +11,21 @@ import (
 
 var xCoordRe = regexp.MustCompile(`^[a-zA-Z]+$`)
 var yCoordRe = regexp.MustCompile(`^[0-9]+$`)
-var coordRe = regexp.MustCompile(`^([a-zA-Z]+)([0-9]+)$`)
+var coordRe = regexp.MustCompile(`^([a-zA-Z]+)([0-9]+)(n|ne|e|se|s|sw|w|nw)?$`)
 
-func RCToPoint(rc string) (image.Point, error) {
+func RCToPoint(rc string, directionAllowed bool) (point image.Point, direction string, err error) {
 	if matches := coordRe.FindStringSubmatch(rc); matches != nil && len(matches) >= 3 {
-		return CoordsToPoint(matches[1], matches[2])
+		if !directionAllowed && len(matches) > 3 && matches[3] != "" {
+			return image.Point{}, "", errors.New("direction not allowed in this context")
+		}
+
+		point, err = CoordsToPoint(matches[1], matches[2])
+		if len(matches) > 3 {
+			direction = matches[3]
+		}
+		return
 	} else {
-		return image.Point{}, errors.New("not an RC coordinate")
+		return image.Point{}, "", errors.New("not an RC coordinate")
 	}
 }
 

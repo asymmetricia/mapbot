@@ -38,3 +38,50 @@ func TestCoordsToPoint(t *testing.T) {
 		t.Logf("CoordsToPoint(%s,%s) -> (%d,%d): OK", test.x, test.y, pt.X, pt.Y)
 	}
 }
+
+func TestRCToPoint(t *testing.T) {
+	type Test struct {
+		inp      string
+		allowDir bool
+		resErr   bool
+		resX     int
+		resY     int
+		resDir   string
+	}
+	tests := []Test{
+		{"a1", true, false, 0, 0, ""},
+		{"z25", true, false, 25, 25, ""},
+		{"b2n", true, false, 1, 1, "n"},
+		{"a2sw", true, false, 0, 1, "sw"},
+		{"a1", false, false, 0, 0, ""},
+		{"z25", false, false, 25, 25, ""},
+		{"b2n", false, true, 0, 0, ""},
+		{"a2sw", false, true, 0, 0, ""},
+	}
+
+	for _, test := range tests {
+		pt, dir, err := RCToPoint(test.inp, test.allowDir)
+
+		if test.resErr && err == nil {
+			t.Fatalf(`Expected RCToPoint("%s") to return non-nil error, returned nil`, test.inp)
+		}
+
+		if !test.resErr && err != nil {
+			t.Fatalf(`Expected RCToPoint("%s") to return nil error, returned %q`, test.inp, err)
+		}
+
+		if pt.X != test.resX {
+			t.Fatalf(`Expected RCToPoint("%s") to return image.Point{%d,_}, returned %v`, test.inp, test.resX, pt)
+		}
+
+		if pt.X != test.resX {
+			t.Fatalf(`Expected RCToPoint("%s") to return image.Point{_,%d}, returned %v`, test.inp, test.resY, pt)
+		}
+
+		if dir != test.resDir {
+			t.Fatalf(`Expected RCToPoint("%s") to return direction %q, returned %q`, test.inp, test.resDir, dir)
+		}
+
+		t.Logf("RCToPoint(%s) -> (%d,%d,%q): OK", test.inp, test.resX, test.resY, test.resDir)
+	}
+}
