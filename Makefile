@@ -36,6 +36,7 @@ release:
 	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
 
 tail:
+	for i in 1 2 3 4 5; do ssh -At vdr.cernu.us docker logs --tail 1 mapbot >/dev/null && exit 0; sleep $$i; done
 	ssh -At vdr.cernu.us docker logs -f --tail 100 mapbot
 
 clean:
