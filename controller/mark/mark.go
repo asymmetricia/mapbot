@@ -9,23 +9,68 @@ import (
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/tabula"
+	"image"
+	"strconv"
+	"strings"
 )
 
 var log = mbLog.Log
 
 func Register(h *hub.Hub) {
 	h.Subscribe("user:mark", cmdMark)
+	h.Subscribe("user:check", cmdMark)
 }
 
-const usage = "usage: mark <place> [<place2> ... <placeN>] <color>\nspecify one ore more places followed by a color. There are a few ways to specify a place:\n" +
+const syntax = "<place> [<place2> ... <placeN>] <color>\n" +
+	"specify one or more places followed by a color. There are a few ways to specify a place:\n" +
 	"    a square -- given by a coordinate, with or without a space; i.e., `a1` or `a 1`\n" +
 	"    a side   -- given by a coordinate (no space) and a cardinal direction (n, s, e, w); example: `a1n` or `a1s`\n" +
-	"    a corner -- given by a coordinate (no space) and an intercardinal direction (ne, se, sw, nw); example: `a1ne`"
+	"    a corner -- given by a coordinate (no space) and an intercardinal direction (ne, se, sw, nw); example: `a1ne`\n" +
+	"    a square -- use `square(top-left,bottom-right)` where `top-left` and `bottom-right` are coordinates (without spaces); example: `square(a1,f6)`\n" +
+	"    a circle -- use `circle(center,radius)` where `center` is a square or corner and `radius` is a number of feet, assuming 5 feet per square; example: `circle(m10,15)` or `circle(m10ne,15)`"
+
+func clearMarks(h *hub.Hub, c *hub.Command) {
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "no active map in this channel, use `map select <name>` first")
+		return
+	}
+
+	tab, err := tabula.Get(db.Instance, *tabId)
+	if err != nil {
+		h.Error(c, "an error occured loading the active map for this channel")
+		log.Errorf("error loading tabula %d: %s", *tabId, err)
+		return
+	}
+
+	c.Context.ClearMarks(*tabId)
+
+	if err := c.Context.Save(); err != nil {
+		log.Errorf("saving marks: %s", err)
+		h.Error(c, ":warning: A problem occurred while saving your marks. This could indicate an bug.")
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+}
 
 func cmdMark(h *hub.Hub, c *hub.Command) {
+	cmdName := strings.Split(string(c.Type), ":")[1]
+
+	var usage string
+	if cmdName == "mark" {
+		usage = fmt.Sprintf("usage: %s %s\nThis command will save marks on the map. Use `check` to visualize marks once.", cmdName, syntax)
+	} else {
+		usage = fmt.Sprintf("usage: %s %s\nThis command will NOT save marks. Use `mark` to save marks on the map.", cmdName, syntax)
+	}
+
 	args, ok := c.Payload.([]string)
 	if !ok || len(args) == 0 {
 		h.Error(c, usage)
+		return
+	}
+
+	if len(args) == 1 && strings.ToLower(args[0]) == "clear" {
+		clearMarks(h, c)
 		return
 	}
 
@@ -43,11 +88,13 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 	}
 
 	marks := []mark.Mark{}
+	coloredMarks := []mark.Mark{}
 	for i := 0; i < len(args); i++ {
-		a := args[i]
+		a := strings.ToLower(args[i])
 		// Option 1: RC-style coordinate (maybe with a direction)
 		// Option 2: Row letter; i+1 contains column
-		// Option 3: color
+		// Option 3: A shape (i.e., square(a,b))
+		// Option 4: color
 		if pt, dir, err := conv.RCToPoint(a, true); err == nil {
 			marks = append(marks, mark.Mark{Point: pt, Direction: dir})
 			continue
@@ -61,26 +108,173 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			}
 		}
 
+		if strings.HasPrefix(a, "square(") && strings.HasSuffix(a, ")") {
+			m, err := marksFromSquare(a)
+			if err != nil {
+				h.Error(c, fmt.Sprintf(":warning: %s", err))
+				return
+			}
+			marks = append(marks, m...)
+			continue
+		}
+
+		if strings.HasPrefix(a, "circle(") && strings.HasSuffix(a, ")") {
+			m, err := marksFromCircle(a)
+			if err != nil {
+				h.Error(c, fmt.Sprintf(":warning: %s", err))
+				return
+			}
+			marks = append(marks, m...)
+			continue
+		}
+
 		if color, err := colors.ToColor(a); err == nil {
 			// paint the squares the color
 			for _, m := range marks {
 				m = m.WithColor(color)
-				log.Debugf("setting mark %v on tabula %v", m, *tabId)
-				c.Context.Mark(*tabId, m)
+				coloredMarks = append(coloredMarks, m)
 			}
 			// reset the list of squares
 			marks = []mark.Mark{}
 			continue
 		}
 
-		h.Error(c, fmt.Sprintf("I couldn't figure out what you mean by `%s`.\n%s", a, usage))
+		h.Error(c, fmt.Sprintf(":warning: I couldn't figure out what you mean by `%s`.\n%s", a, usage))
 		return
 	}
 
-	if err := c.Context.Save(); err != nil {
-		log.Errorf("saving marks: %s", err)
-		h.Error(c, "A problem occurred while saving your marks. This could indicate an bug.")
+	if len(marks) != 0 {
+		h.Error(c, ":warning: A list of marks should always end with a color!")
+		return
 	}
 
-	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	if cmdName == "mark" {
+		for _, m := range coloredMarks {
+			c.Context.Mark(*tabId, m)
+		}
+		if err := c.Context.Save(); err != nil {
+			log.Errorf("saving marks: %s", err)
+			h.Error(c, ":warning: A problem occurred while saving your marks. This could indicate an bug.")
+		}
+
+		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	} else {
+		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithMarks(coloredMarks)))
+	}
+}
+
+func pfsDist(a image.Point, b image.Point) int {
+	dx := a.X - b.X
+	if dx < 0 {
+		dx = dx * -1
+	}
+
+	dy := a.Y - b.Y
+	if dy < 0 {
+		dy = dy * -1
+	}
+
+	diags := 0
+	straights := 0
+	if dx < dy {
+		diags = dx
+		straights = dy - dx
+	} else {
+		diags = dy
+		straights = dx - dy
+	}
+	return straights*5 + diags/2*15 + diags%2*5
+}
+
+func marksFromCircle(in string) (out []mark.Mark, err error) {
+	out = []mark.Mark{}
+	args := strings.Split(in[7:len(in)-1], ",")
+	if len(args) != 2 {
+		return nil, fmt.Errorf("in `%s`, `circle()` expects two comma-separated arguments", in)
+	}
+	center, dir, err := conv.RCToPoint(args[0], true)
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse coordinate `%s`: %s", in, args[0], err)
+	}
+
+	radius, err := strconv.Atoi(args[1])
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse radius `%s`: %s", in, args[1], err)
+	}
+
+	if len(dir) == 1 {
+		return nil, fmt.Errorf("`%s` specifies an edge, not a square or corner; but circles centered on edges are no valid.", args[1])
+	}
+
+	if len(dir) == 0 {
+		for x := -radius; x <= radius; x++ {
+			for y := -radius; y <= radius; y++ {
+				pt := image.Point{center.X + x, center.Y + y}
+				if pfsDist(pt, center) <= radius {
+					out = append(out, mark.Mark{Point: pt})
+				}
+			}
+		}
+	} else {
+		switch dir {
+		case "nw":
+			center.X++
+		case "sw":
+			center.X++
+			center.Y--
+		case "se":
+			center.Y--
+		}
+
+		for x := -radius - 1; x <= radius+1; x++ {
+			for y := -radius - 1; y <= radius+1; y++ {
+				pt := image.Point{center.X + x, center.Y + y}
+				if x <= 0 && y <= 0 && pfsDist(pt, image.Point{center.X + 1, center.Y}) <= radius ||
+					x > 0 && y <= 0 && pfsDist(pt, image.Point{center.X, center.Y}) <= radius ||
+					x > 0 && y > 0 && pfsDist(pt, image.Point{center.X, center.Y - 1}) <= radius ||
+					x <= 0 && y > 0 && pfsDist(pt, image.Point{center.X + 1, center.Y - 1}) <= radius {
+					out = append(out, mark.Mark{Point: pt})
+				}
+			}
+		}
+	}
+
+	return out, nil
+}
+
+func marksFromSquare(in string) (out []mark.Mark, err error) {
+	out = []mark.Mark{}
+	args := strings.Split(in[7:len(in)-1], ",")
+	if len(args) != 2 {
+		return nil, fmt.Errorf("in `%s`, `square()` expects two comma-separated arguments", in)
+	}
+
+	min, _, err := conv.RCToPoint(args[0], false)
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a square, but could not parse coordinate `%s`: %s", in, args[0], err)
+	}
+
+	max, _, err := conv.RCToPoint(args[1], false)
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a square, but could not parse coordinate `%s`: %s", in, args[1], err)
+	}
+
+	if min.X > max.X {
+		min.X, max.X = max.X, min.X
+	}
+
+	if min.Y > max.Y {
+		min.Y, max.Y = max.Y, min.Y
+	}
+
+	pt := min
+	for pt.Y <= max.Y {
+		out = append(out, mark.Mark{Point: pt})
+		pt.X++
+		if pt.X > max.X {
+			pt.X = min.X
+			pt.Y++
+		}
+	}
+	return out, nil
 }

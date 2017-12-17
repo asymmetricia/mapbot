@@ -12,6 +12,7 @@ import (
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/context"
+	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/mask"
 	"github.com/pdbogen/mapbot/model/types"
 	"golang.org/x/image/math/fixed"
@@ -43,6 +44,9 @@ type Tabula struct {
 	Masks      map[string]*mask.Mask
 	Tokens     map[types.ContextId]map[string]Token
 	Version    int
+
+	// A list of marks appended to marks obtained from the context during rendering.
+	Marks []mark.Mark
 }
 
 func (t *Tabula) String() string {
