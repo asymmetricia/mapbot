@@ -1,6 +1,7 @@
 package mark
 
 import (
+	"errors"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/colors"
 	"github.com/pdbogen/mapbot/common/conv"
@@ -128,6 +129,16 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			continue
 		}
 
+		if strings.HasPrefix(a, "cone(") && strings.HasSuffix(a, ")") {
+			m, err := marksFromCone(a)
+			if err != nil {
+				h.Error(c, fmt.Sprintf(":warning: %s", err))
+				return
+			}
+			marks = append(marks, m...)
+			continue
+		}
+
 		if color, err := colors.ToColor(a); err == nil {
 			// paint the squares the color
 			for _, m := range marks {
@@ -207,8 +218,8 @@ func marksFromCircle(in string) (out []mark.Mark, err error) {
 	}
 
 	if len(dir) == 0 {
-		for x := -radius; x <= radius; x++ {
-			for y := -radius; y <= radius; y++ {
+		for x := -radius / 5; x <= radius/5; x++ {
+			for y := -radius / 5; y <= radius/5; y++ {
 				pt := image.Point{center.X + x, center.Y + y}
 				if pfsDist(pt, center) <= radius {
 					out = append(out, mark.Mark{Point: pt})
@@ -226,8 +237,8 @@ func marksFromCircle(in string) (out []mark.Mark, err error) {
 			center.Y--
 		}
 
-		for x := -radius - 1; x <= radius+1; x++ {
-			for y := -radius - 1; y <= radius+1; y++ {
+		for x := -radius/5 - 1; x <= radius/5+1; x++ {
+			for y := -radius/5 - 1; y <= radius/5+1; y++ {
 				pt := image.Point{center.X + x, center.Y + y}
 				if x <= 0 && y <= 0 && pfsDist(pt, image.Point{center.X + 1, center.Y}) <= radius ||
 					x > 0 && y <= 0 && pfsDist(pt, image.Point{center.X, center.Y}) <= radius ||
@@ -235,6 +246,70 @@ func marksFromCircle(in string) (out []mark.Mark, err error) {
 					x <= 0 && y > 0 && pfsDist(pt, image.Point{center.X + 1, center.Y - 1}) <= radius {
 					out = append(out, mark.Mark{Point: pt})
 				}
+			}
+		}
+	}
+
+	return out, nil
+}
+
+func marksFromCone(in string) (out []mark.Mark, err error) {
+	out = []mark.Mark{}
+	args := strings.Split(in[5:len(in)-1], ",")
+	if len(args) != 3 {
+		return nil, fmt.Errorf("in `%s`, `cone()` expects three comma-separated arguments", in)
+	}
+	origin, dir, err := conv.RCToPoint(args[0], true)
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a cone, but could not parse coordinate `%s`: %s", in, args[0], err)
+	}
+
+	if len(dir) != 2 {
+		return nil, errors.New("cones must originate from corners")
+	}
+
+	if dir == "ne" && args[1] != "n" && args[1] != "ne" && args[1] != "e" ||
+		dir == "se" && args[1] != "s" && args[1] != "se" && args[1] != "e" ||
+		dir == "sw" && args[1] != "s" && args[1] != "sw" && args[1] != "w" ||
+		dir == "nw" && args[1] != "n" && args[1] != "nw" && args[1] != "w" {
+		return nil, fmt.Errorf("`%s` is not a legal direction from a %s corner", args[1], dir)
+	}
+
+	radius, err := strconv.Atoi(args[2])
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a cone, but could not parse radius `%s`: %s", in, args[1], err)
+	}
+
+	switch dir {
+	case "nw":
+		origin.X++
+	case "sw":
+		origin.X++
+		origin.Y--
+	case "se":
+		origin.Y--
+	}
+
+	// n -- -radius < y < 0;      -radius < x < radius; constraint: dx < dy
+	// s --       0 < y < radius; -radius < x < radius; constraint: dx < dy
+	// e -- -radius < y < radius;       0 < x < radius; constraint: dy < dx
+
+	for y := -radius / 5; y <= radius/5-1; y++ {
+		for x := y + 1; x <= -y; x++ {
+			if args[1][0] == 'n' && (y >= 0) ||
+				args[1][0] == 's' && (y < 0) {
+				continue
+			}
+			ptA := origin
+			if x <= 0 {
+				ptA.X++
+			}
+			if y >= 0 {
+				ptA.Y--
+			}
+			ptB := image.Point{origin.X + x, origin.Y + y}
+			if pfsDist(ptA, ptB) <= radius {
+				out = append(out, mark.Mark{Point: ptB})
 			}
 		}
 	}
