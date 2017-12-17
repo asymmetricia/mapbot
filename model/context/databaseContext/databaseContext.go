@@ -44,8 +44,7 @@ func (dc *DatabaseContext) Save() error {
 	default:
 		return fmt.Errorf("no DatabaseContext.Save query for dialect %s", dia)
 	}
-	_, err := db.Instance.Exec(query, dc.ContextId, int(*dc.ActiveTabulaId), dc.MinX, dc.MinY, dc.MaxX, dc.MaxY)
-	if err != nil {
+	if _, err := db.Instance.Exec(query, dc.ContextId, int(*dc.ActiveTabulaId), dc.MinX, dc.MinY, dc.MaxX, dc.MaxY); err != nil {
 		return err
 	}
 	return dc.saveMarks()
@@ -53,12 +52,17 @@ func (dc *DatabaseContext) Save() error {
 
 func (dc *DatabaseContext) saveMarks() error {
 	var query string
+
+	if _, err := db.Instance.Exec("UPDATE context_marks SET stale=TRUE WHERE context_id=$1", dc.ContextId); err != nil {
+		return err
+	}
+
 	switch dia := db.Instance.Dialect(); dia {
 	case "postgresql":
-		query = "INSERT INTO context_marks (context_id, tabula_id, square_x, square_y, direction, red, green, blue, alpha) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) " +
-			"ON CONFLICT (context_id, tabula_id, square_x, square_y, direction) DO UPDATE SET red=$6, green=$7, blue=$8, alpha=$9"
+		query = "INSERT INTO context_marks (context_id, tabula_id, square_x, square_y, direction, red, green, blue, alpha, stale) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE) " +
+			"ON CONFLICT (context_id, tabula_id, square_x, square_y, direction) DO UPDATE SET red=$6, green=$7, blue=$8, alpha=$9, stale=FALSE"
 	case "sqlite3":
-		query = "REPLACE INTO context_marks (context_id, tabula_id, square_x, square_y, direction, red, green, blue, alpha) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)"
+		query = "REPLACE INTO context_marks (context_id, tabula_id, square_x, square_y, direction, red, green, blue, alpha, stale) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE)"
 	default:
 		return fmt.Errorf("no DatabaseContext.saveMarks query for dialect %s", dia)
 	}
@@ -76,6 +80,11 @@ func (dc *DatabaseContext) saveMarks() error {
 			}
 		}
 	}
+
+	if _, err := db.Instance.Exec("DELETE FROM context_marks WHERE context_id=$1 AND stale=TRUE", dc.ContextId); err != nil {
+		return err
+	}
+
 	return nil
 }
 

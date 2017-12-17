@@ -151,6 +151,11 @@ var schema = []Migration{
 			`ALTER TABLE context_marks DROP COLUMN direction;` +
 			`ALTER TABLE context_marks ADD PRIMARY KEY (context_id, tabula_id, square_x, square_y);`},
 	},
+	Migration{
+		16,
+		map[string]string{"any": `ALTER TABLE context_marks ADD COLUMN stale BOOLEAN DEFAULT TRUE`},
+		map[string]string{"any": `ALTER TABLE context_marks DROP COLUMN stale`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {
