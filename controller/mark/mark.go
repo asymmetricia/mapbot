@@ -120,7 +120,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 		}
 
 		if strings.HasPrefix(a, "circle(") && strings.HasSuffix(a, ")") {
-			m, err := marksFromCircle(a)
+			m, err := mark.Circle(a)
 			if err != nil {
 				h.Error(c, fmt.Sprintf(":warning: %s", err))
 				return
@@ -172,85 +172,6 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 	} else {
 		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithMarks(coloredMarks)))
 	}
-}
-
-func pfsDist(a image.Point, b image.Point) int {
-	dx := a.X - b.X
-	if dx < 0 {
-		dx = dx * -1
-	}
-
-	dy := a.Y - b.Y
-	if dy < 0 {
-		dy = dy * -1
-	}
-
-	diags := 0
-	straights := 0
-	if dx < dy {
-		diags = dx
-		straights = dy - dx
-	} else {
-		diags = dy
-		straights = dx - dy
-	}
-	return straights*5 + diags/2*15 + diags%2*5
-}
-
-func marksFromCircle(in string) (out []mark.Mark, err error) {
-	out = []mark.Mark{}
-	args := strings.Split(in[7:len(in)-1], ",")
-	if len(args) != 2 {
-		return nil, fmt.Errorf("in `%s`, `circle()` expects two comma-separated arguments", in)
-	}
-	center, dir, err := conv.RCToPoint(args[0], true)
-	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse coordinate `%s`: %s", in, args[0], err)
-	}
-
-	radius, err := strconv.Atoi(args[1])
-	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse radius `%s`: %s", in, args[1], err)
-	}
-
-	if len(dir) == 1 {
-		return nil, fmt.Errorf("`%s` specifies an edge, not a square or corner; but circles centered on edges are no valid.", args[1])
-	}
-
-	if len(dir) == 0 {
-		for x := -radius / 5; x <= radius/5; x++ {
-			for y := -radius / 5; y <= radius/5; y++ {
-				pt := image.Point{center.X + x, center.Y + y}
-				if pfsDist(pt, center) <= radius {
-					out = append(out, mark.Mark{Point: pt})
-				}
-			}
-		}
-	} else {
-		switch dir {
-		case "nw":
-			center.X++
-		case "sw":
-			center.X++
-			center.Y--
-		case "se":
-			center.Y--
-		}
-
-		for x := -radius/5 - 1; x <= radius/5+1; x++ {
-			for y := -radius/5 - 1; y <= radius/5+1; y++ {
-				pt := image.Point{center.X + x, center.Y + y}
-				if x <= 0 && y <= 0 && pfsDist(pt, image.Point{center.X + 1, center.Y}) <= radius ||
-					x > 0 && y <= 0 && pfsDist(pt, image.Point{center.X, center.Y}) <= radius ||
-					x > 0 && y > 0 && pfsDist(pt, image.Point{center.X, center.Y - 1}) <= radius ||
-					x <= 0 && y > 0 && pfsDist(pt, image.Point{center.X + 1, center.Y - 1}) <= radius {
-					out = append(out, mark.Mark{Point: pt})
-				}
-			}
-		}
-	}
-
-	return out, nil
 }
 
 func marksFromCone(in string) (out []mark.Mark, err error) {
@@ -308,7 +229,7 @@ func marksFromCone(in string) (out []mark.Mark, err error) {
 				ptA.Y--
 			}
 			ptB := image.Point{origin.X + x, origin.Y + y}
-			if pfsDist(ptA, ptB) <= radius {
+			if conv.Distance(ptA, ptB) <= radius {
 				out = append(out, mark.Mark{Point: ptB})
 			}
 		}

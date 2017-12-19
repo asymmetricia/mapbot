@@ -616,10 +616,17 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		}
 	}
 
+	log.Debugf("adding marks...")
 	if err := t.addMarks(gridded, ctx); err != nil {
 		return nil, err
 	}
 
+	log.Debugf("adding lighting...")
+	if err := t.addTokenLights(gridded, ctx); err != nil {
+		return nil, err
+	}
+
+	log.Debugf("adding tokens...")
 	if err := t.addTokens(gridded, ctx); err != nil {
 		return nil, err
 	}

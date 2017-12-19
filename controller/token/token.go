@@ -13,7 +13,9 @@ import (
 	"image"
 	"image/color"
 	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 var log = mbLog.Log
@@ -36,8 +38,69 @@ func init() {
 			"remove": cmdproc.Subcommand{"<name>", "removes the named token from the active map", cmdRemove},
 			"swap":   cmdproc.Subcommand{"<old> <new>", "replace an old token with a new token, retaining other settings (location/color)", cmdSwap},
 			"size":   cmdproc.Subcommand{"<name> <size>", "sets the named token to be <size> squares big; medium creatures at 1, large are 2, etc.", cmdSize},
+			"light":  cmdproc.Subcommand{"<name> <dim> [<normal> [<bright>]]", "sets 'light levels' to project as marks around the token; dim is orange, normal is yellow, and bright is bright yellow. values are in 'pathfinder feet'.", cmdLight},
 		},
 	}
+}
+
+func cmdLight(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "unexpected payload")
+		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
+		return
+	}
+
+	if len(args) < 2 || len(args) > 4 {
+		h.Error(c, "usage: token light "+processor.Commands["light"].Args)
+		return
+	}
+
+	tabId := c.Context.GetActiveTabulaId()
+	if tabId == nil {
+		h.Error(c, "no active map in this channel, use `map select <name>` first")
+		return
+	}
+
+	tab, err := tabula.Get(db.Instance, *tabId)
+	if err != nil {
+		h.Error(c, "an error occured loading the active map for this channel")
+		log.Errorf("error loading tabula %d: %s", *tabId, err)
+		return
+	}
+
+	dim, err := strconv.Atoi(args[1])
+	if err != nil {
+		h.Error(c, fmt.Sprintf("`%s` is not a number of feet: %s", args[1], err))
+		return
+	}
+
+	var normal, bright int
+
+	if len(args) >= 3 {
+		normal, err = strconv.Atoi(args[2])
+		if err != nil {
+			h.Error(c, fmt.Sprintf("`%s` is not a number of feet: %s", args[2], err))
+			return
+		}
+	}
+
+	if len(args) == 4 {
+		bright, err = strconv.Atoi(args[3])
+		if err != nil {
+			h.Error(c, fmt.Sprintf("`%s` is not a number of feet: %s", args[3], err))
+			return
+		}
+	}
+
+	tab.Tokens[c.Context.Id()][args[0]] = tab.Tokens[c.Context.Id()][args[0]].WithLight(dim, normal, bright)
+
+	if err := tab.Save(db.Instance); err != nil {
+		h.Error(c, "an error occured saving the active map for this channel")
+		log.Errorf("error saving tabula %d: %s", tab.Id, err)
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
 }
 
 func cmdSize(h *hub.Hub, c *hub.Command) {
@@ -200,6 +263,8 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
 }
 
+var emojiToken = regexp.MustCompile(`^(:[^:]+:)`)
+
 func cmdList(h *hub.Hub, c *hub.Command) {
 	tabId := c.Context.GetActiveTabulaId()
 	if tabId == nil {
@@ -222,11 +287,30 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 
 	rep := fmt.Sprintf("There are %d tokens on the active map:", len(tab.Tokens[ctxId]))
 	for name, token := range tab.Tokens[ctxId] {
-		if name[0] == ':' && name[len(name)-1] == ':' {
-			name = name + "(`" + name + "`)"
+		bits := emojiToken.FindStringSubmatch(name)
+		if bits != nil {
+			name = name + " (`" + bits[1] + "`)"
 		}
-		r, g, b, a := token.TokenColor.RGBA()
-		rep += fmt.Sprintf("\n- %s at (%d,%d), color (%d,%d,%d,%d)", name, token.Coordinate.X, token.Coordinate.Y, r, g, b, a)
+		rep += fmt.Sprintf("\n- %s at (%d,%d)", name, token.Coordinate.X, token.Coordinate.Y)
+
+		r, g, b, a := token.Color().RGBA()
+		if a > 0 {
+			rep += fmt.Sprintf(", color (%d,%d,%d,%d)", r, g, b, a)
+		}
+
+		lights := []string{}
+		if token.DimLight > 0 {
+			lights = append(lights, fmt.Sprintf("%dft dim", token.DimLight))
+		}
+		if token.NormalLight > 0 {
+			lights = append(lights, fmt.Sprintf("%dft normal", token.NormalLight))
+		}
+		if token.BrightLight > 0 {
+			lights = append(lights, fmt.Sprintf("%dft bright", token.BrightLight))
+		}
+		if len(lights) > 0 {
+			rep += fmt.Sprintf(", light (%s)", strings.Join(lights, ", "))
+		}
 	}
 	h.Reply(c, rep)
 	return
@@ -371,7 +455,11 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		}
 
 		if tok, ok := tab.Tokens[c.Context.Id()][name]; !ok {
-			tab.Tokens[c.Context.Id()][name] = tabula.Token{coord, color.RGBA{0, 0, 0, 0}, 1}
+			tab.Tokens[c.Context.Id()][name] = tabula.Token{
+				Coordinate: coord,
+				TokenColor: color.RGBA{0, 0, 0, 0},
+				Size:       1,
+			}
 		} else {
 			tab.Tokens[c.Context.Id()][name] = tok.WithCoords(coord)
 		}

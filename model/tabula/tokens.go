@@ -6,6 +6,7 @@ import (
 	"github.com/nfnt/resize"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/model/context"
+	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/types"
 	"image"
 	"image/color"
@@ -14,9 +15,25 @@ import (
 )
 
 type Token struct {
-	Coordinate image.Point
-	TokenColor color.Color
-	Size       int
+	Coordinate                         image.Point
+	TokenColor                         color.Color
+	Size                               int
+	DimLight, NormalLight, BrightLight int
+}
+
+func (t Token) Color() color.Color {
+	if t.TokenColor != nil {
+		return t.TokenColor
+	}
+	return color.RGBA{0, 0, 0, 0}
+}
+
+func (t Token) WithLight(dim, normal, bright int) (ret Token) {
+	ret = t
+	ret.DimLight = dim
+	ret.NormalLight = normal
+	ret.BrightLight = bright
+	return
 }
 
 func (t Token) WithColor(c color.Color) (ret Token) {
@@ -42,7 +59,7 @@ func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 		return errors.New("cannot load tokens for tabula with nil ID")
 	}
 	// Read list of existing tokens
-	res, err := db.Query("SELECT context_id, name, size, x, y, r, g, b, a FROM tabula_tokens WHERE tabula_id=$1", t.Id)
+	res, err := db.Query("SELECT context_id, name, size, x, y, r, g, b, a, light_dim, light_normal, light_bright FROM tabula_tokens WHERE tabula_id=$1", t.Id)
 	if err != nil {
 		return fmt.Errorf("retrieving list to sync: %s", err)
 	}
@@ -54,7 +71,8 @@ func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 		var name string
 		var x, y, size int
 		var r, g, b, a uint8
-		if err := res.Scan(&ctxId, &name, &size, &x, &y, &r, &g, &b, &a); err != nil {
+		var dim, normal, bright int
+		if err := res.Scan(&ctxId, &name, &size, &x, &y, &r, &g, &b, &a, &dim, &normal, &bright); err != nil {
 			log.Warningf("scanning row: %s", err)
 			continue
 		}
@@ -64,9 +82,12 @@ func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 		}
 
 		t.Tokens[ctxId][name] = Token{
-			image.Point{x, y},
-			color.RGBA{r, g, b, a},
-			size,
+			Coordinate:  image.Point{x, y},
+			TokenColor:  color.RGBA{r, g, b, a},
+			Size:        size,
+			DimLight:    dim,
+			NormalLight: normal,
+			BrightLight: bright,
 		}
 	}
 
@@ -131,10 +152,12 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 	var query string
 	switch dia := db.Dialect(); dia {
 	case "postgresql":
-		query = "INSERT INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) " +
-			"ON CONFLICT (name, context_id, tabula_id) DO UPDATE SET size=$4, x=$5, y=$6, r=$7, g=$8, b=$9, a=$10"
+		query = "INSERT INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a, light_dim, light_normal, light_bright) " +
+			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12, $13) " +
+			"ON CONFLICT (name, context_id, tabula_id) DO UPDATE SET size=$4, x=$5, y=$6, r=$7, g=$8, b=$9, a=$10, light_dim = $11, light_normal=$12, light_bright=$13"
 	case "sqlite3":
-		query = "REPLACE INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"
+		query = "REPLACE INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a, light_dim, light_normal, light_bright) " +
+			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12, $13)"
 	default:
 		return fmt.Errorf("no Tabula.saveTokens query for SQL dialect %s", dia)
 	}
@@ -146,8 +169,8 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 	for ctxId, ctxTokens := range t.Tokens {
 		for name, token := range ctxTokens {
 			pos := token.Coordinate
-			r, g, b, a := token.TokenColor.RGBA()
-			if _, err := add.Exec(name, ctxId, t.Id, token.Size, pos.X, pos.Y, r>>8, g>>8, b>>8, a>>8); err != nil {
+			r, g, b, a := token.Color().RGBA()
+			if _, err := add.Exec(name, ctxId, t.Id, token.Size, pos.X, pos.Y, r>>8, g>>8, b>>8, a>>8, token.DimLight, token.NormalLight, token.BrightLight); err != nil {
 				log.Warningf("error saving token %q at pos (%d,%d) on tabula %d, context ID %q: %s", name, pos.X, pos.Y, t.Id, ctxId, err)
 			}
 		}
@@ -184,6 +207,70 @@ func (t *Tabula) drawAt(i draw.Image, obj image.Image, x float32, y float32, siz
 
 var emojiRe = regexp.MustCompile(`^(:[^:]+:)(.*)$`)
 
+func light(t *Tabula, in image.Image, radius int, coord image.Point, col color.Color) ([]mark.Mark, error) {
+	if radius <= 0 {
+		return []mark.Mark{}, nil
+	}
+	marks, err := mark.CirclePoint(coord, "", radius)
+	if err != nil {
+		return nil, fmt.Errorf("rendering a circle radius %d at %v failed: %s", radius, coord, err)
+	}
+	for i := range marks {
+		marks[i].Color = col
+	}
+	return marks, nil
+}
+
+func (t *Tabula) addTokenLights(in image.Image, ctx context.Context) error {
+	// Map out light levels; brightest lights win.
+	lighting := map[image.Point]mark.Mark{}
+	for tokenName, token := range t.Tokens[ctx.Id()] {
+		log.Debugf("adding dim lighting for token %q at %v", token.DimLight, tokenName, token.Coordinate)
+		// Add "dim lighting" marks
+		marks, err := light(t, in, token.DimLight, token.Coordinate, color.NRGBA{231, 114, 0, 63})
+		if err != nil {
+			return fmt.Errorf("drawing lights: %s", err)
+		}
+
+		for _, m := range marks {
+			lighting[m.Point] = m
+		}
+	}
+
+	for tokenName, token := range t.Tokens[ctx.Id()] {
+		log.Debugf("adding normal lighting for token %q at %v", token.NormalLight, tokenName, token.Coordinate)
+		// Add "normal lighting" marks
+		marks, err := light(t, in, token.NormalLight, token.Coordinate, color.NRGBA{250, 250, 55, 63})
+		if err != nil {
+			return fmt.Errorf("drawing lights: %s", err)
+		}
+
+		for _, m := range marks {
+			lighting[m.Point] = m
+		}
+	}
+
+	for tokenName, token := range t.Tokens[ctx.Id()] {
+		log.Debugf("adding bright lighting for token %q at %v", token.BrightLight, tokenName, token.Coordinate)
+		// Add "bright lighting" marks
+		marks, err := light(t, in, token.BrightLight, token.Coordinate, color.NRGBA{149, 224, 232, 63})
+		if err != nil {
+			return fmt.Errorf("drawing lights: %s", err)
+		}
+
+		for _, m := range marks {
+			lighting[m.Point] = m
+		}
+	}
+
+	// Render all marks
+	marks := []mark.Mark{}
+	for _, m := range lighting {
+		marks = append(marks, m)
+	}
+	return t.addMarkSlice(in, marks)
+}
+
 func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
@@ -192,7 +279,7 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 
 	for tokenName, token := range t.Tokens[ctx.Id()] {
 		coord := token.Coordinate
-		r, g, b, a := token.TokenColor.RGBA()
+		r, g, b, a := token.Color().RGBA()
 
 		var name, label string
 
@@ -206,13 +293,16 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 
 		log.Debugf("Adding token (name=%q) (label=%q) (color:%d,%d,%d,%d) at (%d,%d)", name, label, r, g, b, a, coord.X, coord.Y)
 
+		if a > 0 {
+			t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+token.Size, coord.Y+token.Size), 1, token.Color())
+		}
+
 		if ctx.IsEmoji(name) {
 			emoji, err := ctx.GetEmoji(name)
 			if err != nil {
 				log.Warningf("error obtaining emoji %q: %s", name, err)
 				// no return here, we'll fall through to rendering token name
 			} else {
-				t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+token.Size, coord.Y+token.Size), 1, token.TokenColor)
 				t.drawAt(drawable, emoji, float32(coord.X), float32(coord.Y), float32(token.Size), 2)
 				if label != "" {
 					t.printAt(drawable, label, float32(coord.X), float32(coord.Y)+float32(token.Size)/2, float32(token.Size), float32(token.Size)/2, Bottom, Center)
@@ -220,7 +310,6 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 				continue
 			}
 		}
-		t.squareAt(drawable, image.Rect(coord.X, coord.Y, coord.X+token.Size, coord.Y+token.Size), 1, token.TokenColor)
 		t.printAt(drawable, name, float32(coord.X), float32(coord.Y), float32(token.Size), float32(token.Size), Middle, Center)
 	}
 	return nil

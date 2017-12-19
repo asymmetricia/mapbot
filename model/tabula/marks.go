@@ -9,12 +9,27 @@ import (
 )
 
 func (t *Tabula) addMarks(in image.Image, ctx context.Context) error {
+	dirMarkSlice := []mark.Mark{}
+	for _, dirMarks := range ctx.GetMarks(*t.Id) {
+		for _, mark := range dirMarks {
+			dirMarkSlice = append(dirMarkSlice, mark)
+		}
+	}
+
+	if err := t.addMarkSlice(in, dirMarkSlice); err != nil {
+		return err
+	}
+
+	return t.addMarkSlice(in, t.Marks)
+}
+
+func (t *Tabula) addMarkSlice(in image.Image, marks []mark.Mark) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
 		return errors.New("image provided could not be used as a draw.Image")
 	}
 
-	renderMark := func(mark mark.Mark) {
+	for _, mark := range marks {
 		switch mark.Direction {
 		case "n":
 			t.squareAtFloat(drawable, float32(mark.Point.X), float32(mark.Point.Y)-.1, float32(mark.Point.X)+1, float32(mark.Point.Y)+.1, 0, mark.Color)
@@ -35,16 +50,6 @@ func (t *Tabula) addMarks(in image.Image, ctx context.Context) error {
 		default:
 			t.squareAt(drawable, image.Rect(mark.Point.X, mark.Point.Y, mark.Point.X+1, mark.Point.Y+1), 1, mark.Color)
 		}
-	}
-
-	for _, dirMarks := range ctx.GetMarks(*t.Id) {
-		for _, mark := range dirMarks {
-			renderMark(mark)
-		}
-	}
-
-	for _, mark := range t.Marks {
-		renderMark(mark)
 	}
 
 	return nil
