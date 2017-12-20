@@ -29,10 +29,15 @@ mapbot: ${shell find -name \*.go}
 	go fmt github.com/pdbogen/mapbot/...
 	go build -o mapbot
 
-release:
-	go fmt github.com/pdbogen/mapbot/...
+release: mapbot.darwin_amd64 mapbot.linux_amd64 mapbot.windows_amd64.exe
+
+mapbot.darwin_amd64: mapbot
 	GOOS=darwin  GOARCH=amd64 go build -o mapbot.darwin_amd64
+
+mapbot.linux_amd64: mapbot
 	GOOS=linux   GOARCH=amd64 go build -o mapbot.linux_amd64
+
+mapbot.windows_amd64.exe: mapbot
 	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
 
 tail:
