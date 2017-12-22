@@ -11,6 +11,7 @@ import (
 	_ "image/png"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -31,10 +32,16 @@ var staticAliases = map[string]string{
 	"boat": "sailboat",
 }
 
+type emojiCodePoints struct {
+	FullyQualified    string `json:"fully_qualified"`
+	NonFullyQualified string `json:"non_fully_qualified"`
+}
+
 type emoji struct {
-	Unicode string      `json:"unicode"`
-	Image   image.Image `json:"-"`
-	Aliases []string    `json:"aliases"`
+	CodePoints emojiCodePoints `json:"code_points"`
+	Shortname  string          `json:"shortname"`
+	Image      image.Image     `json:"-"`
+	Aliases    []string        `json:"shortname_alternates"`
 }
 
 var EmojiOne map[string]*emoji = map[string]*emoji{}
@@ -50,6 +57,8 @@ func init() {
 		if _, ok := expanded[n]; ok {
 			continue
 		}
+		EmojiOne[strings.Trim(e.Shortname, ":")] = e
+		expanded[e.Shortname] = true
 		for _, a := range e.Aliases {
 			EmojiOne[strings.Trim(a, ":")] = e
 			expanded[a] = true
@@ -58,51 +67,123 @@ func init() {
 	}
 
 	for from, to := range staticAliases {
-		if e, ok := EmojiOne[to]; ok {
-			EmojiOne[from] = e
+		e, ok := EmojiOne[to]
+		if !ok {
+			log.Warningf("missing target for static alias %q -> %q", from, to)
+			continue
 		}
+		EmojiOne[from] = e
 	}
 
-	log.Debugf("Parsing emojiOne payload took %0.2fs", time.Now().Sub(start).Seconds())
+	log.Debugf("Parsing %d emoji from emojiOne payload took %0.2fs", len(EmojiOne), time.Now().Sub(start).Seconds())
 }
 
 type EmojiNotFound error
 
+func getEmojiOneFile(codepoint string) (image.Image, error) {
+	path := fmt.Sprintf("/emoji/%s.png", codepoint)
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	defer f.Close()
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
+}
+
+func getEmojiOneCdn(codepoint string) (image.Image, error) {
+	emojiUrl := fmt.Sprintf(emojiUrl, codepoint)
+	c := http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	log.Debugf("trying to retrieve glyph %s from %s...", codepoint, emojiUrl)
+	res, err := c.Get(emojiUrl)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving EmojiOne glyph %s: %s", codepoint, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode/100 != 2 {
+		log.Warningf("%d retrieving %s", res.StatusCode, emojiUrl)
+		return nil, nil
+	}
+
+	img, _, err := image.Decode(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parsing EmojiOne glyph %s: %s", codepoint, err)
+	}
+
+	return img, nil
+}
+
 func GetEmojiOne(name string) (image.Image, error) {
 	e, ok := EmojiOne[name]
 	if !ok {
-		e, ok = EmojiOne[strings.Replace(name, "_", "-", -1)]
+		name = strings.Replace(name, "_", "-", -1)
+		e, ok = EmojiOne[name]
 	}
 	if !ok {
-		e, ok = EmojiOne[strings.Replace(name, "-", "_", -1)]
+		name = strings.Replace(name, "-", "_", -1)
+		e, ok = EmojiOne[name]
 	}
 
-	if ok {
-		if e.Image == nil {
-			emojiUrl := fmt.Sprintf("https://cdnjs.cloudflare.com/ajax/libs/emojione/2.2.7/assets/png/%s.png", e.Unicode)
-			c := http.Client{
-				Timeout: 30 * time.Second,
-			}
-
-			res, err := c.Get(emojiUrl)
-			if err != nil {
-				return nil, fmt.Errorf("retrieving EmojiOne glyph %s (%s): %s", name, e.Unicode, err)
-			}
-			defer res.Body.Close()
-
-			img, _, err := image.Decode(res.Body)
-			if err != nil {
-				return nil, fmt.Errorf("parsing EmojiOne glyph %s (%s): %s", name, e.Unicode, err)
-			}
-			e.Image = img
-
-			return img, nil
-		} else {
-			return e.Image, nil
-		}
-	} else {
+	if !ok {
 		return nil, EmojiNotFound(errors.New("not found"))
 	}
+
+	if e.Image != nil {
+		return e.Image, nil
+	}
+
+	img, err := getEmojiOneFile(e.CodePoints.FullyQualified)
+	if err != nil {
+		log.Warningf("error checking file cache for emoji %s: %s", e.CodePoints.FullyQualified, err)
+		return nil, err
+	}
+	if img != nil {
+		EmojiOne[name].Image = img
+		return img, nil
+	}
+
+	img, err = getEmojiOneCdn(e.CodePoints.FullyQualified)
+	if err != nil {
+		log.Warningf("error checking CDN for emoji %s: %s", e.CodePoints.FullyQualified, err)
+		return nil, err
+	}
+	if img != nil {
+		EmojiOne[name].Image = img
+		return img, nil
+	}
+
+	img, err = getEmojiOneFile(e.CodePoints.NonFullyQualified)
+	if err != nil {
+		log.Warningf("error checking file cache for emoji %s: %s", e.CodePoints.NonFullyQualified, err)
+		return nil, err
+	}
+	if img != nil {
+		EmojiOne[name].Image = img
+		return img, nil
+	}
+
+	img, err = getEmojiOneCdn(e.CodePoints.NonFullyQualified)
+	if err != nil {
+		log.Warningf("error checking CDN for emoji %s: %s", e.CodePoints.NonFullyQualified, err)
+		return nil, err
+	}
+	if img != nil {
+		EmojiOne[name].Image = img
+		return img, nil
+	}
+
+	return nil, EmojiNotFound(errors.New("could not retrieve"))
 }
 
 func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
