@@ -225,7 +225,7 @@ func (t *Tabula) addTokenLights(in image.Image, ctx context.Context) error {
 	// Map out light levels; brightest lights win.
 	lighting := map[image.Point]mark.Mark{}
 	for tokenName, token := range t.Tokens[ctx.Id()] {
-		log.Debugf("adding dim lighting for token %q at %v", token.DimLight, tokenName, token.Coordinate)
+		log.Debugf("adding dim lighting %dft for token %q at %v", token.DimLight, tokenName, token.Coordinate)
 		// Add "dim lighting" marks
 		marks, err := light(t, in, token.DimLight, token.Coordinate, color.NRGBA{231, 114, 0, 63})
 		if err != nil {
@@ -238,7 +238,7 @@ func (t *Tabula) addTokenLights(in image.Image, ctx context.Context) error {
 	}
 
 	for tokenName, token := range t.Tokens[ctx.Id()] {
-		log.Debugf("adding normal lighting for token %q at %v", token.NormalLight, tokenName, token.Coordinate)
+		log.Debugf("adding normal lighting %dft for token %q at %v", token.NormalLight, tokenName, token.Coordinate)
 		// Add "normal lighting" marks
 		marks, err := light(t, in, token.NormalLight, token.Coordinate, color.NRGBA{250, 250, 55, 63})
 		if err != nil {
@@ -251,7 +251,7 @@ func (t *Tabula) addTokenLights(in image.Image, ctx context.Context) error {
 	}
 
 	for tokenName, token := range t.Tokens[ctx.Id()] {
-		log.Debugf("adding bright lighting for token %q at %v", token.BrightLight, tokenName, token.Coordinate)
+		log.Debugf("adding bright lighting %dft for token %q at %v", token.BrightLight, tokenName, token.Coordinate)
 		// Add "bright lighting" marks
 		marks, err := light(t, in, token.BrightLight, token.Coordinate, color.NRGBA{149, 224, 232, 63})
 		if err != nil {
