@@ -8,3 +8,5 @@
 /.pull
 /vendor/*
 !/vendor/vendor.json
+/emoji.json
+/ui/slack/context/emoji.go

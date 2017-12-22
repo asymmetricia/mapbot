@@ -46,3 +46,12 @@ tail:
 
 clean:
 	$(RM) .push .docker mapbot
+
+ui/slack/context/emoji.go: emoji.json
+	echo 'package context' > ui/slack/context/emoji.go && \
+	echo 'var emojiJson = `' >> ui/slack/context/emoji.go && \
+	jq . < emoji.json >> ui/slack/context/emoji.go && \
+	echo '`' >> ui/slack/context/emoji.go
+
+emoji.json:
+	curl https://raw.githubusercontent.com/emojione/emojione/v3.1.1/emoji.json > emoji.json
