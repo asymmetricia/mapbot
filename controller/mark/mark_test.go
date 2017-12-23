@@ -3,6 +3,7 @@ package mark
 import (
 	"fmt"
 	"image"
+	"math"
 	"strings"
 	"testing"
 )
@@ -43,5 +44,32 @@ func TestMarksFromCone(t *testing.T) {
 			}
 			t.Fatalf("%q: %d square(s) missing from cone: %s", test.input, len(sq), strings.Join(sq, ","))
 		}
+	}
+}
+
+func TestAngle(t *testing.T) {
+	type test struct {
+		From   image.Point
+		FromC  string
+		To     image.Point
+		ToC    string
+		result float64
+	}
+	tests := []test{
+		{image.Pt(0, 0), "ne", image.Pt(1, 0), "ne", 0},
+		{image.Pt(0, 0), "ne", image.Pt(0, 0), "se", 6 * math.Pi / 4},
+		{image.Pt(0, 0), "ne", image.Pt(1, 0), "nw", math.NaN()},
+	}
+
+	for _, test := range tests {
+		res := angle(test.From, test.FromC, test.To, test.ToC)
+		if math.IsNaN(res) && math.IsNaN(test.result) {
+			continue
+		}
+		if res == test.result {
+			continue
+		}
+
+		t.Fatalf("expected angle(%v,%s,%v,%s) == %f, but was %f", test.From, test.FromC, test.To, test.ToC, test.result, res)
 	}
 }

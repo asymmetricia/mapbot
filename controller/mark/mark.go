@@ -176,91 +176,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 	}
 }
 
-func distance(a image.Point, cornerA string, b image.Point, cornerB string) int {
-	dx := a.X - b.X
-	if dx < 0 {
-		dx = dx * -1
-	}
-
-	dy := a.Y - b.Y
-	if dy < 0 {
-		dy = dy * -1
-	}
-
-	diags := 0
-	straights := 0
-	if (cornerA[0] == cornerB[0]) != (cornerA[1] == cornerB[1]) {
-		straights++
-	} else if cornerA[0] != cornerB[0] {
-		diags++
-	}
-
-	if dx < dy {
-		diags = dx
-		straights = dy - dx
-	} else {
-		diags = dy
-		straights = dx - dy
-	}
-	return straights*5 + diags/2*15 + diags%2*5
-}
-
-func marksFromCircle(in string) (out []mark.Mark, err error) {
-	out = []mark.Mark{}
-	args := strings.Split(in[7:len(in)-1], ",")
-	if len(args) != 2 {
-		return nil, fmt.Errorf("in `%s`, `circle()` expects two comma-separated arguments", in)
-	}
-	center, dir, err := conv.RCToPoint(args[0], true)
-	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse coordinate `%s`: %s", in, args[0], err)
-	}
-
-	radius, err := strconv.Atoi(args[1])
-	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse radius `%s`: %s", in, args[1], err)
-	}
-
-	if len(dir) == 1 {
-		return nil, fmt.Errorf("`%s` specifies an edge, not a square or corner; but circles centered on edges are no valid.", args[1])
-	}
-
-	if len(dir) == 0 {
-		for x := -radius / 5; x <= radius/5; x++ {
-			for y := -radius / 5; y <= radius/5; y++ {
-				pt := image.Point{center.X + x, center.Y + y}
-				if distance(pt, "", center, "") <= radius {
-					out = append(out, mark.Mark{Point: pt})
-				}
-			}
-		}
-	} else {
-		switch dir {
-		case "nw":
-			center.X++
-		case "sw":
-			center.X++
-			center.Y--
-		case "se":
-			center.Y--
-		}
-
-		for x := -radius/5 - 1; x <= radius/5+1; x++ {
-		coord:
-			for y := -radius/5 - 1; y <= radius/5+1; y++ {
-				pt := image.Point{center.X + x, center.Y + y}
-				for _, corner := range []string{"ne", "nw", "sw", "se"} {
-					if distance(pt, corner, center, dir) > radius {
-						continue coord
-					}
-				}
-			}
-		}
-	}
-
-	return out, nil
-}
-
+// List of pairs, each pair is a min and max, in units of Pi/4 (i.e., eighth of a circle)
 var coneAngles = map[string][]float64{
 	"e":  []float64{0, 1, 7, 8},
 	"ne": []float64{0, 2},
@@ -296,35 +212,51 @@ var specialCones = map[string]map[int][]image.Point{
 }
 
 func angle(a image.Point, cA string, b image.Point, cB string) float64 {
-	switch cA {
-	case "nw":
-		a.X--
-	case "sw":
-		a.X--
-		a.Y++
-	case "se":
-		a.Y++
+	cdx := 0
+	cdy := 0
+	if a == b && cA == cB {
+		return math.NaN()
 	}
-	switch cB {
-	case "nw":
-		b.X--
-	case "sw":
-		b.X--
-		b.Y++
-	case "se":
-		b.Y++
+	if len(cA) != 0 && len(cA) != 2 || len(cA) != len(cB) {
+		return math.NaN()
 	}
-	if a == b {
-		return 0
+
+	if cA != cB {
+		if cA[1] != cB[1] {
+			if cA[1] == 'e' {
+				cdx--
+			} else {
+				cdx++
+			}
+		}
+		if cA[0] != cB[0] {
+			if cA[0] == 'n' {
+				cdy++
+			} else {
+				cdy--
+			}
+		}
 	}
-	return math.Atan2(float64(b.Y-a.Y), float64(b.X-a.X))
+
+	dx := b.X - a.X + cdx
+	dy := b.Y - a.Y + cdy
+
+	if dx == 0 && dy == 0 {
+		return math.NaN()
+	}
+	angle := math.Atan2(float64(-dy), float64(dx))
+	if angle < 0 {
+		return 2*math.Pi + angle
+	} else {
+		return angle
+	}
 }
 
 func marksFromCone(in string) (out []mark.Mark, err error) {
 	out = []mark.Mark{}
 	args := strings.Split(in[5:len(in)-1], ",")
 	if len(args) != 3 {
-		return nil, fmt.Errorf("in `%s`, `cone()` expects three comma-separated arguments", in)
+		return nil, fmt.Errorf("in `%s`, `cone()` expects three comma-separated arguments: `corner`, `direction`, `distance`", in)
 	}
 	origin, corner, err := conv.RCToPoint(args[0], true)
 	if err != nil {
@@ -362,29 +294,38 @@ func marksFromCone(in string) (out []mark.Mark, err error) {
 	coord:
 		for x := -radius / 5; x <= radius/5; x++ {
 			// each square has four corners, and all four must be within the right angle
+			cornerCount := 0
 			angles := []float64{
-				angle(origin, corner, image.Pt(x, y), "ne"),
-				angle(origin, corner, image.Pt(x, y), "nw"),
-				angle(origin, corner, image.Pt(x, y), "sw"),
-				angle(origin, corner, image.Pt(x, y), "se"),
+				angle(image.ZP, corner, image.Pt(x, y), "ne"),
+				angle(image.ZP, corner, image.Pt(x, y), "nw"),
+				angle(image.ZP, corner, image.Pt(x, y), "sw"),
+				angle(image.ZP, corner, image.Pt(x, y), "se"),
 			}
+		corner:
 			for _, angle := range angles {
-				if angle < 0 {
-					angle += 2 * math.Pi
+				if math.IsNaN(angle) {
+					log.Debugf("%v has coincident corner", image.Pt(x, y))
+					cornerCount++
+					continue corner
 				}
-				ok := false
+				angle = angle / math.Pi * 4
 				for angleIdx := 0; angleIdx < len(angleRange); angleIdx += 2 {
-					if angle >= angleRange[angleIdx]*math.Pi/4 && angle <= angleRange[angleIdx+1]*math.Pi/4 {
-						ok = true
+					if angle >= angleRange[angleIdx] && angle <= angleRange[angleIdx+1] {
+						log.Debugf("%v has corner angle %f within range", image.Pt(x, y), angle)
+						cornerCount++
+						continue corner
 					}
 				}
-				if !ok {
-					continue coord
-				}
+				log.Debugf("%v corner angle %f out of range", image.Pt(x, y), angle)
 			}
+			if cornerCount < 3 {
+				log.Debugf("%v has %d corners, skipping", image.Pt(x, y), cornerCount)
+				continue coord
+			}
+			log.Debugf("%v has %d corners, moving to distance check", image.Pt(x, y), cornerCount)
 			// and all four corners must be withn the right range
-			for _, ptC := range []string{"ne", "nw", "sw", "se"} {
-				if distance(image.ZP, corner, image.Pt(x, y), ptC) > radius {
+			for _, targetCorner := range []string{"ne", "nw", "sw", "se"} {
+				if conv.DistanceCorners(image.ZP, corner, image.Pt(x, y), targetCorner) > radius {
 					continue coord
 				}
 			}

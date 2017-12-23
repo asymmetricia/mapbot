@@ -74,26 +74,26 @@ func DistanceCorners(a image.Point, cornerA string, b image.Point, cornerB strin
 		return -1
 	}
 
-  cdx := 0
-  cdy := 0
+	cdx := 0
+	cdy := 0
 
-  // (0,0)se -> (1,1)nw == 10 (squares) - 5 (dx>0 and s->n) - 5 (dx>0 and e->w) == 0
+	// (0,0)se -> (1,1)nw == 10 (squares) - 5 (dx>0 and s->n) - 5 (dx>0 and e->w) == 0
 	if len(cornerA) == 2 && cornerA != cornerB {
-	  if cornerA[1] != cornerB[1] {
-	    if cornerA[1] == 'e' {
-	      cdx--
-	    } else {
-	      cdx++
-	    }
-	  }
-	  if cornerA[0] != cornerB[0] {
-	    if cornerA[0] == 'n' {
-	      cdy++
-	    } else {
-	      cdy--
-      }
-	  }
-  }
+		if cornerA[1] != cornerB[1] {
+			if cornerA[1] == 'e' {
+				cdx--
+			} else {
+				cdx++
+			}
+		}
+		if cornerA[0] != cornerB[0] {
+			if cornerA[0] == 'n' {
+				cdy++
+			} else {
+				cdy--
+			}
+		}
+	}
 
 	dx := b.X - a.X + cdx
 	if dx < 0 {
