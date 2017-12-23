@@ -312,26 +312,23 @@ func marksFromCone(in string) (out []mark.Mark, err error) {
 			}
 		corner:
 			for _, angle := range angles {
+			  // if angle is NaN, the corners are co-incident
 				if math.IsNaN(angle) {
-					log.Debugf("%v has coincident corner", image.Pt(x, y))
 					cornerCount++
 					continue corner
 				}
 				angle = angle / math.Pi * 4
 				for angleIdx := 0; angleIdx < len(angleRange); angleIdx += 2 {
 					if angle >= angleRange[angleIdx] && angle <= angleRange[angleIdx+1] {
-						log.Debugf("%v has corner angle %f within range", image.Pt(x, y), angle)
 						cornerCount++
 						continue corner
 					}
 				}
-				log.Debugf("%v corner angle %f out of range", image.Pt(x, y), angle)
 			}
 			if cornerCount < 3 {
-				log.Debugf("%v has %d corners, skipping", image.Pt(x, y), cornerCount)
 				continue coord
 			}
-			log.Debugf("%v has %d corners, moving to distance check", image.Pt(x, y), cornerCount)
+
 			// and all four corners must be withn the right range
 			for _, targetCorner := range []string{"ne", "nw", "sw", "se"} {
 				if conv.DistanceCorners(image.ZP, corner, image.Pt(x, y), targetCorner) > radius {
