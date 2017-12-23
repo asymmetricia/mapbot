@@ -191,7 +191,7 @@ Commands:
 * [ ] Add rectangular mask to mask set
 * [ ] Select/Unselect mask set
 * [X] Spell effect overlay
-    * [ ] cones
+    * [X] cones
 * [ ] Add character ("add me")
 * [ ] Move character
     * [ ] Cardinal directions
