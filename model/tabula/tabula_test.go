@@ -58,17 +58,6 @@ func TestAlign(t *testing.T) {
 		glyph.Set(i, i, color.White)
 	}
 
-	for y := 0; y < glyph.Bounds().Max.Y; y++ {
-		for x := 0; x < glyph.Bounds().Max.X; x++ {
-			if glyph.At(x, y) == (color.RGBA{0, 0, 0, 0}) {
-				fmt.Print(".")
-			} else {
-				fmt.Print("#")
-			}
-		}
-		fmt.Print("\n")
-	}
-
 	for _, size := range []int{3, 4, 19, 50} {
 		half := size/2 - 1
 		max := size - 1
@@ -87,25 +76,6 @@ func TestAlign(t *testing.T) {
 
 		for n, test := range tests {
 			aligned := align(glyph, size, size, test.h, test.v)
-			for y := 0; y < size; y++ {
-				for x := 0; x < size; x++ {
-					if aligned.At(x, y) == (color.RGBA{0, 0, 0, 0}) {
-						fmt.Print(".")
-					} else {
-						fmt.Print("#")
-					}
-				}
-				fmt.Print("    ")
-				for x := 0; x < size; x++ {
-					if test.points[x][y] {
-						fmt.Print("#")
-					} else {
-						fmt.Print(".")
-					}
-				}
-				fmt.Print("\n")
-			}
-			fmt.Print("\n")
 			for x := 0; x < size; x++ {
 				for y := 0; y < size; y++ {
 					should := color.RGBA{0, 0, 0, 0}
@@ -113,6 +83,25 @@ func TestAlign(t *testing.T) {
 						should = color.RGBA{255, 255, 255, 255}
 					}
 					if aligned.At(x, y) != should {
+						for y := 0; y < size; y++ {
+							for x := 0; x < size; x++ {
+								if aligned.At(x, y) == (color.RGBA{0, 0, 0, 0}) {
+									fmt.Print(".")
+								} else {
+									fmt.Print("#")
+								}
+							}
+							fmt.Print("    ")
+							for x := 0; x < size; x++ {
+								if test.points[x][y] {
+									fmt.Print("#")
+								} else {
+									fmt.Print(".")
+								}
+							}
+							fmt.Print("\n")
+						}
+						fmt.Print("\n")
 						t.Fatalf("aligned-at #%d (v=%v, h=%v) (%d,%d) was %v, not %v", n, test.v, test.h, x, y, aligned.At(x, y), should)
 					}
 				}
