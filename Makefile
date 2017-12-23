@@ -19,20 +19,25 @@ push: .push
 	ssh ${SERVER} docker tag ${IMAGE_URL} mapbot && \
 	touch .pull
 
-.docker: mapbot Dockerfile run.sh
+.docker: mapbot Dockerfile run.sh emoji
 	docker build -t mapbot .
 	docker tag mapbot ${IMAGE_URL}
 	touch .docker
 
 
-mapbot: ${shell find -name \*.go}
+mapbot: ${shell find -name \*.go} ui/slack/context/emoji.go
 	go fmt github.com/pdbogen/mapbot/...
 	go build -o mapbot
 
-release:
-	go fmt github.com/pdbogen/mapbot/...
+release: mapbot.darwin_amd64 mapbot.linux_amd64 mapbot.windows_amd64.exe
+
+mapbot.darwin_amd64: mapbot
 	GOOS=darwin  GOARCH=amd64 go build -o mapbot.darwin_amd64
+
+mapbot.linux_amd64: mapbot
 	GOOS=linux   GOARCH=amd64 go build -o mapbot.linux_amd64
+
+mapbot.windows_amd64.exe: mapbot
 	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
 
 tail:
@@ -41,3 +46,18 @@ tail:
 
 clean:
 	$(RM) .push .docker mapbot
+
+ui/slack/context/emoji.go: emoji.json
+	echo 'package context' > ui/slack/context/emoji.go && \
+	echo 'var emojiUrl = `https://cdn.jsdelivr.net/emojione/assets/3.1.1/png/128/%s.png`' >> ui/slack/context/emoji.go && \
+	echo 'var emojiJson = `' >> ui/slack/context/emoji.go && \
+	jq . < emoji.json >> ui/slack/context/emoji.go && \
+	echo '`' >> ui/slack/context/emoji.go
+
+emoji.json:
+	curl https://raw.githubusercontent.com/emojione/emojione/v3.1.1/emoji.json > emoji.json
+
+emoji:
+	curl https://d1j8pt39hxlh3d.cloudfront.net/emoji/emojione/3.1.1/EmojiOne_3.1.1_128x128_png.zip > emoji.zip
+	mkdir emoji
+	cd emoji; unzip ../emoji.zip

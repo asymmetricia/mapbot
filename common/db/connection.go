@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/common/db/schema"
 	"github.com/pdbogen/mapbot/common/elephantsql"
@@ -18,14 +17,6 @@ type PostgreSql struct {
 
 func (p *PostgreSql) Dialect() string {
 	return "postgresql"
-}
-
-type Sqlite struct {
-	*sql.DB
-}
-
-func (s *Sqlite) Dialect() string {
-	return "sqlite3"
 }
 
 var Instance anydb.AnyDb
@@ -63,7 +54,7 @@ func OpenElephant(key, instance_type string, reset bool, resetFrom int) (anydb.A
 	if err != nil {
 		return nil, fmt.Errorf("connecting to instance %s:%d: %s", instance.DbHost, instance.DbPort, err)
 	}
-	return scheme(&PostgreSql{conn}, reset, resetFrom)
+	return scheme(&anydb.WithRetries{&PostgreSql{conn}}, reset, resetFrom)
 }
 
 func OpenPsql(host, user, pass, db string, port int, reset bool, resetFrom int) (anydb.AnyDb, error) {
@@ -81,15 +72,7 @@ func OpenPsql(host, user, pass, db string, port int, reset bool, resetFrom int) 
 	if err != nil {
 		return nil, err
 	}
-	return scheme(&PostgreSql{dbConn}, reset, resetFrom)
-}
-
-func OpenInMemory(reset bool, resetFrom int) (anydb.AnyDb, error) {
-	dbConn, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		return nil, err
-	}
-	return scheme(&Sqlite{dbConn}, reset, resetFrom)
+	return scheme(&anydb.WithRetries{&PostgreSql{dbConn}}, reset, resetFrom)
 }
 
 func scheme(dbConn anydb.AnyDb, reset bool, resetFrom int) (anydb.AnyDb, error) {

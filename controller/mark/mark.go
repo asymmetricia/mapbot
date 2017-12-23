@@ -121,7 +121,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 		}
 
 		if strings.HasPrefix(a, "circle(") && strings.HasSuffix(a, ")") {
-			m, err := marksFromCircle(a)
+			m, err := mark.Circle(a)
 			if err != nil {
 				h.Error(c, fmt.Sprintf(":warning: %s", err))
 				return

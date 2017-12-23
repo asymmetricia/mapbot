@@ -150,6 +150,7 @@ Maps are referred mostly as Tabula in code, since map is a reserved word in gola
 
 * [X] Background Image
 * [X] Alignment (offset & DPI)
+    * [ ] interactive / workflow-driven
 * [ ] Mask Sets
     * [ ] New
     * [ ] Add Rectangle
@@ -164,11 +165,11 @@ Maps are referred mostly as Tabula in code, since map is a reserved word in gola
 
 * [X] Name
 * [X] Icon / Glyphicon
-* [ ] Size
+* [X] Size
 * [X] Position on map
 * [X] Box color
 * [ ] Stacking of small tokens
-* [ ] opened/closed door tokens
+* [X] opened/closed door tokens _implemented via edge marks_
 
 Commands:
 
@@ -188,8 +189,9 @@ Commands:
 * [X] Select Saved Map
 * [ ] Add Mask Set
 * [ ] Add rectangular mask to mask set
-* [ ] Select/Unselect mask  set
-* [ ] Spell effect overlay
+* [ ] Select/Unselect mask set
+* [X] Spell effect overlay
+    * [ ] cones
 * [ ] Add character ("add me")
 * [ ] Move character
     * [ ] Cardinal directions

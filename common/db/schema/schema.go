@@ -156,6 +156,19 @@ var schema = []Migration{
 		map[string]string{"any": `ALTER TABLE context_marks ADD COLUMN stale BOOLEAN DEFAULT TRUE`},
 		map[string]string{"any": `ALTER TABLE context_marks DROP COLUMN stale`},
 	},
+	Migration{
+		17,
+		map[string]string{"any": `ALTER TABLE tabula_tokens ` +
+			`ADD COLUMN light_low INT NOT NULL DEFAULT 0, ` +
+			`ADD COLUMN light_normal INT NOT NULL DEFAULT 0, ` +
+			`ADD COLUMN light_bright INT NOT NULL DEFAULT 0`},
+		map[string]string{"any": `ALTER TABLE tabula_tokens DROP COLUMN light_low, DROP COLUMN light_normal, DROP COLUMN light_bright`},
+	},
+	Migration{
+		18,
+		map[string]string{"any": `ALTER TABLE tabula_tokens RENAME light_low TO light_dim`},
+		map[string]string{"any": `ALTER TABLE tabula_tokens RENAME light_dim TO light_low`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {

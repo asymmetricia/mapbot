@@ -22,6 +22,8 @@ import (
 
 var log = mbLog.Log
 
+var backends = []string{"postgres"}
+
 func main() {
 	SlackClientToken := flag.String("slack-client-id", "", "slack Client ID")
 	SlackClientSecret := flag.String("slack-client-secret", "", "slack Client Secret")
