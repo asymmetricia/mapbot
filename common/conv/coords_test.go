@@ -1,6 +1,9 @@
 package conv
 
-import "testing"
+import (
+	"image"
+	"testing"
+)
 
 func TestCoordsToPoint(t *testing.T) {
 	_, err := CoordsToPoint("-", "5")
@@ -84,5 +87,34 @@ func TestRCToPoint(t *testing.T) {
 		}
 
 		t.Logf("RCToPoint(%s) -> (%d,%d,%q): OK", test.inp, test.resX, test.resY, test.resDir)
+	}
+}
+
+func TestDistanceCorners(t *testing.T) {
+	type test struct {
+		FromPt image.Point
+		FromC  string
+		ToPt   image.Point
+		ToC    string
+		Result int
+	}
+
+	tests := []test{
+		{image.Pt(0, 0), "nw", image.Pt(0, 0), "nw", 0},
+		{image.Pt(0, 0), "nw", image.Pt(0, 0), "ne", 5},
+		{image.Pt(0, 0), "nw", image.Pt(0, 0), "se", 5},
+		{image.Pt(0, 0), "nw", image.Pt(0, 0), "sw", 5},
+		{image.Pt(0, 0), "nw", image.Pt(1, 1), "se", 15},
+		{image.Pt(0, 0), "se", image.Pt(1, 1), "nw", 0},
+		{image.Pt(0, 0), "sw", image.Pt(1, 0), "se", 10},
+		{image.Pt(0, 0), "sw", image.Pt(1, 0), "ne", 10},
+		{image.Pt(0, 0), "sw", image.Pt(1, 0), "nw", 5},
+		{image.Pt(0, 0), "sw", image.Pt(1, 0), "sw", 5},
+	}
+
+	for _, test := range tests {
+		if res := DistanceCorners(test.FromPt, test.FromC, test.ToPt, test.ToC); res != test.Result {
+			t.Fatalf("expected DistanceCorners(%v, %s, %v, %s) == %d, but was %d", test.FromPt, test.FromC, test.ToPt, test.ToC, test.Result, res)
+		}
 	}
 }
