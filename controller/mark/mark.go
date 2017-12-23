@@ -185,28 +185,36 @@ var coneAngles = map[string][]float64{
 	"w":  []float64{3, 5},
 	"sw": []float64{4, 6},
 	"s":  []float64{5, 7},
-	"se": []float64{6, 8},
+	"se": []float64{6, 8, 0, 0},
 }
 
 var specialCones = map[string]map[int][]image.Point{
 	"n": map[int][]image.Point{
 		15: []image.Point{
-			image.Pt(0, -1), image.Pt(-1, -2), image.Pt(0, -2), image.Pt(1, -2), image.Pt(-1, -3), image.Pt(0, -3), image.Pt(1, -3),
+			{-1, -3}, {0, -3}, {1, -3},
+			{-1, -2}, {0, -2}, {1, -2},
+			/*     */ {0, -1},
 		},
 	},
 	"s": map[int][]image.Point{
 		15: []image.Point{
-			image.Pt(0, 1), image.Pt(-1, 2), image.Pt(0, 2), image.Pt(1, 2), image.Pt(-1, 3), image.Pt(0, 3), image.Pt(1, 3),
+			/*    */ {0, 1},
+			{-1, 2}, {0, 2}, {1, 2},
+			{-1, 3}, {0, 3}, {1, 3},
 		},
 	},
 	"e": map[int][]image.Point{
 		15: []image.Point{
-			image.Pt(1, 0), image.Pt(2, -1), image.Pt(2, 0), image.Pt(2, 1), image.Pt(3, -1), image.Pt(3, 0), image.Pt(3, 1),
+			/*   */ {2, -1}, {3, -1},
+			{1, 0}, {2, 0}, {3, 0},
+			/*   */ {2, 1}, {3, 1},
 		},
 	},
 	"w": map[int][]image.Point{
 		15: []image.Point{
-			image.Pt(-1, 0), image.Pt(-2, -1), image.Pt(-2, 0), image.Pt(-2, 1), image.Pt(-3, -1), image.Pt(-3, 0), image.Pt(-3, 1),
+			{-3, -1}, {-2, -1},
+			{-3, 0}, {-2, 0}, {-1, 0},
+			{-3, 1}, {-2, 1},
 		},
 	},
 }
