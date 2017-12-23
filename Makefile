@@ -61,3 +61,6 @@ emoji:
 	curl https://d1j8pt39hxlh3d.cloudfront.net/emoji/emojione/3.1.1/EmojiOne_3.1.1_128x128_png.zip > emoji.zip
 	mkdir emoji
 	cd emoji; unzip ../emoji.zip
+
+test: ui/slack/context/emoji.go
+	go test -v ./...
