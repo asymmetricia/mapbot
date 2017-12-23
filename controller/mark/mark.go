@@ -11,6 +11,7 @@ import (
 	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"image"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -130,6 +131,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 		}
 
 		if strings.HasPrefix(a, "cone(") && strings.HasSuffix(a, ")") {
+			log.Debugf("trying out cone %q", a)
 			m, err := marksFromCone(a)
 			if err != nil {
 				h.Error(c, fmt.Sprintf(":warning: %s", err))
@@ -174,7 +176,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 	}
 }
 
-func pfsDist(a image.Point, b image.Point) int {
+func distance(a image.Point, cornerA string, b image.Point, cornerB string) int {
 	dx := a.X - b.X
 	if dx < 0 {
 		dx = dx * -1
@@ -187,6 +189,12 @@ func pfsDist(a image.Point, b image.Point) int {
 
 	diags := 0
 	straights := 0
+	if (cornerA[0] == cornerB[0]) != (cornerA[1] == cornerB[1]) {
+		straights++
+	} else if cornerA[0] != cornerB[0] {
+		diags++
+	}
+
 	if dx < dy {
 		diags = dx
 		straights = dy - dx
@@ -221,7 +229,7 @@ func marksFromCircle(in string) (out []mark.Mark, err error) {
 		for x := -radius / 5; x <= radius/5; x++ {
 			for y := -radius / 5; y <= radius/5; y++ {
 				pt := image.Point{center.X + x, center.Y + y}
-				if pfsDist(pt, center) <= radius {
+				if distance(pt, "", center, "") <= radius {
 					out = append(out, mark.Mark{Point: pt})
 				}
 			}
@@ -238,13 +246,13 @@ func marksFromCircle(in string) (out []mark.Mark, err error) {
 		}
 
 		for x := -radius/5 - 1; x <= radius/5+1; x++ {
+		coord:
 			for y := -radius/5 - 1; y <= radius/5+1; y++ {
 				pt := image.Point{center.X + x, center.Y + y}
-				if x <= 0 && y <= 0 && pfsDist(pt, image.Point{center.X + 1, center.Y}) <= radius ||
-					x > 0 && y <= 0 && pfsDist(pt, image.Point{center.X, center.Y}) <= radius ||
-					x > 0 && y > 0 && pfsDist(pt, image.Point{center.X, center.Y - 1}) <= radius ||
-					x <= 0 && y > 0 && pfsDist(pt, image.Point{center.X + 1, center.Y - 1}) <= radius {
-					out = append(out, mark.Mark{Point: pt})
+				for _, corner := range []string{"ne", "nw", "sw", "se"} {
+					if distance(pt, corner, center, dir) > radius {
+						continue coord
+					}
 				}
 			}
 		}
@@ -253,26 +261,85 @@ func marksFromCircle(in string) (out []mark.Mark, err error) {
 	return out, nil
 }
 
+var coneAngles = map[string][]float64{
+	"e":  []float64{0, 1, 7, 8},
+	"ne": []float64{0, 2},
+	"n":  []float64{1, 3},
+	"nw": []float64{2, 4},
+	"w":  []float64{3, 5},
+	"sw": []float64{4, 6},
+	"s":  []float64{5, 7},
+	"se": []float64{6, 8},
+}
+
+var specialCones = map[string]map[int][]image.Point{
+	"n": map[int][]image.Point{
+		15: []image.Point{
+			image.Pt(0, -1), image.Pt(-1, -2), image.Pt(0, -2), image.Pt(1, -2), image.Pt(-1, -3), image.Pt(0, -3), image.Pt(1, -3),
+		},
+	},
+	"s": map[int][]image.Point{
+		15: []image.Point{
+			image.Pt(0, 1), image.Pt(-1, 2), image.Pt(0, 2), image.Pt(1, 2), image.Pt(-1, 3), image.Pt(0, 3), image.Pt(1, 3),
+		},
+	},
+	"e": map[int][]image.Point{
+		15: []image.Point{
+			image.Pt(1, 0), image.Pt(2, -1), image.Pt(2, 0), image.Pt(2, 1), image.Pt(3, -1), image.Pt(3, 0), image.Pt(3, 1),
+		},
+	},
+	"w": map[int][]image.Point{
+		15: []image.Point{
+			image.Pt(-1, 0), image.Pt(-2, -1), image.Pt(-2, 0), image.Pt(-2, 1), image.Pt(-3, -1), image.Pt(-3, 0), image.Pt(-3, 1),
+		},
+	},
+}
+
+func angle(a image.Point, cA string, b image.Point, cB string) float64 {
+	switch cA {
+	case "nw":
+		a.X--
+	case "sw":
+		a.X--
+		a.Y++
+	case "se":
+		a.Y++
+	}
+	switch cB {
+	case "nw":
+		b.X--
+	case "sw":
+		b.X--
+		b.Y++
+	case "se":
+		b.Y++
+	}
+	if a == b {
+		return 0
+	}
+	return math.Atan2(float64(b.Y-a.Y), float64(b.X-a.X))
+}
+
 func marksFromCone(in string) (out []mark.Mark, err error) {
 	out = []mark.Mark{}
 	args := strings.Split(in[5:len(in)-1], ",")
 	if len(args) != 3 {
 		return nil, fmt.Errorf("in `%s`, `cone()` expects three comma-separated arguments", in)
 	}
-	origin, dir, err := conv.RCToPoint(args[0], true)
+	origin, corner, err := conv.RCToPoint(args[0], true)
 	if err != nil {
 		return nil, fmt.Errorf("`%s` looked like a cone, but could not parse coordinate `%s`: %s", in, args[0], err)
 	}
 
-	if len(dir) != 2 {
+	if len(corner) != 2 {
 		return nil, errors.New("cones must originate from corners")
 	}
 
-	if dir == "ne" && args[1] != "n" && args[1] != "ne" && args[1] != "e" ||
-		dir == "se" && args[1] != "s" && args[1] != "se" && args[1] != "e" ||
-		dir == "sw" && args[1] != "s" && args[1] != "sw" && args[1] != "w" ||
-		dir == "nw" && args[1] != "n" && args[1] != "nw" && args[1] != "w" {
-		return nil, fmt.Errorf("`%s` is not a legal direction from a %s corner", args[1], dir)
+	if corner == "ne" && args[1] != "n" && args[1] != "ne" && args[1] != "e" ||
+		corner == "se" && args[1] != "s" && args[1] != "se" && args[1] != "e" ||
+		corner == "sw" && args[1] != "s" && args[1] != "sw" && args[1] != "w" ||
+		corner == "nw" && args[1] != "n" && args[1] != "nw" && args[1] != "w" {
+		return nil, fmt.Errorf("`%s` is not a legal direction from a %s corner", args[1], corner)
 	}
 
 	radius, err := strconv.Atoi(args[2])
@@ -280,37 +347,48 @@ func marksFromCone(in string) (out []mark.Mark, err error) {
 		return nil, fmt.Errorf("`%s` looked like a cone, but could not parse radius `%s`: %s", in, args[1], err)
 	}
 
-	switch dir {
-	case "nw":
-		origin.X++
-	case "sw":
-		origin.X++
-		origin.Y--
-	case "se":
-		origin.Y--
+	if coneRanges, ok := specialCones[args[1]]; ok {
+		if cone, ok := coneRanges[radius]; ok {
+			for _, pt := range cone {
+				out = append(out, mark.Mark{Point: pt.Add(origin)})
+			}
+			return out, nil
+		}
 	}
 
-	// n -- -radius < y < 0;      -radius < x < radius; constraint: dx < dy
-	// s --       0 < y < radius; -radius < x < radius; constraint: dx < dy
-	// e -- -radius < y < radius;       0 < x < radius; constraint: dy < dx
+	angleRange := coneAngles[args[1]]
 
-	for y := -radius / 5; y <= radius/5-1; y++ {
-		for x := y + 1; x <= -y; x++ {
-			if args[1][0] == 'n' && (y >= 0) ||
-				args[1][0] == 's' && (y < 0) {
-				continue
+	for y := -radius / 5; y <= radius/5; y++ {
+	coord:
+		for x := -radius / 5; x <= radius/5; x++ {
+			// each square has four corners, and all four must be within the right angle
+			angles := []float64{
+				angle(origin, corner, image.Pt(x, y), "ne"),
+				angle(origin, corner, image.Pt(x, y), "nw"),
+				angle(origin, corner, image.Pt(x, y), "sw"),
+				angle(origin, corner, image.Pt(x, y), "se"),
 			}
-			ptA := origin
-			if x <= 0 {
-				ptA.X++
+			for _, angle := range angles {
+				if angle < 0 {
+					angle += 2 * math.Pi
+				}
+				ok := false
+				for angleIdx := 0; angleIdx < len(angleRange); angleIdx += 2 {
+					if angle >= angleRange[angleIdx]*math.Pi/4 && angle <= angleRange[angleIdx+1]*math.Pi/4 {
+						ok = true
+					}
+				}
+				if !ok {
+					continue coord
+				}
 			}
-			if y >= 0 {
-				ptA.Y--
+			// and all four corners must be withn the right range
+			for _, ptC := range []string{"ne", "nw", "sw", "se"} {
+				if distance(image.ZP, corner, image.Pt(x, y), ptC) > radius {
+					continue coord
+				}
 			}
-			ptB := image.Point{origin.X + x, origin.Y + y}
-			if pfsDist(ptA, ptB) <= radius {
-				out = append(out, mark.Mark{Point: ptB})
-			}
+			out = append(out, mark.Mark{Point: origin.Add(image.Pt(x, y))})
 		}
 	}
 
