@@ -10,6 +10,7 @@ import (
 	"github.com/golang/freetype/truetype"
 	"github.com/nfnt/resize"
 	"github.com/pdbogen/mapbot/common/db/anydb"
+	mbDraw "github.com/pdbogen/mapbot/common/draw"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/mark"
@@ -244,23 +245,6 @@ func (t *Tabula) Hydrate() error {
 	return nil
 }
 
-// BlendAt alters the point (given by (x,y)) in the image i by blending the color there with the color c
-func blendAt(i draw.Image, x, y int, c color.Color) {
-	i.Set(x, y, blend(c, i.At(x, y)))
-}
-
-// blend calculates the result of alpha blending of the two colors
-func blend(a color.Color, b color.Color) color.Color {
-	a_r, a_g, a_b, a_a := a.RGBA()
-	b_r, b_g, b_b, b_a := b.RGBA()
-	return &color.RGBA{
-		R: uint8((a_r + b_r*(0xFFFF-a_a)/0xFFFF) >> 8),
-		G: uint8((a_g + b_g*(0xFFFF-a_a)/0xFFFF) >> 8),
-		B: uint8((a_b + b_b*(0xFFFF-a_a)/0xFFFF) >> 8),
-		A: uint8((a_a + b_a*(0xFFFF-a_a)/0xFFFF) >> 8),
-	}
-}
-
 func (t *Tabula) addGrid(i draw.Image) draw.Image {
 	bounds := i.Bounds()
 	gridded := i //copyImage(i)
@@ -288,7 +272,7 @@ func (t *Tabula) addGrid(i draw.Image) draw.Image {
 			if y < 0 {
 				continue
 			}
-			blendAt(gridded, int(x), int(y), col)
+			mbDraw.BlendAt(gridded, int(x), int(y), col)
 		}
 	}
 
@@ -301,7 +285,7 @@ func (t *Tabula) addGrid(i draw.Image) draw.Image {
 			if y < 0 {
 				continue
 			}
-			blendAt(gridded, int(x), int(y), col)
+			mbDraw.BlendAt(gridded, int(x), int(y), col)
 		}
 	}
 
@@ -504,7 +488,7 @@ func (t *Tabula) squareAtFloat(i draw.Image, minX, minY, maxX, maxY float32, ins
 			if y < 0 {
 				continue
 			}
-			blendAt(i, x, y, col)
+			mbDraw.BlendAt(i, x, y, col)
 		}
 	}
 }
