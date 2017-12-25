@@ -56,6 +56,19 @@ func clearMarks(h *hub.Hub, c *hub.Command) {
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
 }
 
+func consumeUntilSuffix(args []string, i *int, suffix string) string {
+	ret := ""
+	for _, arg := range args {
+		ret = ret + arg
+		if strings.HasSuffix(arg, suffix) {
+			break
+		}
+		*i++
+	}
+	log.Debugf("consumed up to %s", ret)
+	return ret
+}
+
 func cmdMark(h *hub.Hub, c *hub.Command) {
 	cmdName := strings.Split(string(c.Type), ":")[1]
 
@@ -111,7 +124,8 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			}
 		}
 
-		if strings.HasPrefix(a, "square(") && strings.HasSuffix(a, ")") {
+		if strings.HasPrefix(a, "square(") {
+			a = consumeUntilSuffix(args[i:], &i, ")")
 			m, err := marksFromSquare(a)
 			if err != nil {
 				h.Error(c, fmt.Sprintf(":warning: %s", err))
@@ -121,7 +135,8 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			continue
 		}
 
-		if strings.HasPrefix(a, "circle(") && strings.HasSuffix(a, ")") {
+		if strings.HasPrefix(a, "circle(") {
+			a = consumeUntilSuffix(args[i:], &i, ")")
 			m, err := mark.Circle(a)
 			if err != nil {
 				h.Error(c, fmt.Sprintf(":warning: %s", err))
@@ -131,8 +146,8 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			continue
 		}
 
-		if strings.HasPrefix(a, "cone(") && strings.HasSuffix(a, ")") {
-			log.Debugf("trying out cone %q", a)
+		if strings.HasPrefix(a, "cone(") {
+			a = consumeUntilSuffix(args[i:], &i, ")")
 			m, err := marksFromCone(a)
 			if err != nil {
 				h.Error(c, fmt.Sprintf(":warning: %s", err))
@@ -312,7 +327,7 @@ func marksFromCone(in string) (out []mark.Mark, err error) {
 			}
 		corner:
 			for _, angle := range angles {
-			  // if angle is NaN, the corners are co-incident
+				// if angle is NaN, the corners are co-incident
 				if math.IsNaN(angle) {
 					cornerCount++
 					continue corner

@@ -73,3 +73,29 @@ func TestAngle(t *testing.T) {
 		t.Fatalf("expected angle(%v,%s,%v,%s) == %f, but was %f", test.From, test.FromC, test.To, test.ToC, test.result, res)
 	}
 }
+
+func TestConsumeUntilSuffix(t *testing.T) {
+	type test struct {
+		in  []string
+		out string
+		idx int
+	}
+
+	tests := []test{
+		{[]string{"a", "b", "c)"}, "abc)", 2},
+		{[]string{"circle(a6,", "20)", "red"}, "circle(a6,20)", 1},
+		{[]string{"circle(a6,20)", "red"}, "circle(a6,20)", 0},
+	}
+
+	for _, test := range tests {
+		i := 0
+		res := consumeUntilSuffix(test.in, &i, ")")
+		if i != test.idx {
+			t.Fatalf("expected index to point to %d after consume, but was %d", test.idx, i)
+		}
+
+		if res != test.out {
+			t.Fatalf("expected consume result %q but got %q", test.out, res)
+		}
+	}
+}
