@@ -169,6 +169,17 @@ var schema = []Migration{
 		map[string]string{"any": `ALTER TABLE tabula_tokens RENAME light_low TO light_dim`},
 		map[string]string{"any": `ALTER TABLE tabula_tokens RENAME light_dim TO light_low`},
 	},
+	Migration{
+		19,
+		map[string]string{"any": `CREATE TABLE entities (` +
+			`context_id VARCHAR(128) REFERENCES contexts(context_id) ON DELETE CASCADE, ` +
+			`tabula_id  BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
+			`entity_id  INTEGER,` +
+			`string     TEXT,` +
+			`PRIMARY KEY (context_id, tabula_id, entity_id)` +
+			`)`},
+		map[string]string{"any": `DROP TABLE entities`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {
