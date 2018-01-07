@@ -646,3 +646,35 @@ func copyImage(in image.Image) *image.RGBA {
 	}
 	return out
 }
+
+func (t Tabula) PointToPixel(pt image.Point, dir string) image.Point {
+	sX := 0
+	sY := 0
+	switch dir {
+	case "nw":
+	case "n":
+		sX = int(t.Dpi/2 + 0.5)
+	case "ne":
+		sX = int(t.Dpi + 0.5)
+	case "w":
+		sY = int(t.Dpi/2 + 0.5)
+	case "": // middle
+		sX = int(t.Dpi/2 + 0.5)
+		sY = int(t.Dpi/2 + 0.5)
+	case "e":
+		sY = int(t.Dpi/2 + 0.5)
+		sX = int(t.Dpi + 0.5)
+	case "sw":
+		sY = int(t.Dpi + 0.5)
+	case "s":
+		sY = int(t.Dpi + 0.5)
+		sX = int(t.Dpi/2 + 0.5)
+	case "se":
+		sY = int(t.Dpi + 0.5)
+		sX = int(t.Dpi + 0.5)
+	}
+	return image.Pt(
+		int(float32(pt.X)*t.Dpi+0.5)+sX+t.OffsetX,
+		int(float32(pt.Y)*t.Dpi+0.5)+sY+t.OffsetY,
+	)
+}
