@@ -143,26 +143,6 @@ func GetEmojiOne(name string) (image.Image, error) {
 		return e.Image, nil
 	}
 
-	img, err := getEmojiOneFile(e.CodePoints.FullyQualified)
-	if err != nil {
-		log.Warningf("error checking file cache for emoji %s: %s", e.CodePoints.FullyQualified, err)
-		return nil, err
-	}
-	if img != nil {
-		EmojiOne[name].Image = img
-		return img, nil
-	}
-
-	img, err = getEmojiOneCdn(e.CodePoints.FullyQualified)
-	if err != nil {
-		log.Warningf("error checking CDN for emoji %s: %s", e.CodePoints.FullyQualified, err)
-		return nil, err
-	}
-	if img != nil {
-		EmojiOne[name].Image = img
-		return img, nil
-	}
-
 	img, err = getEmojiOneFile(e.CodePoints.NonFullyQualified)
 	if err != nil {
 		log.Warningf("error checking file cache for emoji %s: %s", e.CodePoints.NonFullyQualified, err)
