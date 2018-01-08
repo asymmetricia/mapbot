@@ -29,7 +29,7 @@ func main() {
 	SlackClientSecret := flag.String("slack-client-secret", "", "slack Client Secret")
 	SlackVerificationToken := flag.String("slack-verification-token", "", "slack verification token; if unset or incorrect, message actions will not work")
 	Domain := flag.String("domain", "map.haversack.io", "domain name to receive redirects, construct URLs, and request ACME certs")
-	Port := flag.Int("port", 8443, "port to listen on for web requests and slack aotuh responses")
+	Port := flag.Int("port", 8443, "port to listen on for web requests and slack oauth responses")
 	Tls := flag.Bool("tls", false, "if set, mapbot will use ACME to obtain a cert from Let's Encrypt for the above-configured domain")
 	DbType := flag.String("db-type", "postgres", "database type to use: postgres, sqlite3, or inmemory")
 	ESKey := flag.String("elephant-sql-key", "", "API Key for elephant sql, to create/access DB in lieu of --db-* parameters")
