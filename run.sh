@@ -9,4 +9,5 @@
   --slack-client-secret="$CLIENT_SECRET" \
   --slack-verification-token="$VERIFICATION_TOKEN" \
   --domain="$FQDN" \
+  ${TLS:+--tls} \
   --port="$PORT"
