@@ -33,7 +33,7 @@ var staticAliases = map[string]string{
 }
 
 type emojiCodePoints struct {
-	FullyQualified    string `json:"fully_qualified"`
+	Base              string `json:"base"`
 	NonFullyQualified string `json:"non_fully_qualified"`
 }
 
@@ -143,24 +143,26 @@ func GetEmojiOne(name string) (image.Image, error) {
 		return e.Image, nil
 	}
 
-	img, err = getEmojiOneFile(e.CodePoints.NonFullyQualified)
-	if err != nil {
-		log.Warningf("error checking file cache for emoji %s: %s", e.CodePoints.NonFullyQualified, err)
-		return nil, err
-	}
-	if img != nil {
-		EmojiOne[name].Image = img
-		return img, nil
-	}
+	for _, pt := range []string{e.CodePoints.NonFullyQualified, e.CodePoints.Base} {
+		img, err := getEmojiOneFile(pt)
+		if err != nil {
+			log.Warningf("error checking file cache for emoji %s: %s", pt, err)
+			return nil, err
+		}
+		if img != nil {
+			EmojiOne[name].Image = img
+			return img, nil
+		}
 
-	img, err = getEmojiOneCdn(e.CodePoints.NonFullyQualified)
-	if err != nil {
-		log.Warningf("error checking CDN for emoji %s: %s", e.CodePoints.NonFullyQualified, err)
-		return nil, err
-	}
-	if img != nil {
-		EmojiOne[name].Image = img
-		return img, nil
+		img, err = getEmojiOneCdn(pt)
+		if err != nil {
+			log.Warningf("error checking CDN for emoji %s: %s", pt, err)
+			return nil, err
+		}
+		if img != nil {
+			EmojiOne[name].Image = img
+			return img, nil
+		}
 	}
 
 	return nil, EmojiNotFound(errors.New("could not retrieve"))
