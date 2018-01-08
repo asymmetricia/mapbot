@@ -8,7 +8,8 @@
 /.pull
 /vendor/*
 !/vendor/vendor.json
-/emoji.json
+/emoji*json
 /ui/slack/context/emoji.go
 /emoji
 /emoji.zip
+/.emoji*
