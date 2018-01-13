@@ -163,7 +163,7 @@ func (t *Team) manageMessages() {
 							return
 						}
 
-						argv := strings.Split(strings.TrimSpace(msg.Text), " ")
+						argv := strings.Fields(msg.Text)
 						for i, arg := range argv {
 							if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
 								argv[i] = matches[1]
