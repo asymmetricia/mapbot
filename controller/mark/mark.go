@@ -105,6 +105,8 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 
 	marks := []mark.Mark{}
 	coloredMarks := []mark.Mark{}
+	lines := []mark.Line{}
+	coloredLines := []mark.Line{}
 	for i := 0; i < len(args); i++ {
 		a := strings.ToLower(args[i])
 		// Option 1: RC-style coordinate (maybe with a direction)
@@ -142,6 +144,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 				h.Error(c, fmt.Sprintf(":warning: %s", err))
 				return
 			}
+			log.Debugf("adding circle with %d marks", len(m))
 			marks = append(marks, m...)
 			continue
 		}
@@ -157,14 +160,30 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			continue
 		}
 
+		if strings.HasPrefix(a, "line(") {
+			a = consumeUntilSuffix(args[i:], &i, ")")
+			l, err := linesFromLine(a)
+			if err != nil {
+				h.Error(c, fmt.Sprintf(":warning: %s", err))
+				return
+			}
+			lines = append(lines, l...)
+			continue
+		}
+
 		if color, err := colors.ToColor(a); err == nil {
 			// paint the squares the color
 			for _, m := range marks {
 				m = m.WithColor(color)
 				coloredMarks = append(coloredMarks, m)
 			}
+			for _, l := range lines {
+				l = l.WithColor(color)
+				coloredLines = append(coloredLines, l)
+			}
 			// reset the list of squares
 			marks = []mark.Mark{}
+			lines = []mark.Line{}
 			continue
 		}
 
@@ -172,23 +191,30 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if len(marks) != 0 {
+	if len(marks) != 0 || len(lines) != 0 {
 		h.Error(c, ":warning: A list of marks should always end with a color!")
 		return
 	}
 
 	if cmdName == "mark" {
+		log.Debugf("marking up map...")
 		for _, m := range coloredMarks {
 			c.Context.Mark(*tabId, m)
 		}
+		log.Debugf("saving marks...")
 		if err := c.Context.Save(); err != nil {
 			log.Errorf("saving marks: %s", err)
 			h.Error(c, ":warning: A problem occurred while saving your marks. This could indicate an bug.")
 		}
 
-		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+		log.Debugf("rendering with %d marks", len(coloredMarks))
+		if len(lines) != 0 {
+			h.Error(c, ":warning: lines are not supported as permanent marks")
+		}
+		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithLines(coloredLines)))
 	} else {
-		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithMarks(coloredMarks)))
+		log.Debugf("rendering with %d temporary marks", len(coloredMarks))
+		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithMarks(coloredMarks).WithLines(coloredLines)))
 	}
 }
 
@@ -274,6 +300,50 @@ func angle(a image.Point, cA string, b image.Point, cB string) float64 {
 	} else {
 		return angle
 	}
+}
+
+func linesFromLine(in string) (out []mark.Line, err error) {
+	out = []mark.Line{}
+	args := strings.Split(in[5:len(in)-1], ",")
+	if len(args) != 2 {
+		return nil, fmt.Errorf("in `%s`, `line()` expects two comma-separated arguments: `from`, `to`", in)
+	}
+
+	a, ac, err := conv.RCToPoint(args[0], true)
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a line, but could not parse coordinate `%s`: %s", in, args[0], err)
+	}
+
+	b, bc, err := conv.RCToPoint(args[1], true)
+	if err != nil {
+		return nil, fmt.Errorf("`%s` looked like a line, but could not parse coordinate `%s`: %s", in, args[1], err)
+	}
+
+	if len(ac) != 0 && len(ac) != 2 {
+		return nil, fmt.Errorf("only corners or entire squares can be used to draw lines; you gave `%s`", args[0])
+	}
+
+	if len(bc) != 0 && len(bc) != 2 {
+		return nil, fmt.Errorf("only corners or entire squares can be used to draw lines; you gave `%s`", args[1])
+	}
+
+	cornersA := []string{ac}
+	if len(ac) == 0 {
+		cornersA = []string{"ne", "se", "sw", "nw"}
+	}
+
+	cornersB := []string{bc}
+	if len(bc) == 0 {
+		cornersB = []string{"ne", "se", "sw", "nw"}
+	}
+
+	for _, cA := range cornersA {
+		for _, cB := range cornersB {
+			out = append(out, mark.Line{A: a, CA: cA, B: b, CB: cB})
+		}
+	}
+
+	return out, nil
 }
 
 func marksFromCone(in string) (out []mark.Mark, err error) {

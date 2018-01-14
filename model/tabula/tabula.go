@@ -48,6 +48,9 @@ type Tabula struct {
 
 	// A list of marks appended to marks obtained from the context during rendering.
 	Marks []mark.Mark
+
+	// A list of lines appended to lines obtained from the context during rendering.
+	Lines []mark.Line
 }
 
 func (t *Tabula) String() string {
@@ -479,6 +482,15 @@ func crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
 	return result
 }
 
+func (t *Tabula) line(i draw.Image, fromX, fromY, toX, toY float32, col color.Color) {
+	iFromX := int(fromX*t.Dpi) + t.OffsetX
+	iFromY := int(fromY*t.Dpi) + t.OffsetY
+	iToX := int(toX*t.Dpi) + t.OffsetX
+	iToY := int(toY*t.Dpi) + t.OffsetY
+	log.Debugf("drawing line from (%d,%d) to (%d,%d)", iFromX, iFromY, iToX, iToY)
+	mbDraw.Line(i, image.Pt(iFromX, iFromY), image.Pt(iToX, iToY), col)
+}
+
 func (t *Tabula) squareAtFloat(i draw.Image, minX, minY, maxX, maxY float32, inset int, col color.Color) {
 	for x := int(minX*t.Dpi) + t.OffsetX + inset; x < int(maxX*t.Dpi)+t.OffsetX-inset; x++ {
 		if x < 0 {
@@ -612,6 +624,11 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 
 	log.Debugf("adding tokens...")
 	if err := t.addTokens(gridded, ctx); err != nil {
+		return nil, err
+	}
+
+	log.Debugf("adding lines...")
+	if err := t.addLines(gridded, ctx); err != nil {
 		return nil, err
 	}
 
