@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 /mapbot \
-  --db-host="$DB_HOST" \
+  --db-host="${DB_HOST:-$MAPBOT_DB_PORT_5432_TCP_ADDR}" \
   --db-user="$DB_USER" \
   --db-name="$DB_NAME" \
   --db-pass="$DB_PASS" \
