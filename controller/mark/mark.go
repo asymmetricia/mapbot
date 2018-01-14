@@ -137,7 +137,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			}
 		}
 
-		if f, ok := markFuncs[strings.ToLower(strings.TrimRight(a, "("))]; ok {
+		if f, ok := markFuncs[strings.ToLower(strings.Split(a, "(")[0])]; ok {
 			term := consumeUntilSuffix(args[i:], &i, ")")
 			args := strings.Split(strings.TrimRight(strings.Split(term, "(")[1], ")"), ",")
 			m, err := f(args)
@@ -149,7 +149,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			continue
 		}
 
-		if f, ok := lineFuncs[strings.ToLower(strings.TrimRight(a, "("))]; ok {
+		if f, ok := lineFuncs[strings.ToLower(strings.Split(a, "(")[0])]; ok {
 			term := consumeUntilSuffix(args[i:], &i, ")")
 			args := strings.Split(strings.TrimRight(strings.Split(term, "(")[1], ")"), ",")
 			l, err := f(args)
