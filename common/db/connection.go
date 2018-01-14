@@ -57,16 +57,17 @@ func OpenElephant(key, instance_type string, reset bool, resetFrom int) (anydb.A
 	return scheme(&anydb.WithRetries{&PostgreSql{conn}}, reset, resetFrom)
 }
 
-func OpenPsql(host, user, pass, db string, port int, reset bool, resetFrom int) (anydb.AnyDb, error) {
+func OpenPsql(host, user, pass, db string, port int, reset bool, resetFrom int, sslmode string) (anydb.AnyDb, error) {
 	dbConn, err := sql.Open(
 		"postgres",
 		fmt.Sprintf(
-			"dbname=%s user=%s password=%s host=%s port=%d sslmode=verify-full",
+			"dbname=%s user=%s password=%s host=%s port=%d sslmode=%s",
 			sanitize(db),
 			sanitize(user),
 			sanitize(pass),
 			sanitize(host),
 			port,
+			sanitize(sslmode),
 		),
 	)
 	if err != nil {

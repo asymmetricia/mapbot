@@ -39,6 +39,7 @@ func main() {
 	DbUser := flag.String("db-user", "postgres", "postgresql user to use for authentication (postgres)")
 	DbPass := flag.String("db-pass", "postgres", "postgresql pass to use for authentication (postgres)")
 	DbName := flag.String("db-name", "mapbot", "postgresql database name to use (postgres)")
+	DbSsl := flag.Bool("db-ssl", true, "if set, require SSL to postgresql")
 	DbReset := flag.Bool("db-reset", false, "USE WITH CARE: resets the schema by dropping ALL TABLES and re-executing migrations")
 	DbResetFrom := flag.Int("db-reset-from", -1, "if 0 or greater, roll back to just before the given migration and re-apply later migrations")
 	flag.Parse()
@@ -52,7 +53,11 @@ func main() {
 		if *ESKey != "" {
 			dbHandle, err = db.OpenElephant(*ESKey, *ESType, *DbReset, *DbResetFrom)
 		} else {
-			dbHandle, err = db.OpenPsql(*DbHost, *DbUser, *DbPass, *DbName, *DbPort, *DbReset, *DbResetFrom)
+			sslmode := "disable"
+			if *DbSsl {
+				sslmode = "verify-full"
+			}
+			dbHandle, err = db.OpenPsql(*DbHost, *DbUser, *DbPass, *DbName, *DbPort, *DbReset, *DbResetFrom, sslmode)
 		}
 	}
 
