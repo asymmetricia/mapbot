@@ -30,7 +30,8 @@ const syntax = "<place> [<place2> ... <placeN>] <color>\n" +
 	"    a corner -- given by a coordinate (no space) and an intercardinal direction (ne, se, sw, nw); example: `a1ne`\n" +
 	"    a square -- use `square(top-left,bottom-right)` where `top-left` and `bottom-right` are coordinates (without spaces); example: `square(a1,f6)`\n" +
 	"    a circle -- use `circle(center,radius)` where `center` is a square or corner and `radius` is a number of feet, assuming 5 feet per square; example: `circle(m10,15)` or `circle(m10ne,15)`\n" +
-	"    a cone   -- use `cone(origin-corner,direction,radius)` where `origin-corner` is a square with corner; `direction` is one of the allowable directions from that corner (e.g., ne corner can project a cone north, northeast, or east); and radius is the size of the cone. 15-foot cones are special-cased according to Pahfinder rules, but all other cones are computed as all squares such that 3/4 corners are within a 90-degree cone, and all corners are within the radius. Example: `cone(f6ne,ne,20)`"
+	"    a cone   -- use `cone(origin-corner,direction,radius)` where `origin-corner` is a square with corner; `direction` is one of the allowable directions from that corner (e.g., ne corner can project a cone north, northeast, or east); and radius is the size of the cone. 15-foot cones are special-cased according to Pahfinder rules, but all other cones are computed as all squares such that 3/4 corners are within a 90-degree cone, and all corners are within the radius. Example: `cone(f6ne,ne,20)`\n" +
+	"    a line   -- (or lines) use `line(A,B)` where A and B are squares or corners. Specifying a square will draw lines to/from all corners of that square. Example: `line(a1se,f5)` will draw four lines, from a1se to all corners of f5."
 
 func clearMarks(h *hub.Hub, c *hub.Command) {
 	tabId := c.Context.GetActiveTabulaId()
