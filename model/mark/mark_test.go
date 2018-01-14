@@ -3,6 +3,7 @@ package mark
 import (
 	"fmt"
 	"image"
+	"strings"
 	"testing"
 )
 
@@ -78,7 +79,8 @@ func TestCircle(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := Circle(test.input)
+		args := strings.Split(strings.TrimRight(strings.Split(test.input, "(")[1], ")"), ",")
+		res, err := Circle(args)
 		if err != nil {
 			t.Fatalf("%q: expected non-nil err, produced %q", test.input, err)
 		}

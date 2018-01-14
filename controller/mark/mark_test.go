@@ -10,12 +10,12 @@ import (
 
 func TestMarksFromCone(t *testing.T) {
 	type test struct {
-		input   string
+		input   []string
 		squares map[image.Point]bool
 	}
 
 	tests := []test{
-		{"cone(a1ne,e,15)", map[image.Point]bool{
+		{[]string{"a1ne", "e", "15"}, map[image.Point]bool{
 			image.Pt(1, 0):  true,
 			image.Pt(2, 0):  true,
 			image.Pt(3, 0):  true,
@@ -85,6 +85,7 @@ func TestConsumeUntilSuffix(t *testing.T) {
 		{[]string{"a", "b", "c)"}, "abc)", 2},
 		{[]string{"circle(a6,", "20)", "red"}, "circle(a6,20)", 1},
 		{[]string{"circle(a6,20)", "red"}, "circle(a6,20)", 0},
+		{[]string{"circle (a6,20)", "red"}, "circle (a6,20)", 0},
 	}
 
 	for _, test := range tests {

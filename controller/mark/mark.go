@@ -69,6 +69,17 @@ func consumeUntilSuffix(args []string, i *int, suffix string) string {
 	return ret
 }
 
+var markFuncs = map[string]func([]string) ([]mark.Mark, error){
+	"square": marksFromSquare,
+	"circle": mark.Circle,
+	"cone":   marksFromCone,
+}
+
+var lineFuncs = map[string]func([]string) ([]mark.Line, error){
+	"line":  linesFromLine,
+	"lines": linesFromLine,
+}
+
 func cmdMark(h *hub.Hub, c *hub.Command) {
 	cmdName := strings.Split(string(c.Type), ":")[1]
 
@@ -126,45 +137,24 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			}
 		}
 
-		if strings.HasPrefix(a, "square(") {
-			a = consumeUntilSuffix(args[i:], &i, ")")
-			m, err := marksFromSquare(a)
+		if f, ok := markFuncs[strings.ToLower(strings.TrimRight(a, "("))]; ok {
+			term := consumeUntilSuffix(args[i:], &i, ")")
+			args := strings.Split(strings.TrimRight(strings.Split(term, "(")[1], ")"), ",")
+			m, err := f(args)
 			if err != nil {
-				h.Error(c, fmt.Sprintf(":warning: %s", err))
+				h.Error(c, fmt.Sprintf(":warning: while parsing `%s`, %s", term, err))
 				return
 			}
 			marks = append(marks, m...)
 			continue
 		}
 
-		if strings.HasPrefix(a, "circle(") {
-			a = consumeUntilSuffix(args[i:], &i, ")")
-			m, err := mark.Circle(a)
+		if f, ok := lineFuncs[strings.ToLower(strings.TrimRight(a, "("))]; ok {
+			term := consumeUntilSuffix(args[i:], &i, ")")
+			args := strings.Split(strings.TrimRight(strings.Split(term, "(")[1], ")"), ",")
+			l, err := f(args)
 			if err != nil {
-				h.Error(c, fmt.Sprintf(":warning: %s", err))
-				return
-			}
-			log.Debugf("adding circle with %d marks", len(m))
-			marks = append(marks, m...)
-			continue
-		}
-
-		if strings.HasPrefix(a, "cone(") {
-			a = consumeUntilSuffix(args[i:], &i, ")")
-			m, err := marksFromCone(a)
-			if err != nil {
-				h.Error(c, fmt.Sprintf(":warning: %s", err))
-				return
-			}
-			marks = append(marks, m...)
-			continue
-		}
-
-		if strings.HasPrefix(a, "line(") {
-			a = consumeUntilSuffix(args[i:], &i, ")")
-			l, err := linesFromLine(a)
-			if err != nil {
-				h.Error(c, fmt.Sprintf(":warning: %s", err))
+				h.Error(c, fmt.Sprintf(":warning: while parsing `%s`, %s", term, err))
 				return
 			}
 			lines = append(lines, l...)
@@ -302,21 +292,20 @@ func angle(a image.Point, cA string, b image.Point, cB string) float64 {
 	}
 }
 
-func linesFromLine(in string) (out []mark.Line, err error) {
+func linesFromLine(args []string) (out []mark.Line, err error) {
 	out = []mark.Line{}
-	args := strings.Split(in[5:len(in)-1], ",")
 	if len(args) != 2 {
-		return nil, fmt.Errorf("in `%s`, `line()` expects two comma-separated arguments: `from`, `to`", in)
+		return nil, fmt.Errorf("`line()` expects two comma-separated arguments: `from`, `to`")
 	}
 
 	a, ac, err := conv.RCToPoint(args[0], true)
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a line, but could not parse coordinate `%s`: %s", in, args[0], err)
+		return nil, fmt.Errorf("looked like a line, but could not parse coordinate `%s`: %s", args[0], err)
 	}
 
 	b, bc, err := conv.RCToPoint(args[1], true)
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a line, but could not parse coordinate `%s`: %s", in, args[1], err)
+		return nil, fmt.Errorf("looked like a line, but could not parse coordinate `%s`: %s", args[1], err)
 	}
 
 	if len(ac) != 0 && len(ac) != 2 {
@@ -346,15 +335,14 @@ func linesFromLine(in string) (out []mark.Line, err error) {
 	return out, nil
 }
 
-func marksFromCone(in string) (out []mark.Mark, err error) {
+func marksFromCone(args []string) (out []mark.Mark, err error) {
 	out = []mark.Mark{}
-	args := strings.Split(in[5:len(in)-1], ",")
 	if len(args) != 3 {
-		return nil, fmt.Errorf("in `%s`, `cone()` expects three comma-separated arguments: `corner`, `direction`, `distance`", in)
+		return nil, fmt.Errorf("`cone()` expects three comma-separated arguments: `corner`, `direction`, `distance`")
 	}
 	origin, corner, err := conv.RCToPoint(args[0], true)
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a cone, but could not parse coordinate `%s`: %s", in, args[0], err)
+		return nil, fmt.Errorf("looked like a cone, but could not parse coordinate `%s`: %s", args[0], err)
 	}
 
 	if len(corner) != 2 {
@@ -370,7 +358,7 @@ func marksFromCone(in string) (out []mark.Mark, err error) {
 
 	radius, err := strconv.Atoi(args[2])
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a cone, but could not parse radius `%s`: %s", in, args[1], err)
+		return nil, fmt.Errorf("looked like a cone, but could not parse radius `%s`: %s", args[1], err)
 	}
 
 	if coneRanges, ok := specialCones[args[1]]; ok {
@@ -427,21 +415,20 @@ func marksFromCone(in string) (out []mark.Mark, err error) {
 	return out, nil
 }
 
-func marksFromSquare(in string) (out []mark.Mark, err error) {
+func marksFromSquare(args []string) (out []mark.Mark, err error) {
 	out = []mark.Mark{}
-	args := strings.Split(in[7:len(in)-1], ",")
 	if len(args) != 2 {
-		return nil, fmt.Errorf("in `%s`, `square()` expects two comma-separated arguments", in)
+		return nil, fmt.Errorf("`square()` expects two comma-separated arguments")
 	}
 
 	min, _, err := conv.RCToPoint(args[0], false)
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a square, but could not parse coordinate `%s`: %s", in, args[0], err)
+		return nil, fmt.Errorf("looked like a square, but could not parse coordinate `%s`: %s", args[0], err)
 	}
 
 	max, _, err := conv.RCToPoint(args[1], false)
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a square, but could not parse coordinate `%s`: %s", in, args[1], err)
+		return nil, fmt.Errorf("looked like a square, but could not parse coordinate `%s`: %s", args[1], err)
 	}
 
 	if min.X > max.X {

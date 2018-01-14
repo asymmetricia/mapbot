@@ -22,23 +22,22 @@ func (m Mark) WithColor(c color.Color) (ret Mark) {
 	return ret
 }
 
-func Circle(in string) (out []Mark, err error) {
-	args := strings.Split(in[7:len(in)-1], ",")
+func Circle(args []string) (out []Mark, err error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("in `%s`, `circle()` expects two comma-separated arguments", in)
+		return nil, fmt.Errorf("`circle()` expects two comma-separated arguments")
 	}
 	center, dir, err := conv.RCToPoint(args[0], true)
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse coordinate `%s`: %s", in, args[0], err)
+		return nil, fmt.Errorf("looked like a circle, but could not parse coordinate `%s`: %s", args[0], err)
 	}
 
 	radius, err := strconv.Atoi(args[1])
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a circle, but could not parse radius `%s`: %s", in, args[1], err)
+		return nil, fmt.Errorf("looked like a circle, but could not parse radius `%s`: %s", args[1], err)
 	}
 	out, err = CirclePoint(center, dir, radius)
 	if err != nil {
-		return nil, fmt.Errorf("`%s` looked like a circle, but: %s", in, err)
+		return nil, fmt.Errorf("looked like a circle, but: %s", err)
 	}
 	return out, nil
 }
