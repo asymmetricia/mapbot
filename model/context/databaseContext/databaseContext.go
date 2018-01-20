@@ -137,8 +137,30 @@ func (dc *DatabaseContext) loadMarks() error {
 	return nil
 }
 
+func (dc *DatabaseContext) loadLastTokens() error {
+	res, err := db.Instance.Query("SELECT user_id, token_name FROM last_token WHERE context_id=$1", dc.ContextId)
+	if err != nil {
+		return fmt.Errorf("querying last_token: %s", err)
+	}
+	defer res.Close()
+
+	var u types.UserId
+	var t string
+	for res.Next() {
+		if err := res.Scan(&u, &t); err != nil {
+			return fmt.Errorf("retrieving last token: %s", err)
+		}
+		dc.SetLastToken(u, t)
+	}
+	return nil
+}
+
 func (dc *DatabaseContext) Load() error {
 	if err := dc.loadMarks(); err != nil {
+		return err
+	}
+
+	if err := dc.loadLastTokens(); err != nil {
 		return err
 	}
 
@@ -198,5 +220,8 @@ func (dc *DatabaseContext) GetLastToken(UserId types.UserId) (TokenName string) 
 }
 
 func (dc *DatabaseContext) SetLastToken(UserId types.UserId, TokenName string) {
+	if dc.LastTokens == nil {
+		dc.LastTokens = map[types.UserId]string{}
+	}
 	dc.LastTokens[UserId] = TokenName
 }
