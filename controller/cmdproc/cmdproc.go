@@ -15,6 +15,7 @@ type Subcommand struct {
 type CommandProcessor struct {
 	Command  string
 	Commands map[string]Subcommand
+	Comment  string
 }
 
 func (c *CommandProcessor) Help(h *hub.Hub, cmd *hub.Command) {
@@ -25,6 +26,9 @@ func (c *CommandProcessor) Help(h *hub.Hub, cmd *hub.Command) {
 			help += " " + sc.Args
 		}
 		help += "` - " + sc.Usage
+	}
+	if c.Comment != "" {
+		help += "\n" + c.Comment
 	}
 	h.Publish(&hub.Command{
 		Type:    hub.CommandType(cmd.From),
