@@ -14,6 +14,7 @@ type DatabaseContext struct {
 	ActiveTabulaId         *types.TabulaId
 	MinX, MinY, MaxX, MaxY int
 	Marks                  map[types.TabulaId]map[image.Point]map[string]mark.Mark
+	LastTokens             map[string]string
 }
 
 func (dc *DatabaseContext) Id() types.ContextId {
@@ -47,7 +48,34 @@ func (dc *DatabaseContext) Save() error {
 	if _, err := db.Instance.Exec(query, dc.ContextId, int(*dc.ActiveTabulaId), dc.MinX, dc.MinY, dc.MaxX, dc.MaxY); err != nil {
 		return err
 	}
-	return dc.saveMarks()
+	if err := dc.saveMarks(); err != nil {
+		return err
+	}
+	return dc.saveLastTokens()
+}
+
+func (dc *DatabaseContext) saveLastTokens() error {
+	var query string
+	switch dia := db.Instance.Dialect(); dia {
+	case "postgresql":
+		query = "INSERT INTO last_token (context_id, user_id, token_name) VALUES ($1, $2, $3) ON CONFLICT (context_id, user_id) DO UPDATE SET token_name=$3"
+	case "sqlite3":
+		query = "REPLACE INTO last_token (context_id, user_id, token_name) VALUES ($1, $2, $3)"
+	default:
+		return fmt.Errorf("no DatabaseContext.saveLastTokens query for dialect %s", dia)
+	}
+
+	stmt, err := db.Instance.Prepare(query)
+	if err != nil {
+		return fmt.Errorf("preparing DatabaseContext.saveLastTokens query: %s", err)
+	}
+
+	for user, token := range dc.LastTokens {
+		if _, err := stmt.Exec(dc.ContextId, user, token); err != nil {
+			return fmt.Errorf("executing DatabaseContext.saveLastTokens for (%v,%v,%v): %s", dc.ContextId, user, token, err)
+		}
+	}
+	return nil
 }
 
 func (dc *DatabaseContext) saveMarks() error {
@@ -163,4 +191,12 @@ func (dc *DatabaseContext) GetMarks(tid types.TabulaId) map[image.Point]map[stri
 
 func (dc *DatabaseContext) ClearMarks(tid types.TabulaId) {
 	delete(dc.Marks, tid)
+}
+
+func (dc *DatabaseContext) GetLastToken(UserId string) (TokenName string) {
+	return dc.LastTokens[UserId]
+}
+
+func (dc *DatabaseContext) SetLastToken(UserId string, TokenName string) {
+	dc.LastTokens[UserId] = TokenName
 }
