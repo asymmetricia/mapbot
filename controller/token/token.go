@@ -8,6 +8,7 @@ import (
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/controller/cmdproc"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
 	"image"
@@ -445,6 +446,8 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
+	lines := []mark.Line{}
+
 	for name, coord := range tokens {
 		if tab.Tokens == nil {
 			tab.Tokens = map[types.ContextId]map[string]tabula.Token{}
@@ -461,7 +464,14 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 				Size:       1,
 			}
 		} else {
+			orig := tok.Coordinate
 			tab.Tokens[c.Context.Id()][name] = tok.WithCoords(coord)
+			lines = append(lines,
+				mark.Line{A: orig, B: coord, CA: "ne", CB: "ne", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+				mark.Line{A: orig, B: coord, CA: "se", CB: "se", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+				mark.Line{A: orig, B: coord, CA: "sw", CB: "sw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+				mark.Line{A: orig, B: coord, CA: "nw", CB: "nw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+			)
 		}
 	}
 
@@ -470,5 +480,5 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		log.Errorf("error saving tabula %d: %s", tab.Id, err)
 	}
 
-	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithLines(lines)))
 }
