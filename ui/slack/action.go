@@ -7,6 +7,7 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/model/workflow"
 	"io"
@@ -77,7 +78,7 @@ func (s *SlackUi) Action(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (t *Team) Action(payload *slack.AttachmentActionCallback, rw http.ResponseWriter, req *http.Request) {
-	userObj, err := user.Get(db.Instance, user.Id(payload.User.ID))
+	userObj, err := user.Get(db.Instance, types.UserId(payload.User.ID))
 	if err != nil {
 		writeResponse(rw, "could not retrieve user")
 		log.Errorf("could not retrieve user %q in action", payload.User.ID)

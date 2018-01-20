@@ -14,7 +14,7 @@ type DatabaseContext struct {
 	ActiveTabulaId         *types.TabulaId
 	MinX, MinY, MaxX, MaxY int
 	Marks                  map[types.TabulaId]map[image.Point]map[string]mark.Mark
-	LastTokens             map[string]string
+	LastTokens             map[types.UserId]string
 }
 
 func (dc *DatabaseContext) Id() types.ContextId {
@@ -193,10 +193,10 @@ func (dc *DatabaseContext) ClearMarks(tid types.TabulaId) {
 	delete(dc.Marks, tid)
 }
 
-func (dc *DatabaseContext) GetLastToken(UserId string) (TokenName string) {
+func (dc *DatabaseContext) GetLastToken(UserId types.UserId) (TokenName string) {
 	return dc.LastTokens[UserId]
 }
 
-func (dc *DatabaseContext) SetLastToken(UserId string, TokenName string) {
+func (dc *DatabaseContext) SetLastToken(UserId types.UserId, TokenName string) {
 	dc.LastTokens[UserId] = TokenName
 }

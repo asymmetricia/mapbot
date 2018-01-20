@@ -15,12 +15,12 @@ import (
 var log = mbLog.Log
 
 var Instance = &UserStore{
-	Users: map[Id]*User{},
+	Users: map[types.UserId]*User{},
 	Lock:  sync.RWMutex{},
 }
 
 type UserStore struct {
-	Users map[Id]*User
+	Users map[types.UserId]*User
 	Lock  sync.RWMutex
 }
 
@@ -30,7 +30,7 @@ type WorkflowState struct {
 }
 
 type User struct {
-	Id        Id
+	Id        types.UserId
 	Tabulas   []*tabula.Tabula
 	AutoShow  bool
 	Workflows map[string]WorkflowState
@@ -121,7 +121,7 @@ func (u *User) Save(db anydb.AnyDb) error {
 	return u.saveWorkflows(db)
 }
 
-func Get(db anydb.AnyDb, id Id) (*User, error) {
+func Get(db anydb.AnyDb, id types.UserId) (*User, error) {
 	Instance.Lock.RLock()
 	iUser, iUserOk := Instance.Users[id]
 	Instance.Lock.RUnlock()
@@ -228,11 +228,3 @@ func (n *Name) Value() (driver.Value, error) {
 }
 
 var _ driver.Valuer = (*Name)(nil)
-
-type Id string
-
-func (i *Id) Value() (driver.Value, error) {
-	return string(*i), nil
-}
-
-var _ driver.Valuer = (*Id)(nil)

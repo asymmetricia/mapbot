@@ -147,7 +147,7 @@ func (t *Team) manageMessages() {
 			case "user_typing":
 				go func() {
 					if msg, ok := event.Data.(*slack.UserTypingEvent); ok {
-						_, err := user.Get(db.Instance, user.Id(msg.User))
+						_, err := user.Get(db.Instance, types.UserId(msg.User))
 						if err != nil {
 							log.Errorf("user preload in response to typing failed: %s", err)
 							return
@@ -180,7 +180,7 @@ func (t *Team) manageMessages() {
 
 						log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
 
-						u, err := user.Get(db.Instance, user.Id(msg.User))
+						u, err := user.Get(db.Instance, types.UserId(msg.User))
 						if err != nil {
 							log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
 							return

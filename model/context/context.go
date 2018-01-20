@@ -18,6 +18,6 @@ type Context interface {
 	GetMarks(types.TabulaId) map[image.Point]map[string]mark.Mark
 	ClearMarks(types.TabulaId)
 	Save() error
-	GetLastToken(UserId string) (TokenName string)
-	SetLastToken(UserId string, TokenName string)
+	GetLastToken(UserId types.UserId) (TokenName string)
+	SetLastToken(UserId types.UserId, TokenName string)
 }
