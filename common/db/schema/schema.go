@@ -180,6 +180,16 @@ var schema = []Migration{
 			`)`},
 		map[string]string{"any": `DROP TABLE entities`},
 	},
+	Migration{
+		20,
+		map[string]string{"any": `CREATE TABLE last_token (` +
+			`context_id VARCHAR(128) REFERENCES contexts(context_id) ON DELETE CASCADE, ` +
+			`user_id VARCHAR(9) REFERENCES users (id) ON DELETE CASCADE, ` +
+			`token_name VARCHAR(128),` +
+			`PRIMARY KEY (context_id, user_id)` +
+			`)`},
+		map[string]string{"any": `DROP TABLE last_token`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {
