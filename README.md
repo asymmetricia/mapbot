@@ -13,6 +13,10 @@ edges, as-yet unimplemented features, and lurking bugs.
 
 ## How do I use it?
 
+I'm experimenting with providing mapbot as a service. You can reach the running
+instance of mapbot at https://mapbot.cernu.us and add it to your own Slack
+team. Give it a try, and please let me know if you have any feedback.
+
 If you're interested in running your own instance of mapbot, please see "How
 do I run it?" below. If you've already done that, or someone else has done it
 for you, read on...
@@ -91,12 +95,8 @@ Token names must be unique; but you can use either short words or emoji; an emoj
 
 ## How do I run it?
 
-Because mapbot uses a fair bit of CPU for its image operations and requires
-persistent storage in the form a SQL database, it's not practical for the
-author to provide mapbot to the public as a free service.
-
-Instead, mapbot is designed for you to easily run your own; but this still
-requires a bit of technical aptitude.
+Mapbot is designed for you to easily run your own; but this still requires a
+bit of technical aptitude.
 
 To run mapbot, you'll need the following:
 

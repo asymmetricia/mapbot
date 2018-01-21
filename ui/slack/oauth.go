@@ -10,6 +10,17 @@ import (
 	"time"
 )
 
+func (ui *SlackUi) OAuthAutoStart(rw http.ResponseWriter, req *http.Request) {
+	nonce, err := ui.newNonce()
+	if err != nil {
+		log.Errorf("error generating nonce: %s", err)
+		http.Error(rw, "error generating nonce", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(rw, req, ui.oauth.AuthCodeURL(nonce), http.StatusFound)
+}
+
 func (ui *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
 	nonce, err := ui.newNonce()
 	if err != nil {

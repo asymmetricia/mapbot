@@ -101,18 +101,23 @@ func main() {
 	router.HandleFunc("/action", slackUi.Action)
 	router.HandleFunc("/oauth", slackUi.OAuthPost)
 	router.HandleFunc("/", slackUi.OAuthGet)
+	router.HandleFunc("/install", slackUi.OAuthAutoStart)
+	router.HandleFunc("/map", httpUi.GetMap)
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", *Port),
 		Handler:   router,
 		TLSConfig: &tls.Config{GetCertificate: mgr.GetCertificate},
 	}
-	log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
 	if *Tls {
 		httpChallengeServer := &http.Server{
 			Addr:    ":80",
 			Handler: mgr.HTTPHandler(http.RedirectHandler(fmt.Sprintf("https://%s", *Domain), http.StatusMovedPermanently)),
 		}
-		go log.Fatal(httpChallengeServer.ListenAndServe())
+
+		log.Infof("Listening for ACME challenges on http://%s:80", *Domain)
+		go func() { log.Fatal(httpChallengeServer.ListenAndServe()) }()
+
+		log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
 		log.Fatal(server.ListenAndServeTLS("", ""))
 	} else {
 		log.Fatal(server.ListenAndServe())
