@@ -32,6 +32,20 @@ var hexColorRe = regexp.MustCompile(`^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$`)
 // Hex codes may be three bytes (six characters) or four bytes (eight
 // characters); in the latter case, the final byte represents the alpha channel.
 func ToColor(name string) (color.NRGBA, error) {
+	if len(name) > 5 && strings.ToLower(name[0:5]) == "solid" {
+		if c, ok := Colors[strings.ToLower(name[5:])]; ok {
+			c.A = 0xFF
+			return c, nil
+		}
+	}
+
+	if len(name) > 5 && strings.ToLower(name[0:5]) == "light" {
+		if c, ok := Colors[strings.ToLower(name[5:])]; ok {
+			c.A = 0x3F
+			return c, nil
+		}
+	}
+
 	if namedColor, ok := Colors[strings.ToLower(name)]; ok {
 		return namedColor, nil
 	}
