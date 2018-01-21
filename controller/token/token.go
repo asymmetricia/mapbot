@@ -555,6 +555,11 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		log.Errorf("error saving tabula %d: %s", tab.Id, err)
 	}
 
+	if err := c.User.Save(db.Instance); err != nil {
+		h.Error(c, "an error occured saving your user record")
+		log.Errorf("error saving user record %v: %s", c.User, err)
+	}
+
 	c.Context.SetLastToken(c.User.Id, lastToken)
 	if err := c.Context.Save(); err != nil {
 		h.Error(c, "an error occured saving the context")
