@@ -96,6 +96,7 @@ func main() {
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(*Domain),
 	}
+
 	router := mux.NewRouter()
 	router.HandleFunc("/action", slackUi.Action)
 	router.HandleFunc("/oauth", slackUi.OAuthPost)
@@ -107,6 +108,11 @@ func main() {
 	}
 	log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
 	if *Tls {
+		httpChallengeServer := &http.Server{
+			Addr:    ":80",
+			Handler: mgr.HTTPHandler(http.RedirectHandler(fmt.Sprintf("https://%s", *Domain), http.StatusMovedPermanently)),
+		}
+		go log.Fatal(httpChallengeServer.ListenAndServe())
 		log.Fatal(server.ListenAndServeTLS("", ""))
 	} else {
 		log.Fatal(server.ListenAndServe())
