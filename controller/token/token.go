@@ -363,7 +363,7 @@ func cmdRemove(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if len(args) == 1 {
+	if len(args) == 0 {
 		tok := c.Context.GetLastToken(c.User.Id)
 		if tok == "" {
 			h.Error(c, "You didn't tell me what to remove, and I don't remember the last token you moved.")
