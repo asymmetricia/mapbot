@@ -107,6 +107,11 @@ func main() {
 	}
 	log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
 	if *Tls {
+		http01Server := &http.Server{
+			Addr:    ":80",
+			Handler: mgr.HTTPHandler(http.RedirectHandler(fmt.Sprintf("https://%s", *Domain), http.StatusFound)),
+		}
+		go func() { log.Fatal(http01Server.ListenAndServe()) }()
 		log.Fatal(server.ListenAndServeTLS("", ""))
 	} else {
 		log.Fatal(server.ListenAndServe())
