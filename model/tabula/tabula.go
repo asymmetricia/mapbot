@@ -133,6 +133,14 @@ func (t *Tabula) loadMasks(db anydb.AnyDb) error {
 	return nil
 }
 
+func (t *Tabula) Delete(db anydb.AnyDb) error {
+	_, err := db.Exec("DELETE FROM tabulas WHERE id=$1", int64(*t.Id))
+	if err != nil {
+		return fmt.Errorf("deleting table %d: %s", *t.Id, err)
+	}
+	return nil
+}
+
 func (t *Tabula) Save(db anydb.AnyDb) error {
 	if t.GridColor == nil {
 		t.GridColor = &color.NRGBA{A: 255}

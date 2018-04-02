@@ -30,6 +30,8 @@ func init() {
 		Command: "map",
 		Commands: map[string]cmdproc.Subcommand{
 			"add":       cmdproc.Subcommand{"<name> <url>", "add a map to your collection", cmdAdd},
+			"remove":    cmdproc.Subcommand{"<name>", "remove a map from your collection", cmdRemove},
+			"delete":    cmdproc.Subcommand{"<name>", "remove a map from your collection", cmdRemove},
 			"show":      cmdproc.Subcommand{"[<name>]", "show a the named map; or the active map in this context, if any", cmdShow},
 			"set":       cmdproc.Subcommand{"[<name>] {offsetX|offsetY|dpi|gridColor} <value>[ <key2> <value2> ...]", "set a property of an existing map; offsetX, offsetY, and dpi accepts numbers; color accepts some common color names or a six-digit hex code. If no map is specified, selected map is used.", cmdSet},
 			"list":      cmdproc.Subcommand{"", "list your maps", cmdList},
@@ -320,6 +322,31 @@ func cmdShow(h *hub.Hub, c *hub.Command) {
 			User:    c.User,
 		})
 	}
+}
+
+func cmdRemove(h *hub.Hub, c *hub.Command) {
+	if c.User == nil {
+		log.Errorf("received command with nil user")
+		return
+	}
+	args, ok := c.Payload.([]string)
+	if !ok || len(args) != 1 {
+		h.Error(c, "usage: map remove <map name>")
+		return
+	}
+
+	t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
+	if !ok {
+		h.Error(c, fmt.Sprintf("you have no map named %q", args[0]))
+		return
+	}
+
+	if err := t.Delete(db.Instance); err != nil {
+		h.Error(c, fmt.Sprintf("error updating your list of tables: %s", err))
+		return
+	}
+
+	h.Reply(c, "gone!")
 }
 
 func cmdAdd(h *hub.Hub, c *hub.Command) {
