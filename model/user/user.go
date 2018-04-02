@@ -72,7 +72,7 @@ func (u *User) hydrateWorkflows(db anydb.AnyDb) error {
 		if err := wfRes.Scan(&name, &state, &opaque); err != nil {
 			return fmt.Errorf("scanning user_workflows: %s", err)
 		}
-		var opaqueObj interface{}
+		opaqueObj := new(interface{})
 		if err := json.Unmarshal([]byte(opaque), opaqueObj); err != nil {
 			log.Warningf("user=%s error unmarshaling opaque data %q: %s", u.Id, opaque, err)
 		}
@@ -121,6 +121,9 @@ func (u *User) Save(db anydb.AnyDb) error {
 	return u.saveWorkflows(db)
 }
 
+// Get uses the database given by `db` to retrieve the user identified by id
+// `id`. On success, it returns a pointer to object representing the user; on
+// failure, it returns nil and an error.
 func Get(db anydb.AnyDb, id types.UserId) (*User, error) {
 	Instance.Lock.RLock()
 	iUser, iUserOk := Instance.Users[id]
