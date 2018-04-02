@@ -225,3 +225,11 @@ func (dc *DatabaseContext) SetLastToken(UserId types.UserId, TokenName string) {
 	}
 	dc.LastTokens[UserId] = TokenName
 }
+
+func (dc *DatabaseContext) GetEmoji(name string) (image.Image, error) {
+	return nil, fmt.Errorf("missing")
+}
+
+func (dc *DatabaseContext) IsEmoji(name string) bool {
+	return false
+}
