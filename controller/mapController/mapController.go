@@ -376,6 +376,13 @@ func cmdRemove(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
+	for i, t := range c.User.Tabulas {
+		if t.Name == tabula.TabulaName(args[0]) {
+			c.User.Tabulas = append(c.User.Tabulas[:i], c.User.Tabulas[i+1:])
+			break
+		}
+	}
+
 	h.Reply(c, "gone!")
 }
 
