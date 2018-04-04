@@ -332,7 +332,7 @@ var coordCache map[dimension]map[string]*image.RGBA
 type VerticalAlignment int
 
 const (
-	Top    VerticalAlignment = iota
+	Top VerticalAlignment = iota
 	Middle
 	Bottom
 )
@@ -340,7 +340,7 @@ const (
 type HorizontalAlignment int
 
 const (
-	Left   HorizontalAlignment = iota
+	Left HorizontalAlignment = iota
 	Center
 	Right
 )
@@ -497,10 +497,14 @@ func Crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
 	result := image.NewRGBA(image.Rect(0, 0, max_x-min_x, max_y-min_y))
 	for x := min_x; x < max_x; x++ {
 		srcX := x - offset_x
-		if srcX < 0 || srcX > i.Bounds().Max.X { continue }
+		if srcX < 0 || srcX > i.Bounds().Max.X {
+			continue
+		}
 		for y := min_y; y < max_y; y++ {
 			srcY := y - offset_y
-			if srcY < 0 || srcY > i.Bounds().Max.Y { continue }
+			if srcY < 0 || srcY > i.Bounds().Max.Y {
+				continue
+			}
 			result.Set(x-min_x, y-min_y, i.At(srcX, srcY))
 		}
 	}

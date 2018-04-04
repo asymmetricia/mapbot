@@ -1,21 +1,21 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
+	mbDraw "github.com/pdbogen/mapbot/common/draw"
 	. "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/model/context/databaseContext"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
 	"image"
 	"image/color"
+	"image/draw"
+	"math"
 	"strconv"
 	"strings"
-	"encoding/json"
-	"math"
-	mbDraw "github.com/pdbogen/mapbot/common/draw"
-	"image/draw"
-	"github.com/pdbogen/mapbot/model/context/databaseContext"
 )
 
 var log = Log
@@ -67,7 +67,7 @@ var alignWorkflow = Workflow{
 
 type alignWorkflowOpaque struct {
 	UserId     types.UserId
-	User       *user.User     `json:"-"`
+	User       *user.User `json:"-"`
 	TabulaId   types.TabulaId
 	Tabula     *tabula.Tabula `json:"-"`
 	Top, Left  int
@@ -608,7 +608,7 @@ func alignFineBRResponse(opaque interface{}, choice *string) (string, interface{
 /// Y-Offset Calibration ///
 ///////////////////////////
 
-func alignTopChallenge(opaque interface{}) (*WorkflowMessage) {
+func alignTopChallenge(opaque interface{}) *WorkflowMessage {
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
 		return alignErrorChallenge(fmt.Sprintf("invalid opaque data (was a %T)", opaque))

@@ -4,10 +4,10 @@ package workflow
 import (
 	"fmt"
 	. "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/ui/slack/context"
 	"image"
 	"strings"
-	"github.com/pdbogen/mapbot/model/user"
 )
 
 /* workflow is a state machine
@@ -43,7 +43,7 @@ func (wf *Workflow) Challenge(key string, state string, opaque interface{}) *Wor
 	if msg == nil {
 		return &WorkflowMessage{Workflow: key}
 	}
-	
+
 	msg.Workflow = key
 	return msg
 }

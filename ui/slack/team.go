@@ -1,8 +1,10 @@
 package slack
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/nlopes/slack"
+	"github.com/pdbogen/mapbot/common/blobserv"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/hub"
@@ -20,8 +22,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"github.com/pdbogen/mapbot/common/blobserv"
-	"bytes"
 )
 
 func (s *SlackUi) runTeams() error {

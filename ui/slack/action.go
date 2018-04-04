@@ -9,11 +9,11 @@ import (
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
+	"github.com/pdbogen/mapbot/model/workflow"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"strings"
-	"github.com/pdbogen/mapbot/model/workflow"
 )
 
 func writeResponse(rw http.ResponseWriter, msg string) {

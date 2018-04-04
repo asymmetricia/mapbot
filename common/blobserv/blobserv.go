@@ -1,14 +1,14 @@
 package blobserv
 
 import (
+	"errors"
+	"fmt"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/common/rand"
-	"time"
 	"net/http"
 	"strings"
-	"fmt"
-	"errors"
 	"sync"
+	"time"
 )
 
 var log = mbLog.Log

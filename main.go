@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"github.com/pdbogen/mapbot/common/blobserv"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -18,7 +19,6 @@ import (
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
-	"github.com/pdbogen/mapbot/common/blobserv"
 )
 
 var log = mbLog.Log
