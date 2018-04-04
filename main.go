@@ -15,7 +15,6 @@ import (
 	tokenController "github.com/pdbogen/mapbot/controller/token"
 	workflowController "github.com/pdbogen/mapbot/controller/workflow"
 	"github.com/pdbogen/mapbot/hub"
-	httpUi "github.com/pdbogen/mapbot/ui/http"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
@@ -98,8 +97,6 @@ func main() {
 		HostPolicy: autocert.HostWhitelist(*Domain),
 	}
 
-	httpUiObj := httpUi.New(dbHandle, hub)
-
 	if *Tls {
 		blobserv.Instance = &blobserv.BlobServ{UrlBase: "https://" + *Domain + "/blob/"}
 	} else {
@@ -110,7 +107,6 @@ func main() {
 	router.HandleFunc("/action", slackUi.Action)
 	router.HandleFunc("/oauth", slackUi.OAuthPost)
 	router.HandleFunc("/install", slackUi.OAuthAutoStart)
-	router.HandleFunc("/map", httpUiObj.GetMap)
 	router.HandleFunc("/blob/", blobserv.Instance.Serve)
 	router.HandleFunc("/", slackUi.OAuthGet)
 
