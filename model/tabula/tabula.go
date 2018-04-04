@@ -4,6 +4,7 @@
 package tabula
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/golang/freetype"
@@ -22,6 +23,7 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -234,9 +236,19 @@ func (t *Tabula) Hydrate() error {
 	}
 	defer res.Body.Close()
 
-	img, _, err := image.Decode(res.Body)
+	imgBuf := &bytes.Buffer{}
+	if _, err := io.Copy(imgBuf, res.Body); err != nil {
+		return fmt.Errorf("error reading from HTTP response: %s", err)
+	}
+
+	imgData := imgBuf.Bytes()
+	img, _, err := image.Decode(bytes.NewReader(imgData))
 	if err != nil {
-		return err
+		n := 16
+		if len(imgData) < 16 {
+			n = len(imgData)
+		}
+		return fmt.Errorf("received image data (%q…), but: %s", imgData[0:n], err)
 	}
 
 	var ret *image.RGBA

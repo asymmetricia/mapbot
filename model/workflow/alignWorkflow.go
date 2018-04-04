@@ -253,12 +253,18 @@ func alignLeftChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
+	img := state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250)
+
+	if img == nil {
+		return alignErrorChallenge("sorry! something's wrong with the map image.")
+	}
+
 	return &WorkflowMessage{
 		Text: "First, we need to find the left edge of the map grid. Sometimes " +
 			"this is the very edge of the image, but sometimes it's farther to " +
 			"the right. _(If it's not visible, you can pan around to find it.)_",
 		State: "left",
-		Image: VerticalLine(state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250), state.Tabula.OffsetX-state.Left),
+		Image: VerticalLine(img, state.Tabula.OffsetX-state.Left),
 		ChoiceSets: [][]string{
 			{alignLeftOf, alignPerfect, alignRightOf},
 			{alignUp, alignDown, alignLeft, alignRight},
@@ -342,11 +348,16 @@ func alignRoughDpiChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
+	img := state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250)
+	if img == nil {
+		return alignErrorChallenge("sorry! something's wrong with the map image.")
+	}
+
 	return &WorkflowMessage{
 		Text: "Now we can get our rough DPI. Is the red line left-of or right-of the *second* grid line?" +
 			fmt.Sprintf(" _(current DPI: %d)_", int(state.Tabula.Dpi)),
 		State: "rough",
-		Image: VerticalLine(state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250), state.Tabula.OffsetX-state.Left+int(state.Tabula.Dpi)),
+		Image: VerticalLine(img, state.Tabula.OffsetX-state.Left+int(state.Tabula.Dpi)),
 		ChoiceSets: [][]string{
 			{alignLeftOf, alignPerfect, alignRightOf},
 			{alignUp, alignDown, alignLeft, alignRight},
@@ -423,6 +434,10 @@ func alignFineChallenge(opaque interface{}) *WorkflowMessage {
 	}
 
 	img := state.MapImage(state.Left, state.Top, state.Left+400, state.Top+400)
+	if img == nil {
+		return alignErrorChallenge("sorry! something's wrong with the map image.")
+	}
+
 	i := 0
 	for {
 		x := state.Tabula.OffsetX - state.Left + int(float32(i)*state.Tabula.Dpi)
@@ -522,6 +537,10 @@ func alignFineBRChallenge(opaque interface{}) *WorkflowMessage {
 	}
 
 	img := state.MapImage(state.Left, state.Top, state.Left+400, state.Top+400)
+	if img == nil {
+		return alignErrorChallenge("sorry! something's wrong with the map image.")
+	}
+
 	i := 0
 	for {
 		x := state.Tabula.OffsetX - state.Left + int(float32(i)*state.Tabula.Dpi)
@@ -617,14 +636,16 @@ func alignTopChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
+	img := state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250)
+	if img == nil {
+		return alignErrorChallenge("sorry! something's wrong with the map image.")
+	}
+
 	return &WorkflowMessage{
 		Text: "This is the home stretch; we just need to align the top line. Is " +
 			"the red line **above** or **below** the top grid line?",
 		State: "top",
-		Image: horizontalLine(
-			state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250),
-			-state.Top+state.Tabula.OffsetY,
-		),
+		Image: horizontalLine(img, -state.Top+state.Tabula.OffsetY),
 		ChoiceSets: [][]string{
 			{alignAbove},
 			{alignPerfect},
