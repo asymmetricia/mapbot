@@ -348,7 +348,14 @@ func alignRoughDpiChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
-	img := state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250)
+	vline := state.Tabula.OffsetX - state.Left + int(state.Tabula.Dpi)
+	right := state.Left + 250
+
+	if vline > right {
+		right = vline + 50
+	}
+
+	img := state.MapImage(state.Left, state.Top, right, state.Top+250)
 	if img == nil {
 		return alignErrorChallenge("sorry! something's wrong with the map image.")
 	}
@@ -357,7 +364,7 @@ func alignRoughDpiChallenge(opaque interface{}) *WorkflowMessage {
 		Text: "Now we can get our rough DPI. Is the red line left-of or right-of the *second* grid line?" +
 			fmt.Sprintf(" _(current DPI: %d)_", int(state.Tabula.Dpi)),
 		State: "rough",
-		Image: VerticalLine(img, state.Tabula.OffsetX-state.Left+int(state.Tabula.Dpi)),
+		Image: VerticalLine(img, vline),
 		ChoiceSets: [][]string{
 			{alignLeftOf, alignPerfect, alignRightOf},
 			{alignUp, alignDown, alignLeft, alignRight},
