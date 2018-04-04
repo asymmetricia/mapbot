@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"github.com/pdbogen/mapbot/common/blobserv"
+	"bytes"
 )
 
 func (s *SlackUi) runTeams() error {
@@ -212,19 +214,53 @@ func (t *Team) manageMessages() {
 	}
 }
 
-func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) slack.PostMessageParameters {
-	params := slack.PostMessageParameters{
-		Text: msg.Text,
+func attachImage(a *[]slack.Attachment, i image.Image) {
+	if i == nil {
+		return
+	}
+	log.Debugf("attaching image to workflow message")
+
+	imgData := &bytes.Buffer{}
+	if err := png.Encode(imgData, i); err != nil {
+		log.Errorf("encoding image as png: %s", err)
+		return
+	}
+	url, err := blobserv.Upload(imgData.Bytes())
+	if err != nil {
+		log.Errorf("uploading image in workflow message: %s", err)
+		return
+	}
+	log.Debugf("image uploaded with URL %q", url)
+
+	*a = append(*a, slack.Attachment{ImageURL: url})
+}
+
+func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage, channel string) *slack.PostMessageParameters {
+	if msg.Text == "" {
+		return nil
+	}
+
+	params := &slack.PostMessageParameters{
+		Text:     msg.Text,
+		Markdown: true,
 	}
 
 	params.Attachments = []slack.Attachment{}
+	if msg.ChoiceSets == nil {
+		msg.ChoiceSets = [][]string{}
+	}
+
 	if msg.Choices != nil {
+		msg.ChoiceSets = append(msg.ChoiceSets, msg.Choices)
+	}
+
+	for _, choices := range msg.ChoiceSets {
 		attachment := slack.Attachment{
 			CallbackID: msg.Id(),
-			Actions:    make([]slack.AttachmentAction, len(msg.Choices)),
+			Actions:    make([]slack.AttachmentAction, len(choices)),
 			Fallback:   "Your client does not support actions. :cry:",
 		}
-		for i, choice := range msg.Choices {
+		for i, choice := range choices {
 			log.Debugf("adding choice %q", choice)
 			attachment.Actions[i] = slack.AttachmentAction{
 				Name:  "choice",
@@ -236,16 +272,7 @@ func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) slack.PostMe
 		params.Attachments = append(params.Attachments, attachment)
 	}
 
-	if msg.Image != nil {
-		url, err := t.uploadImage(msg.Image, nil)
-		if err != nil {
-			log.Errorf("uploading image in workflow message: %s", err)
-		}
-		params.Attachments = append(params.Attachments, slack.Attachment{
-			ImageURL: url,
-		})
-
-	}
+	attachImage(&params.Attachments, msg.Image)
 
 	return params
 }
@@ -259,14 +286,13 @@ func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.Wor
 
 	channel := comps[4]
 
-	_, _, err := t.botClient.PostMessage(
-		channel,
-		msg.Text,
-		t.renderWorkflowMessage(msg),
-	)
+	rendered := t.renderWorkflowMessage(msg, channel)
+	if rendered != nil {
+		_, _, err := t.botClient.PostMessage(channel, msg.Text, *rendered)
 
-	if err != nil {
-		log.Errorf("%s: error posting workflow message to channel %q: %s", t.Info.ID, comps[4], err)
+		if err != nil {
+			log.Errorf("%s: error posting workflow message to channel %q: %s", t.Info.ID, comps[4], err)
+		}
 	}
 }
 
@@ -316,7 +342,7 @@ func (t *Team) uploadImage(img image.Image, channels []string) (string, error) {
 	repErr := func(s string, e error) error { return fmt.Errorf("%s: %s", s, e) }
 	buf, err := ioutil.TempFile("", "")
 	if err != nil {
-		return "", repErr("opeaning tmpfile for", err)
+		return "", repErr("opening tmpfile for", err)
 	}
 
 	err = png.Encode(buf, img)
@@ -335,15 +361,16 @@ func (t *Team) uploadImage(img image.Image, channels []string) (string, error) {
 	if err != nil {
 		return "", repErr("uploading", err)
 	}
+
 	return upload.URLPrivate, nil
 }
 
-func (t *Team) Context(SubTeamId string) context.Context {
+func (t *Team) Context(ChannelId string) context.Context {
 	ret := &slackContext.SlackContext{
 		Emoji:      t.Emoji,
 		EmojiCache: t.EmojiCache,
 	}
-	ret.ContextId = types.ContextId(t.Info.ID + "-" + SubTeamId)
+	ret.ContextId = types.ContextId(t.Info.ID + "-" + ChannelId)
 	if err := ret.Load(); err != nil {
 		log.Errorf("failed while hydrating context %s from the db: %s", ret.ContextId, err)
 	}

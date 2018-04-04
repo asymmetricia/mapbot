@@ -215,7 +215,7 @@ func New(name, url string) (*Tabula, error) {
 		Name: TabulaName(name),
 		Url:  url,
 		//Background: ret,
-		Dpi: 10,
+		Dpi: 50,
 	}, nil
 }
 
@@ -332,7 +332,7 @@ var coordCache map[dimension]map[string]*image.RGBA
 type VerticalAlignment int
 
 const (
-	Top VerticalAlignment = iota
+	Top    VerticalAlignment = iota
 	Middle
 	Bottom
 )
@@ -340,7 +340,7 @@ const (
 type HorizontalAlignment int
 
 const (
-	Left HorizontalAlignment = iota
+	Left   HorizontalAlignment = iota
 	Center
 	Right
 )
@@ -477,14 +477,31 @@ max_x:
 		}
 	}
 
-	return crop(i, min_x, min_y, max_x, max_y)
+	return Crop(i, min_x, min_y, max_x, max_y)
 }
 
-func crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
+// Crops the given image to the given pixel dimensions and returns a new image.RGBA.
+func Crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
+	offset_x := 0
+	if min_x < 0 {
+		offset_x = -min_x
+		min_x = 0
+	}
+
+	offset_y := 0
+	if min_y < 0 {
+		offset_y = -min_y
+		min_y = 0
+	}
+
 	result := image.NewRGBA(image.Rect(0, 0, max_x-min_x, max_y-min_y))
 	for x := min_x; x < max_x; x++ {
+		srcX := x - offset_x
+		if srcX < 0 || srcX > i.Bounds().Max.X { continue }
 		for y := min_y; y < max_y; y++ {
-			result.Set(x-min_x, y-min_y, i.At(x, y))
+			srcY := y - offset_y
+			if srcY < 0 || srcY > i.Bounds().Max.Y { continue }
+			result.Set(x-min_x, y-min_y, i.At(srcX, srcY))
 		}
 	}
 	return result
@@ -567,7 +584,44 @@ type cacheEntry struct {
 
 var cache = map[string]cacheEntry{}
 
+func (t *Tabula) BackgroundImage() (image.Image, error) {
+	if t.Background == nil {
+		bg, ok := cache[t.Url]
+		if ok && bg.version == t.Version {
+			t.Background = copyImage(bg.image)
+		} else {
+			if err := t.Hydrate(); err != nil {
+				return nil, fmt.Errorf("retrieving background: %s", err)
+			}
+			cache[t.Url] = cacheEntry{t.Version, copyImage(t.Background)}
+		}
+	}
+
+	dx := t.Background.Rect.Dx()
+	dy := t.Background.Rect.Dy()
+	var resized image.Image = t.Background
+	if dx > 2000 || dy > 2000 {
+		if dx > dy {
+			resized = resize.Resize(2000, 0, t.Background, resize.Bilinear)
+		} else {
+			resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
+		}
+	}
+	if dx < 2000 && dy < 2000 {
+		if dx > dy {
+			resized = resize.Resize(2000, 0, t.Background, resize.Bilinear)
+		} else {
+			resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
+		}
+	}
+	return resized, nil
+}
+
 func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (image.Image, error) {
+	if sendStatusMessage == nil {
+		sendStatusMessage = func(string) {}
+	}
+
 	if ctx == nil {
 		return nil, fmt.Errorf("render of tabula %d received nil context", t.Id)
 	}
@@ -582,35 +636,10 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		gridded = copyImage(cached.image)
 	} else {
 		log.Infof("Cache miss: %s", cacheKey)
-		if t.Background == nil {
-			bg, ok := cache[t.Url]
-			if ok && bg.version == t.Version {
-				t.Background = copyImage(bg.image)
-			} else {
-				sendStatusMessage("I have to retrieve the background image; this could take a moment.")
-				if err := t.Hydrate(); err != nil {
-					return nil, fmt.Errorf("retrieving background: %s", err)
-				}
-				cache[t.Url] = cacheEntry{t.Version, copyImage(t.Background)}
-			}
-		}
-
-		dx := t.Background.Rect.Dx()
-		dy := t.Background.Rect.Dy()
-		var resized image.Image = t.Background
-		if dx > 2000 || dy > 2000 {
-			if dx > dy {
-				resized = resize.Resize(2000, 0, t.Background, resize.Bilinear)
-			} else {
-				resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
-			}
-		}
-		if dx < 2000 && dy < 2000 {
-			if dx > dy {
-				resized = resize.Resize(2000, 0, t.Background, resize.Bilinear)
-			} else {
-				resized = resize.Resize(0, 2000, t.Background, resize.Bilinear)
-			}
+		sendStatusMessage("I have to retrieve the background image; this could take a moment.")
+		resized, err := t.BackgroundImage()
+		if err != nil {
+			return nil, fmt.Errorf("retrieving background: %s", err)
 		}
 		if drawable, ok := resized.(draw.Image); ok {
 			gridded = t.addGrid(drawable)
@@ -650,7 +679,7 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 	}
 
 	if maxx > minx && maxy > miny {
-		coord = crop(
+		coord = Crop(
 			coord,
 			int(float64(minx)*float64(t.Dpi))+t.OffsetX,
 			int(float64(miny)*float64(t.Dpi))+t.OffsetY,

@@ -140,6 +140,9 @@ Under the "Bot Users" tab, make sure you've selected a reasonable default
 username. In public channels, you'll interact with mapbot my starting messages
 with `@<bot name>`, so pick something easy to type.
 
+Under the "Interactive Components" tab, enable Interactive Components and
+provide an action URL of `https://<hostname>/action`.
+
 # Major Features
 
 ## Model
@@ -150,7 +153,7 @@ Maps are referred mostly as Tabula in code, since map is a reserved word in gola
 
 * [X] Background Image
 * [X] Alignment (offset & DPI)
-    * [ ] interactive / workflow-driven
+    * [X] interactive / workflow-driven
 * [ ] Mask Sets
     * [ ] New
     * [ ] Add Rectangle

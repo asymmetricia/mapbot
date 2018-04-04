@@ -9,11 +9,11 @@ import (
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
-	"github.com/pdbogen/mapbot/model/workflow"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"github.com/pdbogen/mapbot/model/workflow"
 )
 
 func writeResponse(rw http.ResponseWriter, msg string) {
@@ -30,10 +30,13 @@ func writeResponse(rw http.ResponseWriter, msg string) {
 	rw.Write(body)
 }
 
-// upon receiving an action, we need to pass it to the corresponding workflow with the appropriate state name, opaque data, and choice.
-// thus the action's ID will need to let us obtain the workflow name, state name, and opaque data. the choice will come from the action callback itself.
-// the response func may return an error, whic we need to send to the user.
-// if the response doesn't report an error, we'll call the challenge for the new state; which will give back a WorkflowMessage.
+// upon receiving an action, we need to pass it to the corresponding workflow
+// with the appropriate state name, opaque data, and choice. thus the action's
+// ID will need to let us obtain the workflow name, state name, and opaque
+// data. the choice will come from the action callback itself. the response
+// func may return an error, which we need to send to the user. if the response
+// doesn't report an error, we'll call the challenge for the new state; which
+// will give back a WorkflowMessage.
 func (s *SlackUi) Action(rw http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	if err := req.ParseForm(); err != nil {
@@ -91,7 +94,7 @@ func (t *Team) Action(payload *slack.AttachmentActionCallback, rw http.ResponseW
 
 	t.hub.Publish(&hub.Command{
 		User:    userObj,
-		From:    fmt.Sprintf("internal:updateAction:slack:%s:%s", t.Info.ID, payload.ResponseURL),
+		From:    fmt.Sprintf("internal:updateAction:slack:%s:%s:%s", t.Info.ID, payload.Channel.ID, payload.ResponseURL),
 		Context: t.Context(payload.Channel.ID),
 		Payload: []string{"respond", payload.CallbackID, payload.Actions[0].Value},
 		Type:    "user:workflow",
@@ -100,18 +103,18 @@ func (t *Team) Action(payload *slack.AttachmentActionCallback, rw http.ResponseW
 
 func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
 	comps := strings.Split(string(c.Type), ":")
-	if len(comps) < 5 {
+	if len(comps) < 6 {
 		log.Errorf("%s: received but cannot process command %s", t.Info.ID, c.Type)
 		return
 	}
-	responseUrl := strings.Join(comps[4:], ":")
+	responseUrl := strings.Join(comps[5:], ":")
 
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
 
 	switch msg := c.Payload.(type) {
 	case *workflow.WorkflowMessage:
-		err := enc.Encode(t.renderWorkflowMessage(msg))
+		err := enc.Encode(t.renderWorkflowMessage(msg, comps[4]))
 		if err != nil {
 			log.Errorf("marshaling %q: %s", msg, err)
 		}

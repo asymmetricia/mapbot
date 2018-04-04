@@ -39,8 +39,38 @@ func init() {
 			"dpi":       cmdproc.Subcommand{"<name> <dpi>", "shorthand for set, to set the map DPI", cmdDpi},
 			"gridcolor": cmdproc.Subcommand{"<name> <value>", "shorthand for set, to set the grid color", cmdGridColor},
 			"zoom":      cmdproc.Subcommand{"<min X> <min Y> <max X> <max Y>", "requests that mapbot display only a portion of the map; useful for larger maps where the action is in a small area. requires an active map. Set to `a 1 a 1` to disable zoom. The space between column and row is optional (i.e., `a1` is OK).", cmdZoom},
+			"align":     cmdproc.Subcommand{"<name>", "begin guided alignment for the named map", cmdAlign},
 		},
 	}
+}
+
+func cmdAlign(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		log.Debugf("received non-[]string payload %T", c.Payload)
+		h.Error(c, "usage: map set "+processor.Commands["set"].Args)
+		return
+	}
+
+	if len(args) != 1 {
+		log.Debugf("received %d args, expected exactly 1", len(args))
+		h.Error(c, "usage: map align "+processor.Commands["set"].Args)
+		return
+	}
+
+	t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
+	if !ok {
+		h.Error(c, notFound(tabula.TabulaName(args[0])))
+		return
+	}
+
+	h.Publish(&hub.Command{
+		User:    c.User,
+		From:    c.From,
+		Context: c.Context,
+		Payload: []string{"start", "align", string(c.User.Id), strconv.FormatInt(int64(*t.Id), 10)},
+		Type:    "user:workflow",
+	})
 }
 
 func cmdZoom(h *hub.Hub, c *hub.Command) {

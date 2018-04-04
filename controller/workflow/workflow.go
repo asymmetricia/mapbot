@@ -64,7 +64,7 @@ func cmdStart(h *hub.Hub, c *hub.Command) {
 	}
 
 	choice := strings.Join(args[1:], " ")
-	state, opaque, err := wf.Response("enter", nil, &choice)
+	state, opaque, err := wf.Response(user.WorkflowState{State: "enter"}, &choice)
 	if err != nil {
 		h.Error(c, fmt.Sprintf("error initiating workflow %q: %s", args[0], err))
 		return
@@ -72,9 +72,12 @@ func cmdStart(h *hub.Hub, c *hub.Command) {
 	if state == "exit" {
 		delete(c.User.Workflows, strings.ToLower(args[0]))
 	} else {
-		c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}
+		c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{State: state, Opaque: opaque}
 	}
-	c.User.Save(db.Instance)
+	if err := c.User.Save(db.Instance); err != nil {
+		h.Error(c, fmt.Sprintf("error saving user opaque data: %s", err))
+		return
+	}
 
 	msg := wf.Challenge(args[0], state, opaque)
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(msg))
@@ -109,7 +112,7 @@ func cmdRespond(h *hub.Hub, c *hub.Command) {
 	}
 
 	choice := strings.Join(args[1:], " ")
-	state, opaque, err := wf.Response(wfState.State, wfState.Opaque, &choice)
+	state, opaque, err := wf.Response(wfState, &choice)
 	if err != nil {
 		h.Error(c, fmt.Sprintf("action not accepted: %s", err))
 		return
@@ -117,11 +120,16 @@ func cmdRespond(h *hub.Hub, c *hub.Command) {
 	if state == "exit" {
 		delete(c.User.Workflows, strings.ToLower(args[0]))
 	} else {
-		c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{state, opaque}
+		c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{State: state, Opaque: opaque}
 	}
+
+	if err := c.User.Save(db.Instance); err != nil {
+		h.Error(c, fmt.Sprintf("error saving opaque data: %s", err))
+		return
+	}
+
 	msg := wf.Challenge(args[0], state, opaque)
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(msg))
-	c.User.Save(db.Instance)
 }
 
 func cmdClear(h *hub.Hub, c *hub.Command) {}

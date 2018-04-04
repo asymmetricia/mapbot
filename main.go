@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/gorilla/mux"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -15,9 +14,11 @@ import (
 	tokenController "github.com/pdbogen/mapbot/controller/token"
 	workflowController "github.com/pdbogen/mapbot/controller/workflow"
 	"github.com/pdbogen/mapbot/hub"
+	httpUi "github.com/pdbogen/mapbot/ui/http"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
+	"github.com/pdbogen/mapbot/common/blobserv"
 )
 
 var log = mbLog.Log
@@ -97,12 +98,22 @@ func main() {
 		HostPolicy: autocert.HostWhitelist(*Domain),
 	}
 
-	router := mux.NewRouter()
+	httpUiObj := httpUi.New(dbHandle, hub)
+
+	if *Tls {
+		blobserv.Instance = &blobserv.BlobServ{UrlBase: "https://" + *Domain + "/blob/"}
+	} else {
+		blobserv.Instance = &blobserv.BlobServ{UrlBase: "http://" + *Domain + "/blob/"}
+	}
+
+	router := http.NewServeMux()
 	router.HandleFunc("/action", slackUi.Action)
 	router.HandleFunc("/oauth", slackUi.OAuthPost)
-	router.HandleFunc("/", slackUi.OAuthGet)
 	router.HandleFunc("/install", slackUi.OAuthAutoStart)
-	router.HandleFunc("/map", httpUi.GetMap)
+	router.HandleFunc("/map", httpUiObj.GetMap)
+	router.HandleFunc("/blob/", blobserv.Instance.Serve)
+	router.HandleFunc("/", slackUi.OAuthGet)
+
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", *Port),
 		Handler:   router,
