@@ -66,7 +66,7 @@ var alignWorkflow = Workflow{
 
 type alignWorkflowOpaque struct {
 	UserId               types.UserId
-	User                 *user.User     `json:"-"`
+	User                 *user.User `json:"-"`
 	TabulaId             types.TabulaId
 	Tabula               *tabula.Tabula `json:"-"`
 	Top, Left            int
