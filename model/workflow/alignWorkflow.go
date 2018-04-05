@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
 	mbDraw "github.com/pdbogen/mapbot/common/draw"
-	. "github.com/pdbogen/mapbot/common/log"
+	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/model/context/databaseContext"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
@@ -13,12 +13,11 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
-	"math"
 	"strconv"
 	"strings"
 )
 
-var log = Log
+var log = mbLog.Log
 
 var alignWorkflow = Workflow{
 	States: map[string]WorkflowState{
@@ -29,13 +28,13 @@ var alignWorkflow = Workflow{
 			Challenge: alignConfirmChallenge,
 			Response:  alignConfirmResponse,
 		},
-		"left": {
-			Challenge: alignLeftChallenge,
-			Response:  alignLeftResponse,
+		"vertical_a": {
+			Challenge: alignVerticalAChallenge,
+			Response:  alignVerticalAResponse,
 		},
-		"rough": {
-			Challenge: alignRoughDpiChallenge,
-			Response:  alignRoughDpiResponse,
+		"vertical_b": {
+			Challenge: alignVerticalBChallenge,
+			Response:  alignVerticalBResponse,
 		},
 		"fine": {
 			Challenge: alignFineChallenge,
@@ -66,14 +65,16 @@ var alignWorkflow = Workflow{
 }
 
 type alignWorkflowOpaque struct {
-	UserId     types.UserId
-	User       *user.User `json:"-"`
-	TabulaId   types.TabulaId
-	Tabula     *tabula.Tabula `json:"-"`
-	Top, Left  int
-	Min, Max   int // generically used for binary searching.
-	MinF, MaxF float32
-	Error      bool // set when we're exiting due to error
+	UserId               types.UserId
+	User                 *user.User     `json:"-"`
+	TabulaId             types.TabulaId
+	Tabula               *tabula.Tabula `json:"-"`
+	Top, Left            int
+	Min, Max             int // generically used for binary searching.
+	MinF, MaxF           float32
+	Error                bool // set when we're exiting due to error
+	VerticalA, VerticalB int
+	SavedDpi             float32
 }
 
 func (a *alignWorkflowOpaque) MapImage(minX, minY, maxX, maxY int) draw.Image {
@@ -95,13 +96,19 @@ func (a *alignWorkflowOpaque) MapImage(minX, minY, maxX, maxY int) draw.Image {
 	return nil
 }
 
-func VerticalLine(in draw.Image, x int) (out draw.Image) {
-	mbDraw.Line(in, image.Pt(x, 0), image.Pt(x, in.Bounds().Max.Y), color.NRGBA{255, 0, 0, 255})
+func VerticalLine(in draw.Image, x int, col ...color.NRGBA) (out draw.Image) {
+	if len(col) == 0 {
+		col = []color.NRGBA{{255, 0, 0, 255}}
+	}
+	mbDraw.Line(in, image.Pt(x, 0), image.Pt(x, in.Bounds().Max.Y), col[0])
 	return in
 }
 
-func horizontalLine(in draw.Image, y int) (out draw.Image) {
-	mbDraw.Line(in, image.Pt(0, y), image.Pt(in.Bounds().Max.X, y), color.NRGBA{255, 0, 0, 255})
+func horizontalLine(in draw.Image, y int, col ...color.NRGBA) (out draw.Image) {
+	if len(col) == 0 {
+		col = []color.NRGBA{{255, 0, 0, 255}}
+	}
+	mbDraw.Line(in, image.Pt(0, y), image.Pt(in.Bounds().Max.X, y), col[0])
 	return in
 }
 
@@ -161,6 +168,10 @@ func alignEnterResponse(opaque interface{}, choice *string) (string, interface{}
 var alignConfirmYes = "Yep! Let's go."
 var alignConfirmNo = "Oh, maybe not..."
 
+/////////////////////////////////////////////
+/// Confirmation of Ready To Rock status ///
+///////////////////////////////////////////
+
 func alignConfirmChallenge(opaque interface{}) *WorkflowMessage {
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
@@ -192,17 +203,19 @@ func alignConfirmResponse(opaque interface{}, choice *string) (string, interface
 	}
 	switch *choice {
 	case alignConfirmYes:
-		state.Top = -50
-		state.Left = -50
 		state.Tabula.Dpi = 50
 		state.Tabula.OffsetX = 0
 		state.Tabula.OffsetY = 0
 		if err := state.Tabula.Save(db.Instance); err != nil {
 			return alignError("huh! couldn't save the table: %s", err)
 		}
+
+		state.Top = -50
+		state.Left = -50
 		state.Min = -50
-		state.Max = 250
-		return "left", state
+		state.Max = 310
+		state.VerticalA = (state.Max + state.Min) / 2
+		return "vertical_a", state
 	case alignConfirmNo:
 		return "error", "Ok! See you later."
 	default:
@@ -240,11 +253,11 @@ var (
 	alignBelow      = "Below"
 )
 
-/////////////////////////////
-/// X-Offset Calibration ///
-///////////////////////////
+//////////////////////////////////////
+/// Mk2 Alignment, First Vertical ///
+////////////////////////////////////
 
-func alignLeftChallenge(opaque interface{}) *WorkflowMessage {
+func alignVerticalAChallenge(opaque interface{}) *WorkflowMessage {
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
 		return alignErrorChallenge(fmt.Sprintf("invalid opaque data (was a %T)", opaque))
@@ -253,18 +266,13 @@ func alignLeftChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
-	img := state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250)
-
-	if img == nil {
-		return alignErrorChallenge("sorry! something's wrong with the map image.")
-	}
+	img := state.MapImage(state.Left, state.Top, state.Left+360, state.Top+360)
+	VerticalLine(img, state.VerticalA-state.Left)
 
 	return &WorkflowMessage{
-		Text: "First, we need to find the left edge of the map grid. Sometimes " +
-			"this is the very edge of the image, but sometimes it's farther to " +
-			"the right. _(If it's not visible, you can pan around to find it.)_",
-		State: "left",
-		Image: VerticalLine(img, state.Tabula.OffsetX-state.Left),
+		Text:  "Choose a pair of vertical lines. Is the red line left-of or right-of the left line? _(If you don't see a good pair of map lines, you can use the Pan buttons to shift the view.)_",
+		State: "vertical_a",
+		Image: img,
 		ChoiceSets: [][]string{
 			{alignLeftOf, alignPerfect, alignRightOf},
 			{alignUp, alignDown, alignLeft, alignRight},
@@ -273,7 +281,8 @@ func alignLeftChallenge(opaque interface{}) *WorkflowMessage {
 	}
 }
 
-func alignLeftResponse(opaque interface{}, choice *string) (string, interface{}) {
+func alignVerticalAResponse(opaque interface{}, choice *string) (string, interface{}) {
+	shift := 200
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
 		return alignError("invalid opaque data (was a %T)", opaque)
@@ -288,58 +297,61 @@ func alignLeftResponse(opaque interface{}, choice *string) (string, interface{})
 	}
 	switch *choice {
 	case alignRightOf:
-		state.Max = state.Tabula.OffsetX
-		state.Tabula.OffsetX = (state.Max + state.Min) / 2
+		state.Max = state.VerticalA
+		state.VerticalA = (state.Max + state.Min) / 2
+		if state.VerticalA < state.Left {
+			state.Left = state.VerticalA - 50
+		}
 	case alignLeftOf:
-		state.Min = state.Tabula.OffsetX
-		state.Tabula.OffsetX = (state.Max + state.Min) / 2
+		state.Min = state.VerticalA
+		state.VerticalA = (state.Max + state.Min) / 2
+		if state.VerticalA > state.Left+360 {
+			state.Left = state.VerticalA - 310
+		}
 	case alignRestart:
-		state.Min = -int(math.Ceil(float64(state.Tabula.Dpi)))
-		state.Max = int(math.Ceil(float64(state.Tabula.Dpi)))
-		state.Top = -50
-		state.Left = -50
-		state.Tabula.OffsetX = 0
+		state.Min = -50
+		state.Max = 310
+		state.VerticalA = (state.Max + state.Min) / 2
+		state.Left = state.VerticalA - 180
 	case alignUp:
-		state.Top -= 250
+		state.Top -= shift
 		if state.Top < -50 {
 			state.Top = -50
 		}
 	case alignDown:
-		state.Top += 250
+		state.Top += shift
 	case alignRight:
-		state.Left += 250
-		state.Tabula.OffsetX += 250
-		state.Min += 250
-		state.Max += 250
+		state.Left += shift
+		state.VerticalA += shift
+		state.Min += shift
+		state.Max += shift
 	case alignLeft:
-		state.Left -= 250
-		state.Tabula.OffsetX -= 250
-		state.Min -= 250
-		state.Max -= 250
-		if state.Left < -50 {
-			state.Left += 250
-			state.Tabula.OffsetX += 250
-			state.Min += 250
-			state.Max += 250
+		if state.Left-shift >= -50 {
+			state.Left -= shift
+			state.VerticalA -= shift
+			state.Min -= shift
+			state.Max -= shift
 		}
 	case alignPerfect:
-		state.Min = 1
-		state.Max = 300
-		return "rough", state
+		state.Min = state.VerticalA
+		state.Max = state.VerticalA + 360
+		state.VerticalB = state.VerticalA + 50
+		return "vertical_b", state
 	}
 
+	log.Debugf("align vertical_a %q -- %d...%d...%d", state.Tabula.Name, state.Min, state.VerticalA, state.Max)
 	if err := state.Tabula.Save(db.Instance); err != nil {
 		return alignError("huh! couldn't save the table: %s", err)
 	}
 
-	return "left", state
+	return "vertical_a", state
 }
 
-//////////////////////////////
-/// Rough DPI Calibration ///
-////////////////////////////
+///////////////////////////////////////
+/// Mk2 Alignment, Second Vertical ///
+/////////////////////////////////////
 
-func alignRoughDpiChallenge(opaque interface{}) *WorkflowMessage {
+func alignVerticalBChallenge(opaque interface{}) *WorkflowMessage {
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
 		return alignErrorChallenge(fmt.Sprintf("invalid opaque data (was a %T)", opaque))
@@ -348,23 +360,14 @@ func alignRoughDpiChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
-	vline := state.Tabula.OffsetX - state.Left + int(state.Tabula.Dpi)
-	right := state.Left + 250
-
-	if vline > right {
-		right = vline + 50
-	}
-
-	img := state.MapImage(state.Left, state.Top, right, state.Top+250)
-	if img == nil {
-		return alignErrorChallenge("sorry! something's wrong with the map image.")
-	}
+	img := state.MapImage(state.Left, state.Top, state.Left+360, state.Top+360)
+	VerticalLine(img, state.VerticalA-state.Left)
+	VerticalLine(img, state.VerticalB-state.Left, color.NRGBA{0, 0, 255, 255})
 
 	return &WorkflowMessage{
-		Text: "Now we can get our rough DPI. Is the red line left-of or right-of the *second* grid line?" +
-			fmt.Sprintf(" _(current DPI: %d)_", int(state.Tabula.Dpi)),
-		State: "rough",
-		Image: VerticalLine(img, vline),
+		Text:  "Choose a pair of vertical lines. Is the **blue** line left-of or right-of the **right** line? _(If you don't see a good pair of map lines, you can use the Pan buttons to shift the view.)_",
+		State: "vertical_b",
+		Image: img,
 		ChoiceSets: [][]string{
 			{alignLeftOf, alignPerfect, alignRightOf},
 			{alignUp, alignDown, alignLeft, alignRight},
@@ -373,7 +376,8 @@ func alignRoughDpiChallenge(opaque interface{}) *WorkflowMessage {
 	}
 }
 
-func alignRoughDpiResponse(opaque interface{}, choice *string) (string, interface{}) {
+func alignVerticalBResponse(opaque interface{}, choice *string) (string, interface{}) {
+	shift := 200
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
 		return alignError("invalid opaque data (was a %T)", opaque)
@@ -387,44 +391,61 @@ func alignRoughDpiResponse(opaque interface{}, choice *string) (string, interfac
 		return alignError("huh, got a nil string pointer...")
 	}
 	switch *choice {
-	case alignLeftOf:
-		state.Min = int(state.Tabula.Dpi)
-		state.Tabula.Dpi = float32((state.Min + state.Max) / 2)
 	case alignRightOf:
-		state.Max = int(state.Tabula.Dpi)
-		state.Tabula.Dpi = float32((state.Min + state.Max) / 2)
+		state.Max = state.VerticalB
+		state.VerticalB = (state.Max + state.Min) / 2
+		if state.VerticalB < state.Left {
+			state.Left = state.VerticalB - 50
+		}
+	case alignLeftOf:
+		state.Min = state.VerticalB
+		state.VerticalB = (state.Max + state.Min) / 2
+		if state.VerticalB > state.Left+360 {
+			state.Left = state.VerticalB - 310
+		}
 	case alignRestart:
-		state.Min = 1
-		state.Max = 300
-		state.Tabula.Dpi = 50
+		state.Min = state.VerticalA
+		state.Max = state.VerticalA + 360
+		state.VerticalB = state.VerticalA + 50
+		state.Left = state.VerticalB - 180
+	case alignUp:
+		state.Top -= shift
+		if state.Top < -50 {
+			state.Top = -50
+		}
+	case alignDown:
+		state.Top += shift
+	case alignRight:
+		state.Left += shift
+		state.Min += shift
+		state.Max += shift
+	case alignLeft:
+		if state.Left-shift >= -50 {
+			state.Left -= shift
+			state.Min -= shift
+			state.Max -= shift
+		}
 	case alignPerfect:
-		state.Left = state.Tabula.OffsetX - 5
+		log.Infof("rough dpi %d", state.VerticalB-state.VerticalA)
+		state.Tabula.Dpi = float32(state.VerticalB - state.VerticalA)
+		state.Tabula.OffsetX = state.VerticalA
+		for state.Tabula.OffsetX >= int(state.Tabula.Dpi) {
+			state.Tabula.OffsetX -= int(state.Tabula.Dpi)
+		}
+		if err := state.Tabula.Save(db.Instance); err != nil {
+			return alignError("huh! couldn't save the table: %s", err)
+		}
 		state.MinF = state.Tabula.Dpi * 0.9
 		state.MaxF = state.Tabula.Dpi * 1.1
-		state.Min = int(state.Tabula.Dpi)
-		state.Max = int(state.Tabula.Dpi)
 		return "fine", state
-	case alignUp:
-		state.Top -= 250
-		if state.Top < -50 {
-			state.Top = -50
-		}
-	case alignDown:
-		state.Top += 250
-	case alignRight:
-		state.Left += 250
-	case alignLeft:
-		state.Left -= 250
-		if state.Left < -50 {
-			state.Left = -50
-		}
 	}
 
+	log.Debugf("align vertical_b %q -- %d...%d...%d", state.Tabula.Name, state.Min, state.VerticalB, state.Max)
 	if err := state.Tabula.Save(db.Instance); err != nil {
 		return alignError("huh! couldn't save the table: %s", err)
 	}
 
-	return "rough", state
+	return "vertical_b", state
 }
 
 /////////////////////////////
@@ -448,7 +469,7 @@ func alignFineChallenge(opaque interface{}) *WorkflowMessage {
 	i := 0
 	for {
 		x := state.Tabula.OffsetX - state.Left + int(float32(i)*state.Tabula.Dpi)
-		if x > 400 {
+		if x > 360 {
 			break
 		}
 		VerticalLine(img, x)
@@ -519,8 +540,9 @@ func alignFineResponse(opaque interface{}, choice *string) (string, interface{})
 		}
 		state.Top = bg.Bounds().Max.Y - 400
 		state.Left = bg.Bounds().Max.X - 400
-		//state.MinF = state.Tabula.Dpi * .99
-		//state.MaxF = state.Tabula.Dpi * 1.01
+		state.MinF = state.Tabula.Dpi * .99
+		state.MaxF = state.Tabula.Dpi * 1.01
+		state.SavedDpi = state.Tabula.Dpi
 		return "fine_br", state
 	}
 	if err := state.Tabula.Save(db.Instance); err != nil {
@@ -594,9 +616,9 @@ func alignFineBRResponse(opaque interface{}, choice *string) (string, interface{
 		state.MinF = state.Tabula.Dpi
 		state.Tabula.Dpi = (state.MaxF + state.MinF) / 2
 	case alignRestart:
-		state.MinF = float32(state.Min) * 0.9
-		state.MaxF = float32(state.Max) * 1.1
-		state.Tabula.Dpi = (state.MaxF + state.MinF) / 2
+		state.Tabula.Dpi = state.SavedDpi
+		state.MinF = state.Tabula.Dpi * 0.99
+		state.MaxF = state.Tabula.Dpi * 1.01
 	case alignShiftLeft:
 		state.Tabula.OffsetX--
 	case alignShiftRight:
@@ -619,8 +641,8 @@ func alignFineBRResponse(opaque interface{}, choice *string) (string, interface{
 		state.Top = -50
 		state.Left = -50
 		state.Min = -50
-		state.Max = int(state.Tabula.Dpi)
-		state.Tabula.OffsetY = 0
+		state.Max = 310
+		state.Tabula.OffsetY = (state.Min + state.Max) / 2
 		return "top", state
 	}
 	if err := state.Tabula.Save(db.Instance); err != nil {
@@ -643,14 +665,14 @@ func alignTopChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
-	img := state.MapImage(state.Left, state.Top, state.Left+250, state.Top+250)
+	img := state.MapImage(state.Left, state.Top, state.Left+360, state.Top+360)
 	if img == nil {
 		return alignErrorChallenge("sorry! something's wrong with the map image.")
 	}
 
 	return &WorkflowMessage{
-		Text: "This is the home stretch; we just need to align the top line. Is " +
-			"the red line **above** or **below** the top grid line?",
+		Text: "This is the home stretch; we just need to align the horizontal. Pan around until you find a good horizontal line. Is " +
+			"the red line **above** or **below** that map line?",
 		State: "top",
 		Image: horizontalLine(img, -state.Top+state.Tabula.OffsetY),
 		ChoiceSets: [][]string{
@@ -664,6 +686,7 @@ func alignTopChallenge(opaque interface{}) *WorkflowMessage {
 }
 
 func alignTopResponse(opaque interface{}, choice *string) (string, interface{}) {
+	shift := 200
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
 		return alignError("invalid opaque data (was a %T)", opaque)
@@ -677,6 +700,12 @@ func alignTopResponse(opaque interface{}, choice *string) (string, interface{}) 
 		return alignError("huh, got a nil string pointer...")
 	}
 	switch *choice {
+	case alignRestart:
+		state.Top = -50
+		state.Left = -50
+		state.Min = -50
+		state.Max = 310
+		state.Tabula.OffsetY = (state.Min + state.Max) / 2
 	case alignAbove:
 		state.Min = state.Tabula.OffsetY
 		state.Tabula.OffsetY = (state.Min + state.Max) / 2
@@ -684,18 +713,26 @@ func alignTopResponse(opaque interface{}, choice *string) (string, interface{}) 
 		state.Max = state.Tabula.OffsetY
 		state.Tabula.OffsetY = (state.Min + state.Max) / 2
 	case alignPerfect:
+		for state.Tabula.OffsetY > int(state.Tabula.Dpi)-10 {
+			state.Tabula.OffsetY -= int(state.Tabula.Dpi)
+		}
 		return "exit", state
 	case alignUp:
-		state.Top -= 250
-		if state.Top < -50 {
-			state.Top = -50
+		if state.Top-shift >= -50 {
+			state.Top -= shift
+			state.Tabula.OffsetY -= shift
+			state.Min -= shift
+			state.Max -= shift
 		}
 	case alignDown:
-		state.Top += 250
+		state.Top += shift
+		state.Tabula.OffsetY += shift
+		state.Min += shift
+		state.Max += shift
 	case alignRight:
-		state.Left += 250
+		state.Left += shift
 	case alignLeft:
-		state.Left -= 250
+		state.Left -= shift
 		if state.Left < -50 {
 			state.Left = -50
 		}
@@ -724,7 +761,7 @@ func alignExit(opaque interface{}) *WorkflowMessage {
 	}
 
 	return &WorkflowMessage{
-		Text:  "You're done! Thanks for playing!",
+		Text:  "Ok! We've done our best. Some maps don't have perfectly rectangular grids, but I hope this one turned out well.",
 		Image: img,
 		State: "exit",
 	}
