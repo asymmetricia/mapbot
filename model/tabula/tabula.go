@@ -572,8 +572,8 @@ func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int) draw.Image {
 
 	result := i //copyImage(i)
 
-	rows := int(float32(i.Bounds().Max.Y) / t.Dpi)
-	cols := int(float32(i.Bounds().Max.X) / t.Dpi)
+	rows := int(float32(i.Bounds().Max.Y)/t.Dpi + 0.2)
+	cols := int(float32(i.Bounds().Max.X)/t.Dpi + 0.2)
 	// 0 1 2 3 4 ... 25 26 27 28
 	// A B C D E ... Y  Z  AA AB
 	for x := first_x; x < cols; x++ {

@@ -428,10 +428,8 @@ func alignVerticalBResponse(opaque interface{}, choice *string) (string, interfa
 	case alignPerfect:
 		log.Infof("rough dpi %d", state.VerticalB-state.VerticalA)
 		state.Tabula.Dpi = float32(state.VerticalB - state.VerticalA)
-		state.Tabula.OffsetX = state.VerticalA
-		for state.Tabula.OffsetX >= int(state.Tabula.Dpi) {
-			state.Tabula.OffsetX -= int(state.Tabula.Dpi)
-		}
+		// Calculate many DPI our line is from the left side of the image, then shift it about over that many.
+		state.Tabula.OffsetX = state.VerticalA - int(state.Tabula.Dpi*float32(int(float32(state.VerticalA)/state.Tabula.Dpi+0.2))+0.5)
 		if err := state.Tabula.Save(db.Instance); err != nil {
 			return alignError("huh! couldn't save the table: %s", err)
 		}
@@ -461,7 +459,7 @@ func alignFineChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
-	img := state.MapImage(state.Left, state.Top, state.Left+400, state.Top+400)
+	img := state.MapImage(state.Left, state.Top, state.Left+360, state.Top+360)
 	if img == nil {
 		return alignErrorChallenge("sorry! something's wrong with the map image.")
 	}
@@ -565,7 +563,7 @@ func alignFineBRChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
-	img := state.MapImage(state.Left, state.Top, state.Left+400, state.Top+400)
+	img := state.MapImage(state.Left, state.Top, state.Left+360, state.Top+360)
 	if img == nil {
 		return alignErrorChallenge("sorry! something's wrong with the map image.")
 	}
@@ -573,7 +571,7 @@ func alignFineBRChallenge(opaque interface{}) *WorkflowMessage {
 	i := 0
 	for {
 		x := state.Tabula.OffsetX - state.Left + int(float32(i)*state.Tabula.Dpi)
-		if x > 400 {
+		if x > 360 {
 			break
 		}
 		VerticalLine(img, x)
@@ -713,8 +711,11 @@ func alignTopResponse(opaque interface{}, choice *string) (string, interface{}) 
 		state.Max = state.Tabula.OffsetY
 		state.Tabula.OffsetY = (state.Min + state.Max) / 2
 	case alignPerfect:
-		for state.Tabula.OffsetY > int(state.Tabula.Dpi)-10 {
-			state.Tabula.OffsetY -= int(state.Tabula.Dpi)
+		// With a small fudge factor, calculate how many DPI below the top of the image we are, and then
+		// shift back up that much.
+		state.Tabula.OffsetY -= int(state.Tabula.Dpi*float32(int(float32(state.Tabula.OffsetY)/state.Tabula.Dpi+0.2)) + 0.5)
+		if err := state.Tabula.Save(db.Instance); err != nil {
+			return alignError("huh! couldn't save the table: %s", err)
 		}
 		return "exit", state
 	case alignUp:
