@@ -305,7 +305,7 @@ func alignLeftResponse(opaque interface{}, choice *string) (string, interface{})
 			state.Top = -50
 		}
 	case alignDown:
-		state.Left += 250
+		state.Top += 250
 	case alignRight:
 		state.Left += 250
 		state.Tabula.OffsetX += 250
