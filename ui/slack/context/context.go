@@ -201,6 +201,10 @@ func (sc *SlackContext) GetEmoji(baseName string) (image.Image, error) {
 		defer res.Body.Close()
 
 		switch hdr := res.Header.Get("content-type"); hdr {
+		case "image/jpeg":
+			fallthrough
+		case "image/gif":
+			fallthrough
 		case "image/png":
 			img, _, err := image.Decode(res.Body)
 			if err != nil {
