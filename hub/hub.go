@@ -6,6 +6,7 @@ import (
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/ryanuber/go-glob"
+	"strings"
 )
 
 var log = mbLog.Log
@@ -15,6 +16,7 @@ type Hub struct {
 }
 
 func (h *Hub) Subscribe(c CommandType, s Subscriber) {
+  c = c.Canonical()
 	log.Debugf("subscribe: %s", c)
 	if h.Subscribers == nil {
 		h.Subscribers = map[CommandType][]Subscriber{
@@ -36,9 +38,10 @@ func (h *Hub) Publish(c *Command) {
 		h.Subscribers = map[CommandType][]Subscriber{}
 	}
 
+  typ := c.Type.Canonical()
 	found := false
 	for cmd, subs := range h.Subscribers {
-		if glob.Glob(string(cmd), string(c.Type)) {
+		if glob.Glob(string(cmd), string(typ)) {
 			for _, sub := range subs {
 				found = true
 				go sub(h, c)
@@ -49,7 +52,7 @@ func (h *Hub) Publish(c *Command) {
 	if !found && c.From != "" {
 		h.Publish(&Command{
 			Type:    CommandType(c.From),
-			Payload: fmt.Sprintf("No handler for command '%s'", c.Type),
+			Payload: fmt.Sprintf("No handler for command '%s'", typ),
 			User:    c.User,
 			Context: c.Context,
 		})
@@ -122,6 +125,10 @@ func (c *Command) WithPayload(p interface{}) *Command {
 //
 // CommandTypes are matched using wildcards; thus a slack team might subscribe to internal:slack:SOME_TEAM_ID:*.
 type CommandType string
+
+func (c CommandType) Canonical() CommandType {
+	return CommandType(strings.ToLower(string(c)))
+}
 
 type Subscriber func(hub *Hub, cmd *Command)
 type Responder func(msg string)
