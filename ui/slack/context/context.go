@@ -8,6 +8,8 @@ import (
 	contextModel "github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/context/databaseContext"
 	"image"
+	_ "image/gif"
+	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
 	"net/url"
