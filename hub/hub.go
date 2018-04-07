@@ -16,7 +16,7 @@ type Hub struct {
 }
 
 func (h *Hub) Subscribe(c CommandType, s Subscriber) {
-  c = c.Canonical()
+	c = c.Canonical()
 	log.Debugf("subscribe: %s", c)
 	if h.Subscribers == nil {
 		h.Subscribers = map[CommandType][]Subscriber{
@@ -38,7 +38,7 @@ func (h *Hub) Publish(c *Command) {
 		h.Subscribers = map[CommandType][]Subscriber{}
 	}
 
-  typ := c.Type.Canonical()
+	typ := c.Type.Canonical()
 	found := false
 	for cmd, subs := range h.Subscribers {
 		if glob.Glob(string(cmd), string(typ)) {

@@ -183,21 +183,54 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 }
 
 func (t *Tabula) drawAt(i draw.Image, obj image.Image, x float32, y float32, size float32, inset int) {
+	t.drawAtAlign(i, obj, x, y, size, inset, Middle, Center)
+}
+
+func (t *Tabula) drawAtAlign(i draw.Image, obj image.Image, x float32, y float32, size float32, inset int, vert VerticalAlignment, horiz HorizontalAlignment) {
 	oX := obj.Bounds().Dx()
 	oY := obj.Bounds().Dy()
 	tgt := uint(size*t.Dpi - 2*float32(inset))
+	tgtX := 0
+	tgtY := 0
 	var scaled image.Image
 	if oX > oY {
 		scaled = resize.Resize(tgt, 0, obj, resize.Bilinear)
+		tgtX = int(tgt)
+		tgtY = int(tgt) * oY / oX
 	} else {
 		scaled = resize.Resize(0, tgt, obj, resize.Bilinear)
+		tgtX = int(tgt) * oX / oY
+		tgtY = int(tgt)
 	}
+
+	top := 0
+	left := 0
+
+	switch vert {
+	case Top:
+		top = 0
+	case Middle:
+		top = (int(size*t.Dpi) - 2*inset - tgtY) / 2
+	case Bottom:
+		top = int(size*t.Dpi) - 2*inset - tgtY
+	}
+
+	switch horiz {
+	case Left:
+		left = 0
+	case Center:
+		left = (int(size*t.Dpi) - 2*inset - tgtX) / 2
+	case Right:
+		left = int(size*t.Dpi) - 2*inset - tgtX
+	}
+
+	log.Debugf("should draw emoji %dx%d at (%d,%d)", tgtX, tgtY, left, top)
 
 	draw.Draw(
 		i,
 		image.Rect(
-			int(x*t.Dpi)+t.OffsetX+int(inset), int(y*t.Dpi)+t.OffsetY+int(inset),
-			int((x+1)*t.Dpi*size)+t.OffsetX-int(inset), int((y+1)*t.Dpi*size)+t.OffsetY-int(inset),
+			int(x*t.Dpi)+t.OffsetX+int(inset)+left, int(y*t.Dpi)+t.OffsetY+int(inset)+top,
+			int((x+1)*t.Dpi*size)+t.OffsetX-int(inset)+left, int((y+1)*t.Dpi*size)+t.OffsetY-int(inset)+top,
 		),
 		scaled,
 		image.Pt(0, 0),
@@ -312,7 +345,7 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context) error {
 				log.Warningf("error obtaining emoji %q: %s", name, err)
 				// no return here, we'll fall through to rendering token name
 			} else {
-				t.drawAt(drawable, emoji, float32(coord.X), float32(coord.Y), float32(token.Size), 2)
+				t.drawAtAlign(drawable, emoji, float32(coord.X), float32(coord.Y), float32(token.Size), 2, Middle, Center)
 				if label != "" {
 					t.printAt(drawable, label, float32(coord.X), float32(coord.Y)+float32(token.Size)/2, float32(token.Size), float32(token.Size)/2, Bottom, Center)
 				}
