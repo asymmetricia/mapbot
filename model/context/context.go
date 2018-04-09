@@ -10,7 +10,12 @@ type Context interface {
 	Id() types.ContextId
 	GetActiveTabulaId() *types.TabulaId
 	SetActiveTabulaId(*types.TabulaId)
+
+	// GetZoom returns the map grid coordinates describing the upper-left
+	// square that should be shown (min) and the lower-right square (max). Note
+	// that this is **not** pixel coordinates.
 	GetZoom() (MinX, MinY, MaxX, MaxY int)
+
 	SetZoom(MinX, MinY, MaxX, MaxY int)
 	GetEmoji(name string) (image.Image, error)
 	IsEmoji(name string) bool
