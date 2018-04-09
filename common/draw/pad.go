@@ -1,14 +1,14 @@
 package draw
 
 import (
-	"image/draw"
 	"image"
+	"image/draw"
 )
 
 // Pad returns a new image the size of `bounds` with the image `in` draw on it.
 // If the lower bounds of `bounds` are negative, `in` will be shifted down and
 // right.
-func Pad(in draw.Image, bounds image.Rectangle) (draw.Image) {
+func Pad(in draw.Image, bounds image.Rectangle) draw.Image {
 	dstR := image.Rectangle{}
 	srcPt := image.Point{}
 
