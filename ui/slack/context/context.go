@@ -31,7 +31,8 @@ func (sc *SlackContext) IsEmoji(name string) bool {
 }
 
 var staticAliases = map[string]string{
-	"boat": "sailboat",
+	"boat":              "sailboat",
+	"large_blue_circle": "blue_circle",
 }
 
 type emojiCodePoints struct {
