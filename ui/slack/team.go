@@ -330,6 +330,13 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 			repErr("rendering", err)
 			return
 		}
+		if img.Bounds().Dx() == 0 || img.Bounds().Dy() == 0 {
+			repErr(
+				"rendering",
+				fmt.Errorf("no pixels (dx=%d, dy=%d)", img.Bounds().Dx(), img.Bounds().Dy()),
+			)
+			return
+		}
 
 		if _, err := t.uploadImage(img, []string{channel}); err != nil {
 			repErr("uploading", err)
