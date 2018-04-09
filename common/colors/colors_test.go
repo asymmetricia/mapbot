@@ -29,7 +29,7 @@ func TestToColor(t *testing.T) {
 			if test.err {
 				t.Fatalf("test %d: expected non-nil err, but received nil", testN)
 			} else {
-				t.Fatalf("test %d: expected nil err, but received %q", err)
+				t.Fatalf("test %d: expected nil err, but received %q", testN, err)
 			}
 		}
 
