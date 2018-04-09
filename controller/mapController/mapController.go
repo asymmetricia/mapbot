@@ -300,6 +300,7 @@ func cmdSelect(h *hub.Hub, c *hub.Command) {
 		}
 
 		c.Context.SetActiveTabulaId(t.Id)
+		c.Context.SetZoom(0, 0, 0, 0)
 
 		if err := c.Context.Save(); err != nil {
 			log.Errorf("Error saving context: %s", err)

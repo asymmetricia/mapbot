@@ -10,6 +10,7 @@ import (
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 	"github.com/nfnt/resize"
+	"github.com/pdbogen/mapbot/common/cache"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbDraw "github.com/pdbogen/mapbot/common/draw"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -607,19 +608,12 @@ func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int, offset image
 	return result
 }
 
-type cacheEntry struct {
-	version int
-	image   image.Image
-}
-
-var cache = map[string]cacheEntry{}
-
 // Returns the tabula BackgroundImage, scaled so that its largest dimension is 2000px.
 func (t *Tabula) BackgroundImage(sendStatusMessage func(string)) (image.Image, error) {
 	if t.Background == nil {
-		bg, ok := cache[t.Url]
-		if ok && bg.version == t.Version {
-			t.Background = copyImage(bg.image)
+		bg, ok := cache.Get(t.Url)
+		if ok && bg.Version == t.Version {
+			t.Background = copyImage(bg.Image)
 		} else {
 			if sendStatusMessage != nil {
 				sendStatusMessage("I have to retrieve the background image; this could take a moment.")
@@ -627,7 +621,7 @@ func (t *Tabula) BackgroundImage(sendStatusMessage func(string)) (image.Image, e
 			if err := t.Hydrate(); err != nil {
 				return nil, fmt.Errorf("retrieving background: %s", err)
 			}
-			cache[t.Url] = cacheEntry{t.Version, copyImage(t.Background)}
+			cache.Put(t.Url, &cache.CacheEntry{t.Version, copyImage(t.Background)})
 		}
 	}
 
@@ -683,8 +677,8 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 	cacheKey := fmt.Sprintf("%s|%fdpi+%dx%d-%dx%d", t.Url, t.Dpi, minx, miny, maxx, maxy)
 
 	var gridded image.Image
-	if cached, ok := cache[cacheKey]; ok && cached.version == t.Version {
-		gridded = copyImage(cached.image)
+	if cached, ok := cache.Get(cacheKey); ok && cached.Version == t.Version {
+		gridded = copyImage(cached.Image)
 	} else {
 		log.Infof("Cache miss: %s", cacheKey)
 		resized, err := t.BackgroundImage(sendStatusMessage)
@@ -714,7 +708,7 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		log.Debugf("padding out to %v", r)
 		padded := mbDraw.Pad(drawable, r)
 		gridded = t.addGrid(padded)
-		cache[cacheKey] = cacheEntry{t.Version, copyImage(gridded)}
+		cache.Put(cacheKey, &cache.CacheEntry{t.Version, copyImage(gridded)})
 	}
 
 	log.Debugf("adding marks...")

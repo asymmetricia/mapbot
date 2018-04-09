@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/blobserv"
+	_ "github.com/pdbogen/mapbot/common/cache"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
