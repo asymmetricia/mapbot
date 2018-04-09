@@ -25,7 +25,6 @@ import (
 	_ "image/png"
 	"io"
 	"io/ioutil"
-	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -272,15 +271,20 @@ func (t *Tabula) addGrid(i draw.Image) draw.Image {
 	bounds := i.Bounds()
 	gridded := i //copyImage(i)
 
-	xOff := float32(t.OffsetX)
-	for xOff > 0 {
-		xOff -= t.Dpi
-	}
+	log.Debugf("adding grid to image with bounds %v at spacing %.02f", i.Bounds(), t.Dpi)
 
-	yOff := float32(t.OffsetY)
-	for yOff > 0 {
-		yOff -= t.Dpi
-	}
+	//xOff := float32(t.OffsetX)
+	//for xOff > 0 {
+	//	xOff -= t.Dpi
+	//}
+	//
+	//yOff := float32(t.OffsetY)
+	//for yOff > 0 {
+	//	yOff -= t.Dpi
+	//}
+
+	xOff := float32(0)
+	yOff := float32(0)
 
 	var col color.Color = t.GridColor
 	if col == nil {
@@ -523,21 +527,21 @@ func Crop(i image.Image, min_x, min_y, max_x, max_y int) *image.RGBA {
 	return result
 }
 
-func (t *Tabula) line(i draw.Image, fromX, fromY, toX, toY float32, col color.Color) {
-	iFromX := int(fromX*t.Dpi) + t.OffsetX
-	iFromY := int(fromY*t.Dpi) + t.OffsetY
-	iToX := int(toX*t.Dpi) + t.OffsetX
-	iToY := int(toY*t.Dpi) + t.OffsetY
+func (t *Tabula) line(i draw.Image, fromX, fromY, toX, toY float32, col color.Color, offset image.Point) {
+	iFromX := int(fromX*t.Dpi) + offset.X
+	iFromY := int(fromY*t.Dpi) + offset.Y
+	iToX := int(toX*t.Dpi) + offset.X
+	iToY := int(toY*t.Dpi) + offset.Y
 	log.Debugf("drawing line from (%d,%d) to (%d,%d)", iFromX, iFromY, iToX, iToY)
 	mbDraw.Line(i, image.Pt(iFromX, iFromY), image.Pt(iToX, iToY), col)
 }
 
-func (t *Tabula) squareAtFloat(i draw.Image, minX, minY, maxX, maxY float32, inset int, col color.Color) {
-	for x := int(minX*t.Dpi) + t.OffsetX + inset; x < int(maxX*t.Dpi)+t.OffsetX-inset; x++ {
+func (t *Tabula) squareAtFloat(i draw.Image, minX, minY, maxX, maxY float32, inset int, col color.Color, offset image.Point) {
+	for x := int(minX*t.Dpi) + offset.X + inset; x < int(maxX*t.Dpi)+offset.X-inset; x++ {
 		if x < 0 {
 			continue
 		}
-		for y := int(minY*t.Dpi) + t.OffsetY + inset; y < int(maxY*t.Dpi)+t.OffsetY-inset; y++ {
+		for y := int(minY*t.Dpi) + offset.Y + inset; y < int(maxY*t.Dpi)+offset.Y-inset; y++ {
 			if y < 0 {
 				continue
 			}
@@ -546,19 +550,19 @@ func (t *Tabula) squareAtFloat(i draw.Image, minX, minY, maxX, maxY float32, ins
 	}
 }
 
-func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col color.Color) {
-	t.squareAtFloat(i, float32(bounds.Min.X), float32(bounds.Min.Y), float32(bounds.Max.X), float32(bounds.Max.Y), inset, col)
+func (t *Tabula) squareAt(i draw.Image, bounds image.Rectangle, inset int, col color.Color, offset image.Point) {
+	t.squareAtFloat(i, float32(bounds.Min.X), float32(bounds.Min.Y), float32(bounds.Max.X), float32(bounds.Max.Y), inset, col, offset)
 }
 
 // drawAt *modifies* the image given by `i` so that the string given by `what` is printed in the square at tabula
 // coordinates x,y (not image coordinates), scaled so that the string occupies a rectangle described by (width,height) tabula squares
-func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, width float32, height float32, valign VerticalAlignment, halign HorizontalAlignment) {
+func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, width float32, height float32, valign VerticalAlignment, halign HorizontalAlignment, offset image.Point) {
 	g := glyph(what, t.Dpi*width, t.Dpi*height, valign, halign)
 	draw.Draw(
 		i,
 		image.Rect(
-			int(x*t.Dpi)+t.OffsetX, int(y*t.Dpi)+t.OffsetY,
-			int((x+width)*t.Dpi)+t.OffsetX, int((y+height)*t.Dpi)+t.OffsetY,
+			int(x*t.Dpi)+offset.X, int(y*t.Dpi)+offset.Y,
+			int((x+width)*t.Dpi)+offset.X, int((y+height)*t.Dpi)+offset.Y,
 		),
 		g,
 		image.Pt(0, 0),
@@ -566,10 +570,22 @@ func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, width 
 	)
 }
 
-func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int) draw.Image {
+func toLetter(p int) string {
 	letters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
 		"N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+	if p < 0 {
+		return "-" + toLetter(-p-1)
+	}
+	c := letters[p%26] // 0..25
+	tmp := p
+	for tmp > 25 {
+		tmp = int(tmp/26) - 1
+		c = letters[tmp%26] + c
+	}
+	return c
+}
 
+func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int, offset image.Point) draw.Image {
 	result := i //copyImage(i)
 
 	rows := int(float32(i.Bounds().Max.Y)/t.Dpi + 0.2)
@@ -577,17 +593,15 @@ func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int) draw.Image {
 	// 0 1 2 3 4 ... 25 26 27 28
 	// A B C D E ... Y  Z  AA AB
 	for x := first_x; x < cols; x++ {
-		c := letters[x%26] // 0..25
-		tmp := x
-		for tmp > 25 {
-			tmp = int(tmp/26) - 1
-			c = letters[tmp%26] + c
-		}
-		t.printAt(result, c, float32(x), float32(first_y), 1, 0.5, Middle, Left)
+		t.printAt(result, toLetter(x), float32(x), float32(first_y), 1, 0.5, Middle, Left, offset)
 	}
 
 	for y := first_y; y < rows; y++ {
-		t.printAt(result, strconv.Itoa(y+1), float32(first_x), float32(y)+0.5, 1, 0.5, Middle, Right)
+		if y < 0 {
+			t.printAt(result, strconv.Itoa(y), float32(first_x), float32(y)+0.5, 1, 0.5, Middle, Right, offset)
+		} else {
+			t.printAt(result, strconv.Itoa(y+1), float32(first_x), float32(y)+0.5, 1, 0.5, Middle, Right, offset)
+		}
 	}
 
 	return result
@@ -600,12 +614,16 @@ type cacheEntry struct {
 
 var cache = map[string]cacheEntry{}
 
-func (t *Tabula) BackgroundImage() (image.Image, error) {
+// Returns the tabula BackgroundImage, scaled so that its largest dimension is 2000px.
+func (t *Tabula) BackgroundImage(sendStatusMessage func(string)) (image.Image, error) {
 	if t.Background == nil {
 		bg, ok := cache[t.Url]
 		if ok && bg.version == t.Version {
 			t.Background = copyImage(bg.image)
 		} else {
+			if sendStatusMessage != nil {
+				sendStatusMessage("I have to retrieve the background image; this could take a moment.")
+			}
 			if err := t.Hydrate(); err != nil {
 				return nil, fmt.Errorf("retrieving background: %s", err)
 			}
@@ -645,63 +663,85 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		return nil, errors.New("cannot render tabula with zero DPI")
 	}
 
-	cacheKey := fmt.Sprintf("%s|%fdpi+%dx%d", t.Url, t.Dpi, t.OffsetX, t.OffsetY)
+	minx, miny, maxx, maxy := ctx.GetZoom()
+
+	log.Debugf("map with bounds from (%d,%d) to (%d,%d)", minx, miny, maxx, maxy)
+
+	imgOffset := image.Point{
+		int(float32(minx)*t.Dpi) + t.OffsetX,
+		int(float32(miny)*t.Dpi) + t.OffsetY,
+	}
+
+	log.Debugf("calculated image offset %v", imgOffset)
+
+	tokenOffset := image.Point{
+		int(float32(minx)*t.Dpi) * -1,
+		int(float32(miny)*t.Dpi) * -1,
+	}
+	log.Debugf("token offset %v", tokenOffset)
+
+	cacheKey := fmt.Sprintf("%s|%fdpi+%v", t.Url, t.Dpi, imgOffset)
 
 	var gridded image.Image
 	if cached, ok := cache[cacheKey]; ok && cached.version == t.Version {
 		gridded = copyImage(cached.image)
 	} else {
 		log.Infof("Cache miss: %s", cacheKey)
-		sendStatusMessage("I have to retrieve the background image; this could take a moment.")
-		resized, err := t.BackgroundImage()
+		resized, err := t.BackgroundImage(sendStatusMessage)
 		if err != nil {
 			return nil, fmt.Errorf("retrieving background: %s", err)
 		}
-		if drawable, ok := resized.(draw.Image); ok {
-			gridded = t.addGrid(drawable)
-			cache[cacheKey] = cacheEntry{t.Version, copyImage(gridded)}
-		} else {
+
+		drawable, ok := resized.(draw.Image)
+		if !ok {
 			panic("resize didn't return a drawable image?!")
 		}
+
+		if minx == maxx {
+			maxx = int(float32(drawable.Bounds().Dx()+t.OffsetX) / t.Dpi)
+		}
+
+		if miny == maxy {
+			maxy = int(float32(drawable.Bounds().Dy()+t.OffsetY) / t.Dpi)
+		}
+
+		r := image.Rect(
+			imgOffset.X,
+			imgOffset.Y,
+			int(float32(maxx+1)*t.Dpi)+t.OffsetX+1,
+			int(float32(maxy+1)*t.Dpi)+t.OffsetY+1,
+		)
+		log.Debugf("padding out to %v", r)
+		padded := mbDraw.Pad(drawable, r)
+		gridded = t.addGrid(padded)
+		cache[cacheKey] = cacheEntry{t.Version, copyImage(gridded)}
 	}
 
 	log.Debugf("adding marks...")
-	if err := t.addMarks(gridded, ctx); err != nil {
+	if err := t.addMarks(gridded, ctx, tokenOffset); err != nil {
 		return nil, err
 	}
 
 	log.Debugf("adding lighting...")
-	if err := t.addTokenLights(gridded, ctx); err != nil {
+	if err := t.addTokenLights(gridded, ctx, tokenOffset); err != nil {
 		return nil, err
 	}
 
 	log.Debugf("adding tokens...")
-	if err := t.addTokens(gridded, ctx); err != nil {
+	if err := t.addTokens(gridded, ctx, tokenOffset); err != nil {
 		return nil, err
 	}
 
 	log.Debugf("adding lines...")
-	if err := t.addLines(gridded, ctx); err != nil {
+	if err := t.addLines(gridded, ctx, tokenOffset); err != nil {
 		return nil, err
 	}
 
-	minx, miny, maxx, maxy := ctx.GetZoom()
-
 	var coord image.Image
 	if drawable, ok := gridded.(draw.Image); ok {
-		coord = t.addCoordinates(drawable, minx, miny)
+		coord = t.addCoordinates(drawable, minx, miny, tokenOffset)
 	} else {
 		panic("resize didn't return a drawable image?!")
-	}
-
-	if maxx > minx && maxy > miny {
-		coord = Crop(
-			coord,
-			int(float64(minx)*float64(t.Dpi))+t.OffsetX,
-			int(float64(miny)*float64(t.Dpi))+t.OffsetY,
-			int(math.Ceil(float64(maxx+1)*float64(t.Dpi)))+t.OffsetX,
-			int(math.Ceil(float64(maxy+1)*float64(t.Dpi)))+t.OffsetY,
-		)
 	}
 
 	return coord, nil

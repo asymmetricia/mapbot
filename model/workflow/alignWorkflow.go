@@ -80,7 +80,7 @@ type alignWorkflowOpaque struct {
 func (a *alignWorkflowOpaque) MapImage(minX, minY, maxX, maxY int) draw.Image {
 	//ctx := &databaseContext.DatabaseContext{}
 
-	img, err := a.Tabula.BackgroundImage()
+	img, err := a.Tabula.BackgroundImage(nil)
 	if err != nil {
 		log.Errorf("failed to render tabula: %s", err)
 		return nil
@@ -532,7 +532,7 @@ func alignFineResponse(opaque interface{}, choice *string) (string, interface{})
 			state.Left = -50
 		}
 	case alignPerfect:
-		bg, err := state.Tabula.BackgroundImage()
+		bg, err := state.Tabula.BackgroundImage(nil)
 		if err != nil {
 			return alignError("surprising that we should be unable now to get the background image, but: %s", err)
 		}

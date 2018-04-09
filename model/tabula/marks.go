@@ -8,7 +8,7 @@ import (
 	"image/draw"
 )
 
-func (t *Tabula) addLines(in image.Image, ctx context.Context) error {
+func (t *Tabula) addLines(in image.Image, ctx context.Context, offset image.Point) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
 		return errors.New("not drawable!")
@@ -41,12 +41,12 @@ func (t *Tabula) addLines(in image.Image, ctx context.Context) error {
 		}
 
 		log.Debugf("post-cornering it's %v -> %v", from, to)
-		t.line(drawable, float32(from.X), float32(from.Y), float32(to.X), float32(to.Y), l.Color)
+		t.line(drawable, float32(from.X), float32(from.Y), float32(to.X), float32(to.Y), l.Color, offset)
 	}
 	return nil
 }
 
-func (t *Tabula) addMarks(in image.Image, ctx context.Context) error {
+func (t *Tabula) addMarks(in image.Image, ctx context.Context, offset image.Point) error {
 	dirMarkSlice := []mark.Mark{}
 	for _, dirMarks := range ctx.GetMarks(*t.Id) {
 		for _, mark := range dirMarks {
@@ -54,14 +54,14 @@ func (t *Tabula) addMarks(in image.Image, ctx context.Context) error {
 		}
 	}
 
-	if err := t.addMarkSlice(in, dirMarkSlice); err != nil {
+	if err := t.addMarkSlice(in, dirMarkSlice, offset); err != nil {
 		return err
 	}
 
-	return t.addMarkSlice(in, t.Marks)
+	return t.addMarkSlice(in, t.Marks, offset)
 }
 
-func (t *Tabula) addMarkSlice(in image.Image, marks []mark.Mark) error {
+func (t *Tabula) addMarkSlice(in image.Image, marks []mark.Mark, offset image.Point) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
 		return errors.New("image provided could not be used as a draw.Image")
@@ -70,23 +70,23 @@ func (t *Tabula) addMarkSlice(in image.Image, marks []mark.Mark) error {
 	for _, mark := range marks {
 		switch mark.Direction {
 		case "n":
-			t.squareAtFloat(drawable, float32(mark.Point.X), float32(mark.Point.Y)-.1, float32(mark.Point.X)+1, float32(mark.Point.Y)+.1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X), float32(mark.Point.Y)-.1, float32(mark.Point.X)+1, float32(mark.Point.Y)+.1, 0, mark.Color, offset)
 		case "s":
-			t.squareAtFloat(drawable, float32(mark.Point.X), float32(mark.Point.Y)+.9, float32(mark.Point.X)+1, float32(mark.Point.Y)+1.1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X), float32(mark.Point.Y)+.9, float32(mark.Point.X)+1, float32(mark.Point.Y)+1.1, 0, mark.Color, offset)
 		case "e":
-			t.squareAtFloat(drawable, float32(mark.Point.X)+.9, float32(mark.Point.Y), float32(mark.Point.X)+1.1, float32(mark.Point.Y)+1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X)+.9, float32(mark.Point.Y), float32(mark.Point.X)+1.1, float32(mark.Point.Y)+1, 0, mark.Color, offset)
 		case "w":
-			t.squareAtFloat(drawable, float32(mark.Point.X)-.1, float32(mark.Point.Y), float32(mark.Point.X)+.1, float32(mark.Point.Y)+1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X)-.1, float32(mark.Point.Y), float32(mark.Point.X)+.1, float32(mark.Point.Y)+1, 0, mark.Color, offset)
 		case "ne":
-			t.squareAtFloat(drawable, float32(mark.Point.X)+.9, float32(mark.Point.Y)-.1, float32(mark.Point.X)+1.1, float32(mark.Point.Y)+.1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X)+.9, float32(mark.Point.Y)-.1, float32(mark.Point.X)+1.1, float32(mark.Point.Y)+.1, 0, mark.Color, offset)
 		case "se":
-			t.squareAtFloat(drawable, float32(mark.Point.X)+.9, float32(mark.Point.Y)+.9, float32(mark.Point.X)+1.1, float32(mark.Point.Y)+1.1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X)+.9, float32(mark.Point.Y)+.9, float32(mark.Point.X)+1.1, float32(mark.Point.Y)+1.1, 0, mark.Color, offset)
 		case "nw":
-			t.squareAtFloat(drawable, float32(mark.Point.X)-.1, float32(mark.Point.Y)-.1, float32(mark.Point.X)+.1, float32(mark.Point.Y)+.1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X)-.1, float32(mark.Point.Y)-.1, float32(mark.Point.X)+.1, float32(mark.Point.Y)+.1, 0, mark.Color, offset)
 		case "sw":
-			t.squareAtFloat(drawable, float32(mark.Point.X)-.1, float32(mark.Point.Y)+.9, float32(mark.Point.X)+.1, float32(mark.Point.Y)+1.1, 0, mark.Color)
+			t.squareAtFloat(drawable, float32(mark.Point.X)-.1, float32(mark.Point.Y)+.9, float32(mark.Point.X)+.1, float32(mark.Point.Y)+1.1, 0, mark.Color, offset)
 		default:
-			t.squareAt(drawable, image.Rect(mark.Point.X, mark.Point.Y, mark.Point.X+1, mark.Point.Y+1), 1, mark.Color)
+			t.squareAt(drawable, image.Rect(mark.Point.X, mark.Point.Y, mark.Point.X+1, mark.Point.Y+1), 1, mark.Color, offset)
 		}
 	}
 
