@@ -12,9 +12,9 @@ import (
 
 var log = mbLog.Log
 
-var xCoordRe = regexp.MustCompile(`^[a-z]+$`)
-var yCoordRe = regexp.MustCompile(`^[0-9]+$`)
-var coordRe = regexp.MustCompile(`^([a-z]+)([0-9]+)(n|ne|e|se|s|sw|w|nw)?$`)
+var xCoordRe = regexp.MustCompile(`^-?[a-z]+$`)
+var yCoordRe = regexp.MustCompile(`^-?[0-9]+$`)
+var coordRe = regexp.MustCompile(`^(-?[a-z]+)(-?[0-9]+)(n|ne|e|se|s|sw|w|nw)?$`)
 
 func RCToPoint(rc string, directionAllowed bool) (point image.Point, direction string, err error) {
 	rc = strings.ToLower(rc)
@@ -45,13 +45,24 @@ func CoordsToPoint(x, y string) (image.Point, error) {
 	}
 
 	accumX := 0
-	for i := 0; i < len(x); i++ {
-		accumX = accumX*26 + int(x[i]) - int('a') + 1
+	if x[0] == '-' {
+		// -a is -1 (no zero in this system)
+		for i := 1; i < len(x); i++ {
+			accumX = accumX*26 - (int(x[i]) - int('a') + 1)
+		}
+		accumX += 1
+	} else {
+		for i := 0; i < len(x); i++ {
+			accumX = accumX*26 + int(x[i]) - int('a') + 1
+		}
 	}
 
 	accumY, err := strconv.Atoi(y)
 	if err != nil {
 		return image.Point{}, fmt.Errorf("invalid Y coordinate: %s", err)
+	}
+	if accumY < 0 {
+		accumY += 1
 	}
 	return image.Point{accumX - 1, accumY - 1}, nil
 }

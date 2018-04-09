@@ -19,10 +19,14 @@ func TestCoordsToPoint(t *testing.T) {
 		resY int
 	}
 	tests := []Test{
+		Test{"-a", "1", -1, 0},
+		Test{"-a", "-1", -1, -1},
+		Test{"-a", "-10", -1, -10},
 		Test{"a", "5", 0, 4},
 		Test{"Aa", "55", 26, 54},
 		Test{"Z", "999", 25, 998},
 		Test{"ZZ", "1", 701, 0},
+		Test{"-ZZ", "1", -702, 0},
 	}
 
 	for _, test := range tests {
@@ -32,11 +36,11 @@ func TestCoordsToPoint(t *testing.T) {
 		}
 
 		if pt.X != test.resX {
-			t.Fatalf(`Expected CoordsToPoint("%s", "%s") to return image.Point{1,_}, returned image.Point{%d,_}`, test.x, test.y, pt.X)
+			t.Fatalf(`Expected CoordsToPoint("%s", "%s") to return image.Point{%d,_}, returned image.Point{%d,_}`, test.x, test.y, test.resX, pt.X)
 		}
 
 		if pt.Y != test.resY {
-			t.Fatalf(`Expected CoordsToPoint("%s", "%s") to return image.Point{_,5}, returned image.Point{_,%d}`, test.x, test.y, pt.Y)
+			t.Fatalf(`Expected CoordsToPoint("%s", "%s") to return image.Point{_,%d}, returned image.Point{_,%d}`, test.x, test.y, test.resY, pt.Y)
 		}
 		t.Logf("CoordsToPoint(%s,%s) -> (%d,%d): OK", test.x, test.y, pt.X, pt.Y)
 	}
