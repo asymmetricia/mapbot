@@ -81,6 +81,12 @@ func cmdLight(h *hub.Hub, c *hub.Command) {
 		args = append([]string{tok}, args...)
 	}
 
+	// Check again, because we may have just altered the argument list.
+	if len(args) < 2 || len(args) > 4 {
+		h.Error(c, "usage: token light "+processor.Commands["light"].Args)
+		return
+	}
+
 	dim, err := strconv.Atoi(args[1])
 	if err != nil {
 		h.Error(c, fmt.Sprintf("`%s` is not a number of feet: %s", args[1], err))
