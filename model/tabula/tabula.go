@@ -592,11 +592,11 @@ func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int, offset image
 	cols := int(float32(i.Bounds().Max.X)/t.Dpi + 0.2)
 	// 0 1 2 3 4 ... 25 26 27 28
 	// A B C D E ... Y  Z  AA AB
-	for x := first_x; x < cols; x++ {
+	for x := first_x; x < first_x+cols; x++ {
 		t.printAt(result, toLetter(x), float32(x), float32(first_y), 1, 0.5, Middle, Left, offset)
 	}
 
-	for y := first_y; y < rows; y++ {
+	for y := first_y; y < first_y+rows; y++ {
 		if y < 0 {
 			t.printAt(result, strconv.Itoa(y), float32(first_x), float32(y)+0.5, 1, 0.5, Middle, Right, offset)
 		} else {
@@ -680,7 +680,7 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 	}
 	log.Debugf("token offset %v", tokenOffset)
 
-	cacheKey := fmt.Sprintf("%s|%fdpi+%v", t.Url, t.Dpi, imgOffset)
+	cacheKey := fmt.Sprintf("%s|%fdpi+%dx%d-%dx%d", t.Url, t.Dpi, minx, miny, maxx, maxy)
 
 	var gridded image.Image
 	if cached, ok := cache[cacheKey]; ok && cached.version == t.Version {
