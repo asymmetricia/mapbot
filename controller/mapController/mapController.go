@@ -40,8 +40,15 @@ func init() {
 			"gridcolor": cmdproc.Subcommand{"<name> <value>", "shorthand for set, to set the grid color", cmdGridColor},
 			"zoom":      cmdproc.Subcommand{"<min X> <min Y> <max X> <max Y>", "requests that mapbot display only a portion of the map; useful for larger maps where the action is in a small area. requires an active map. Set to `a 1 a 1` to disable zoom. The space between column and row is optional (i.e., `a1` is OK).", cmdZoom},
 			"align":     cmdproc.Subcommand{"<name>", "begin guided alignment for the named map", cmdAlign},
+			"mark":      cmdproc.Subcommand{"", "alias for non-map command `mark`; see `mark help` for more", cmdMark},
+			"check":     cmdproc.Subcommand{"", "alias for non-map command `check`; see `check help` for more", cmdMark},
 		},
 	}
+}
+
+func cmdMark(h *hub.Hub, c *hub.Command) {
+	args := strings.Split(string(c.Type), ":")
+	h.Publish(c.WithType(hub.CommandType(strings.Join(args[1:], ":"))))
 }
 
 func cmdAlign(h *hub.Hub, c *hub.Command) {
