@@ -12,6 +12,7 @@ import (
 	"image/color"
 	"image/draw"
 	"regexp"
+	"sort"
 )
 
 type Token struct {
@@ -313,13 +314,44 @@ func (t *Tabula) addTokenLights(in image.Image, ctx context.Context, offset imag
 	return t.addMarkSlice(in, marks, offset)
 }
 
+type TokensByNameThenSize struct {
+	names  []string
+	tokens map[string]Token
+}
+
+func (t *TokensByNameThenSize) Len() int {
+	return len(t.names)
+}
+
+func (t *TokensByNameThenSize) Less(a, b int) bool {
+	return t.names[a] < t.names[b] ||
+		(t.names[a] == t.names[b] && t.tokens[t.names[a]].Size < t.tokens[t.names[b]].Size)
+}
+
+func (t *TokensByNameThenSize) Swap(a, b int) {
+	t.names[a], t.names[b] = t.names[b], t.names[a]
+}
+
+var _ sort.Interface = (*TokensByNameThenSize)(nil)
+
 func (t *Tabula) addTokens(in image.Image, ctx context.Context, offset image.Point) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
 		return errors.New("image provided could not be used as a draw.Image")
 	}
 
-	for tokenName, token := range t.Tokens[ctx.Id()] {
+	tokens := t.Tokens[ctx.Id()]
+	names := make([]string, len(tokens))
+	n := 0
+	for name := range tokens {
+		names[n] = name
+		n++
+	}
+	sort.Sort(&TokensByNameThenSize{names, tokens})
+
+	counts := map[string]int{}
+	for _, tokenName := range names {
+		token := tokens[tokenName]
 		coord := token.Coordinate
 		r, g, b, a := token.Color().RGBA()
 
