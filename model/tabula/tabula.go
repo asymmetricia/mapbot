@@ -287,33 +287,40 @@ func (t *Tabula) addGrid(i draw.Image) draw.Image {
 	xOff := float32(0)
 	yOff := float32(0)
 
+	blackOnWhite := false
 	var col color.Color = t.GridColor
 	if col == nil {
 		col = &color.Black
 	}
 
-	for x := xOff; x < float32(bounds.Max.X); x += t.Dpi {
-		if x < 0 {
-			continue
-		}
-		for y := yOff; y < float32(bounds.Max.Y); y++ {
-			if y < 0 {
-				continue
-			}
-			mbDraw.BlendAt(gridded, int(x), int(y), col)
-		}
+	r, g, b, _ := col.RGBA()
+	if r == 0 && b == 0 && g == 0 {
+		blackOnWhite = true
 	}
 
-	// Horizontal lines; X at DPI intervals, all Y
-	for x := xOff; x < float32(bounds.Max.X); x++ {
-		if x < 0 {
-			continue
+	for x := xOff; x < float32(bounds.Max.X); x += t.Dpi {
+		if blackOnWhite {
+			mbDraw.Line(gridded, image.Pt(int(x-1), 0), image.Pt(int(x-1), bounds.Max.Y), col)
+			mbDraw.Line(gridded, image.Pt(int(x+1), 0), image.Pt(int(x+1), bounds.Max.Y), col)
+		}
+		mbDraw.Line(gridded, image.Pt(int(x), 0), image.Pt(int(x), bounds.Max.Y), col)
+	}
+
+	// Horizontal lines; Y at DPI intervals, all X
+	for y := yOff; y < float32(bounds.Max.Y); y += t.Dpi {
+		if blackOnWhite {
+			mbDraw.Line(gridded, image.Pt(0, int(y-1)), image.Pt(bounds.Max.X, int(y-1)), col)
+			mbDraw.Line(gridded, image.Pt(0, int(y+1)), image.Pt(bounds.Max.X, int(y+1)), col)
+		}
+		mbDraw.Line(gridded, image.Pt(0, int(y)), image.Pt(bounds.Max.X, int(y)), col)
+	}
+
+	if blackOnWhite {
+		for x := xOff; x < float32(bounds.Max.X); x += t.Dpi {
+			mbDraw.Line(gridded, image.Pt(int(x), 0), image.Pt(int(x), bounds.Max.Y), color.White)
 		}
 		for y := yOff; y < float32(bounds.Max.Y); y += t.Dpi {
-			if y < 0 {
-				continue
-			}
-			mbDraw.BlendAt(gridded, int(x), int(y), col)
+			mbDraw.Line(gridded, image.Pt(0, int(y)), image.Pt(bounds.Max.X, int(y)), color.White)
 		}
 	}
 
