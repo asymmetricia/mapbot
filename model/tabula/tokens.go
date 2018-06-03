@@ -349,7 +349,6 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context, offset image.Poi
 	}
 	sort.Sort(&TokensByNameThenSize{names, tokens})
 
-	counts := map[string]int{}
 	for _, tokenName := range names {
 		token := tokens[tokenName]
 		coord := token.Coordinate
