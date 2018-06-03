@@ -33,6 +33,26 @@ func RCToPoint(rc string, directionAllowed bool) (point image.Point, direction s
 	}
 }
 
+func PointToCoords(pt image.Point) string {
+	accumX := ""
+	signX := pt.X < 0
+	if signX {
+		pt.X = pt.X * -1
+	}
+	for {
+		accumX = accumX + string((pt.X%26)+int('a'))
+		pt.X = pt.X / 26
+		if pt.X == 0 {
+			break
+		}
+	}
+	if signX {
+		accumX = "-" + accumX
+	}
+
+	return accumX + strconv.Itoa(pt.Y)
+}
+
 func CoordsToPoint(x, y string) (image.Point, error) {
 	x = strings.ToLower(x)
 	if !xCoordRe.MatchString(x) {
