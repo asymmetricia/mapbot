@@ -81,7 +81,7 @@ func cmdAlign(h *hub.Hub, c *hub.Command) {
 	})
 }
 
-func cmdAutoZoome(h *hub.Hub, c *hub.Command) {
+func cmdAutoZoom(h *hub.Hub, c *hub.Command) {
 	tabId := c.Context.GetActiveTabulaId()
 	if tabId == nil {
 		h.Error(c, "no active map in this channel, use `map select <name>` first")
@@ -101,26 +101,36 @@ func cmdAutoZoome(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
+	first := true
 	min_x, min_y, max_x, max_y := 0, 0, 0, 0
-	for name, token := range tab.Tokens[ctxId] {
+	for _, token := range tab.Tokens[ctxId] {
+		if first {
+			min_x = token.Coordinate.X
+			max_x = token.Coordinate.X
+			min_y = token.Coordinate.Y
+			max_y = token.Coordinate.Y
+			first = false
+			continue
+		}
+
 		if token.Coordinate.X < min_x {
 			min_x = token.Coordinate.X
 		}
 		if token.Coordinate.X+token.Size > max_x {
-			max_x = token.Coordinate.X + token.Size
+			max_x = token.Coordinate.X + token.Size - 1
 		}
 		if token.Coordinate.Y < min_y {
 			min_y = token.Coordinate.Y
 		}
 		if token.Coordinate.Y+token.Size > max_y {
-			max_y = token.Coordinate.Y + token.Size
+			max_y = token.Coordinate.Y + token.Size - 1
 		}
 	}
 
-	cmdZoom(h, c.WithPayload(
+	cmdZoom(h, c.WithPayload([]string{
 		conv.PointToCoords(image.Pt(min_x-1, min_y-1)),
 		conv.PointToCoords(image.Pt(max_x+1, max_y+1)),
-	))
+	}))
 }
 
 func cmdZoom(h *hub.Hub, c *hub.Command) {
