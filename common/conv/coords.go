@@ -33,24 +33,24 @@ func RCToPoint(rc string, directionAllowed bool) (point image.Point, direction s
 	}
 }
 
-func PointToCoords(pt image.Point) string {
-	accumX := ""
-	signX := pt.X < 0
-	if signX {
-		pt.X = pt.X * -1
-	}
-	for {
-		accumX = accumX + string((pt.X%26)+int('a'))
-		pt.X = pt.X / 26
-		if pt.X == 0 {
-			break
-		}
-	}
-	if signX {
-		accumX = "-" + accumX
+func numberToLetters(n int) string {
+	if n < 0 {
+		return "-" + numberToLetters(-n)
 	}
 
-	return accumX + strconv.Itoa(pt.Y)
+	if n < 26 {
+		return string(n + int('a'))
+	}
+
+	return numberToLetters(n/26) + numberToLetters(n%26)
+}
+
+func PointToCoords(pt image.Point) string {
+
+	if pt.Y >= 0 {
+		pt.Y++
+	}
+	return numberToLetters(pt.X) + strconv.Itoa(pt.Y)
 }
 
 func CoordsToPoint(x, y string) (image.Point, error) {
@@ -65,17 +65,17 @@ func CoordsToPoint(x, y string) (image.Point, error) {
 	}
 
 	accumX := 0
+	sign := 1
 	if x[0] == '-' {
-		// -a is -1 (no zero in this system)
-		for i := 1; i < len(x); i++ {
-			accumX = accumX*26 - (int(x[i]) - int('a') + 1)
-		}
-		accumX += 1
-	} else {
-		for i := 0; i < len(x); i++ {
-			accumX = accumX*26 + int(x[i]) - int('a') + 1
-		}
+		sign = -1
+		x = x[1:]
 	}
+
+	for i := 0; i < len(x); i++ {
+		accumX = accumX*26 + int(x[i]) - int('a')
+	}
+
+	accumX = accumX * sign
 
 	accumY, err := strconv.Atoi(y)
 	if err != nil {
@@ -84,7 +84,7 @@ func CoordsToPoint(x, y string) (image.Point, error) {
 	if accumY < 0 {
 		accumY += 1
 	}
-	return image.Point{accumX - 1, accumY - 1}, nil
+	return image.Point{accumX, accumY - 1}, nil
 }
 
 // Distance calculates the "pathfinder-style" distance between two points;

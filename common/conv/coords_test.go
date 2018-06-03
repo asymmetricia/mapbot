@@ -2,8 +2,28 @@ package conv
 
 import (
 	"image"
+	"strings"
 	"testing"
 )
+
+type coordTest struct {
+	x, y       string
+	resX, resY int
+}
+
+var coordTests = []coordTest{
+	{"a", "1", 0, 0},
+	{"a", "-1", 0, -1},
+	{"a", "-10", 0, -10},
+	{"-b", "1", -1, 0},
+	{"-b", "-1", -1, -1},
+	{"-b", "-10", -1, -10},
+	{"a", "5", 0, 4},
+	{"Ba", "55", 26, 54},
+	{"Z", "999", 25, 998},
+	{"ZZ", "1", 675, 0},
+	{"-ZZ", "1", -675, 0},
+}
 
 func TestCoordsToPoint(t *testing.T) {
 	_, err := CoordsToPoint("-", "5")
@@ -12,24 +32,7 @@ func TestCoordsToPoint(t *testing.T) {
 		t.Fatal(`Expected CoordsToPoint("-", "5") to return err, returned nil`)
 	}
 
-	type Test struct {
-		x    string
-		y    string
-		resX int
-		resY int
-	}
-	tests := []Test{
-		Test{"-a", "1", -1, 0},
-		Test{"-a", "-1", -1, -1},
-		Test{"-a", "-10", -1, -10},
-		Test{"a", "5", 0, 4},
-		Test{"Aa", "55", 26, 54},
-		Test{"Z", "999", 25, 998},
-		Test{"ZZ", "1", 701, 0},
-		Test{"-ZZ", "1", -702, 0},
-	}
-
-	for _, test := range tests {
+	for _, test := range coordTests {
 		pt, err := CoordsToPoint(test.x, test.y)
 		if err != nil {
 			t.Fatalf(`Expected CoordsToPoint("%s", "%s") to return nil, returned %q`, test.x, test.y, err)
@@ -119,6 +122,14 @@ func TestDistanceCorners(t *testing.T) {
 	for _, test := range tests {
 		if res := DistanceCorners(test.FromPt, test.FromC, test.ToPt, test.ToC); res != test.Result {
 			t.Fatalf("expected DistanceCorners(%v, %s, %v, %s) == %d, but was %d", test.FromPt, test.FromC, test.ToPt, test.ToC, test.Result, res)
+		}
+	}
+}
+
+func TestPointToCoords(t *testing.T) {
+	for _, test := range coordTests {
+		if res := PointToCoords(image.Pt(test.resX, test.resY)); res != strings.ToLower(test.x+test.y) {
+			t.Fatalf("expected PointToCoords(%d,%d) == %s%s, but was %q", test.resX, test.resY, test.x, test.y, res)
 		}
 	}
 }
