@@ -550,10 +550,19 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 				orig := tok.Coordinate
 				tab.Tokens[c.Context.Id()][name] = tok.WithCoords(coord)
 				lines = append(lines,
-					mark.Line{A: orig, B: coord, CA: "ne", CB: "ne", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
-					mark.Line{A: orig, B: coord, CA: "se", CB: "se", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
-					mark.Line{A: orig, B: coord, CA: "sw", CB: "sw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
 					mark.Line{A: orig, B: coord, CA: "nw", CB: "nw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+					mark.Line{
+						A:  orig.Add(image.Pt(tok.Size-1, 0)),
+						B:  coord.Add(image.Pt(tok.Size-1, 0)),
+						CA: "ne", CB: "ne", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+					mark.Line{
+						A:  orig.Add(image.Pt(tok.Size-1, tok.Size-1)),
+						B:  coord.Add(image.Pt(tok.Size-1, tok.Size-1)),
+						CA: "se", CB: "se", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+					mark.Line{
+						A:  orig.Add(image.Pt(0, tok.Size-1)),
+						B:  coord.Add(image.Pt(0, tok.Size-1)),
+						CA: "sw", CB: "sw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
 				)
 				dist[name] = dist[name] + conv.Distance(orig, coord)
 			}
