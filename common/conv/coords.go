@@ -33,16 +33,16 @@ func RCToPoint(rc string, directionAllowed bool) (point image.Point, direction s
 	}
 }
 
-func numberToLetters(n int) string {
+func ToLetter(n int) string {
 	if n < 0 {
-		return "-" + numberToLetters(-n)
+		return "-" + ToLetter(-n)
 	}
 
 	if n < 26 {
-		return string(n + int('a'))
+		return string(n + int('A'))
 	}
 
-	return numberToLetters(n/26) + numberToLetters(n%26)
+	return ToLetter(n/26) + ToLetter(n%26)
 }
 
 func PointToCoords(pt image.Point) string {
@@ -50,7 +50,7 @@ func PointToCoords(pt image.Point) string {
 	if pt.Y >= 0 {
 		pt.Y++
 	}
-	return numberToLetters(pt.X) + strconv.Itoa(pt.Y)
+	return ToLetter(pt.X) + strconv.Itoa(pt.Y)
 }
 
 func CoordsToPoint(x, y string) (image.Point, error) {

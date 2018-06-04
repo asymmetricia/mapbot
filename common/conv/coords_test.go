@@ -128,7 +128,7 @@ func TestDistanceCorners(t *testing.T) {
 
 func TestPointToCoords(t *testing.T) {
 	for _, test := range coordTests {
-		if res := PointToCoords(image.Pt(test.resX, test.resY)); res != strings.ToLower(test.x+test.y) {
+		if res := PointToCoords(image.Pt(test.resX, test.resY)); strings.ToLower(res) != strings.ToLower(test.x+test.y) {
 			t.Fatalf("expected PointToCoords(%d,%d) == %s%s, but was %q", test.resX, test.resY, test.x, test.y, res)
 		}
 	}
