@@ -527,6 +527,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 	}
 
 	lines := []mark.Line{}
+	dist := map[string]int{}
 
 	lastToken := ""
 	for name, coords := range tokens {
@@ -554,6 +555,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 					mark.Line{A: orig, B: coord, CA: "sw", CB: "sw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
 					mark.Line{A: orig, B: coord, CA: "nw", CB: "nw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
 				)
+				dist[name] = dist[name] + conv.Distance(orig, coord)
 			}
 		}
 		lastToken = name
@@ -575,5 +577,13 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		log.Errorf("error saving context: %s", err)
 	}
 
-	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithLines(lines)))
+	notes := []string{}
+	for name, d := range dist {
+		notes = append(notes, fmt.Sprintf("%s moved %dft", name, d))
+	}
+
+	h.Publish(c.
+		WithType(hub.CommandType(c.From)).
+		WithPayload(tab.WithLines(lines).WithNote(strings.Join(notes, "; "))),
+	)
 }

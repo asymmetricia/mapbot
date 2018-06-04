@@ -45,6 +45,7 @@ type Tabula struct {
 	Dpi        float32
 	GridColor  color.Color
 	Masks      map[string]*mask.Mask
+	Note       string // Not saved to database; just used when rendering.
 	Tokens     map[types.ContextId]map[string]Token
 	Version    int
 
