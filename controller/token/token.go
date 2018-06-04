@@ -336,7 +336,10 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 		if bits != nil {
 			name = name + " (`" + bits[1] + "`)"
 		}
-		rep += fmt.Sprintf("\n- %s at (%d,%d)", name, token.Coordinate.X, token.Coordinate.Y)
+		rep += fmt.Sprintf("\n- %s at %s",
+			name,
+			strings.ToUpper(conv.PointToCoords(image.Pt(token.Coordinate.X, token.Coordinate.Y))),
+		)
 
 		r, g, b, a := token.Color().RGBA()
 		if a > 0 {
