@@ -314,26 +314,6 @@ func (t *Tabula) addTokenLights(in image.Image, ctx context.Context, offset imag
 	return t.addMarkSlice(in, marks, offset)
 }
 
-type TokensByNameThenSize struct {
-	names  []string
-	tokens map[string]Token
-}
-
-func (t *TokensByNameThenSize) Len() int {
-	return len(t.names)
-}
-
-func (t *TokensByNameThenSize) Less(a, b int) bool {
-	return t.names[a] < t.names[b] ||
-		(t.names[a] == t.names[b] && t.tokens[t.names[a]].Size < t.tokens[t.names[b]].Size)
-}
-
-func (t *TokensByNameThenSize) Swap(a, b int) {
-	t.names[a], t.names[b] = t.names[b], t.names[a]
-}
-
-var _ sort.Interface = (*TokensByNameThenSize)(nil)
-
 func (t *Tabula) addTokens(in image.Image, ctx context.Context, offset image.Point) error {
 	drawable, ok := in.(draw.Image)
 	if !ok {
@@ -347,7 +327,12 @@ func (t *Tabula) addTokens(in image.Image, ctx context.Context, offset image.Poi
 		names[n] = name
 		n++
 	}
-	sort.Sort(&TokensByNameThenSize{names, tokens})
+
+	// note reversal of i and j in args; to cause a reverse sort
+	sort.Slice(names, func(j, i int) bool {
+		return tokens[names[i]].Size < tokens[names[j]].Size ||
+			(tokens[names[i]].Size == tokens[names[j]].Size && names[i] < names[j])
+	})
 
 	for _, tokenName := range names {
 		token := tokens[tokenName]
