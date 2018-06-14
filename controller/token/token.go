@@ -336,7 +336,10 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 		if bits != nil {
 			name = name + " (`" + bits[1] + "`)"
 		}
-		rep += fmt.Sprintf("\n- %s at (%d,%d)", name, token.Coordinate.X, token.Coordinate.Y)
+		rep += fmt.Sprintf("\n- %s at %s",
+			name,
+			strings.ToUpper(conv.PointToCoords(image.Pt(token.Coordinate.X, token.Coordinate.Y))),
+		)
 
 		r, g, b, a := token.Color().RGBA()
 		if a > 0 {
@@ -524,6 +527,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 	}
 
 	lines := []mark.Line{}
+	dist := map[string]int{}
 
 	lastToken := ""
 	for name, coords := range tokens {
@@ -546,11 +550,21 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 				orig := tok.Coordinate
 				tab.Tokens[c.Context.Id()][name] = tok.WithCoords(coord)
 				lines = append(lines,
-					mark.Line{A: orig, B: coord, CA: "ne", CB: "ne", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
-					mark.Line{A: orig, B: coord, CA: "se", CB: "se", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
-					mark.Line{A: orig, B: coord, CA: "sw", CB: "sw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
 					mark.Line{A: orig, B: coord, CA: "nw", CB: "nw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+					mark.Line{
+						A:  orig.Add(image.Pt(tok.Size-1, 0)),
+						B:  coord.Add(image.Pt(tok.Size-1, 0)),
+						CA: "ne", CB: "ne", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+					mark.Line{
+						A:  orig.Add(image.Pt(tok.Size-1, tok.Size-1)),
+						B:  coord.Add(image.Pt(tok.Size-1, tok.Size-1)),
+						CA: "se", CB: "se", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
+					mark.Line{
+						A:  orig.Add(image.Pt(0, tok.Size-1)),
+						B:  coord.Add(image.Pt(0, tok.Size-1)),
+						CA: "sw", CB: "sw", Color: color.RGBA{R: 255, G: 0, B: 0, A: 255}},
 				)
+				dist[name] = dist[name] + conv.Distance(orig, coord)
 			}
 		}
 		lastToken = name
@@ -572,5 +586,13 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		log.Errorf("error saving context: %s", err)
 	}
 
-	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithLines(lines)))
+	notes := []string{}
+	for name, d := range dist {
+		notes = append(notes, fmt.Sprintf("%s moved %dft", name, d))
+	}
+
+	h.Publish(c.
+		WithType(hub.CommandType(c.From)).
+		WithPayload(tab.WithLines(lines).WithNote(strings.Join(notes, "; "))),
+	)
 }

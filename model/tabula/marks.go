@@ -108,3 +108,8 @@ func (t *Tabula) WithLines(lines []mark.Line) *Tabula {
 	}
 	return t
 }
+
+func (t *Tabula) WithNote(note string) *Tabula {
+	t.Note = note
+	return t
+}

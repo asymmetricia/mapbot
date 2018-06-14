@@ -11,6 +11,7 @@ import (
 	"github.com/golang/freetype/truetype"
 	"github.com/nfnt/resize"
 	"github.com/pdbogen/mapbot/common/cache"
+	"github.com/pdbogen/mapbot/common/conv"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbDraw "github.com/pdbogen/mapbot/common/draw"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -45,6 +46,7 @@ type Tabula struct {
 	Dpi        float32
 	GridColor  color.Color
 	Masks      map[string]*mask.Mask
+	Note       string // Not saved to database; just used when rendering.
 	Tokens     map[types.ContextId]map[string]Token
 	Version    int
 
@@ -578,30 +580,15 @@ func (t *Tabula) printAt(i draw.Image, what string, x float32, y float32, width 
 	)
 }
 
-func toLetter(p int) string {
-	letters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-		"N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
-	if p < 0 {
-		return "-" + toLetter(-p-1)
-	}
-	c := letters[p%26] // 0..25
-	tmp := p
-	for tmp > 25 {
-		tmp = int(tmp/26) - 1
-		c = letters[tmp%26] + c
-	}
-	return c
-}
-
 func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int, offset image.Point) draw.Image {
 	result := i //copyImage(i)
 
 	rows := int(float32(i.Bounds().Max.Y)/t.Dpi + 0.2)
 	cols := int(float32(i.Bounds().Max.X)/t.Dpi + 0.2)
 	// 0 1 2 3 4 ... 25 26 27 28
-	// A B C D E ... Y  Z  AA AB
+	// A B C D E ... Y  Z  BA BB
 	for x := first_x; x < first_x+cols; x++ {
-		t.printAt(result, toLetter(x), float32(x), float32(first_y), 1, 0.5, Middle, Left, offset)
+		t.printAt(result, conv.ToLetter(x), float32(x), float32(first_y), 1, 0.5, Middle, Left, offset)
 	}
 
 	for y := first_y; y < first_y+rows; y++ {

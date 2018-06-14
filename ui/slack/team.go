@@ -338,14 +338,14 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 			return
 		}
 
-		if _, err := t.uploadImage(img, []string{channel}); err != nil {
+		if _, err := t.uploadImage(msg.Note, img, []string{channel}); err != nil {
 			repErr("uploading", err)
 			return
 		}
 	}
 }
 
-func (t *Team) uploadImage(img image.Image, channels []string) (string, error) {
+func (t *Team) uploadImage(title string, img image.Image, channels []string) (string, error) {
 	repErr := func(s string, e error) error { return fmt.Errorf("%s: %s", s, e) }
 	buf, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -360,6 +360,7 @@ func (t *Team) uploadImage(img image.Image, channels []string) (string, error) {
 
 	upload, err := t.botClient.UploadFile(
 		slack.FileUploadParameters{
+			Title:    title,
 			Filetype: mime.TypeByExtension(".png"),
 			Channels: channels,
 			File:     buf.Name(),
