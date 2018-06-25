@@ -83,10 +83,11 @@ type WorkflowState struct {
 type ChallengeFunc func(opaque interface{}) *WorkflowMessage
 
 // Response is idempotent from the state machine perspective but may have side
-// effects like modifying Tabula or tokens. It executes the action associated
-// with a state for the given choice. Usually the 'choice' is one of the
-// options provided in the corresponding state's challenge's WorkflowMessage,
-// but especially for `enter` states can be potentially any string.
+// effects (thus, implementers should ensure that side effects are idempotent).
+// It executes the action associated with a state for the given choice.
+// Usually the 'choice' is one of the options provided in the corresponding
+// state's challenge's WorkflowMessage, but especially for `enter` states can
+// be potentially any string.
 type ResponseFunc func(opaque interface{}, choice *string) (newState string, newOpaque interface{})
 
 type WorkflowMessage struct {
