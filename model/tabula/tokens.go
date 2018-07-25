@@ -228,7 +228,7 @@ func (t *Tabula) drawAtAlign(i draw.Image, obj image.Image, x float32, y float32
 
 	objRect := image.Rect(
 		int(x*t.Dpi)+offset.X+int(inset)+left, int(y*t.Dpi)+offset.Y+int(inset)+top,
-		int((x+1)*t.Dpi*size)+offset.X-int(inset)+left, int((y+1)*t.Dpi*size)+offset.Y-int(inset)+top,
+		int((x+size)*t.Dpi)+offset.X-int(inset)+left, int((y+size)*t.Dpi)+offset.Y-int(inset)+top,
 	)
 
 	log.Debugf("should draw emoji %dx%d in %v", targetWidth, targetHeight, objRect)
