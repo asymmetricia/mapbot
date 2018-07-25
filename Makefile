@@ -12,7 +12,7 @@ restart: .push
 push: .push
 .push: .docker
 	@ set -e; \
-	eval "$$(aws ecr get-login)" && \
+	eval "$$(aws ecr get-login --no-include-email)" && \
 	docker push ${IMAGE_URL} && \
 	touch .push
 
