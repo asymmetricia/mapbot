@@ -188,6 +188,7 @@ func (t *Tabula) drawAt(i draw.Image, obj image.Image, x float32, y float32, siz
 }
 
 func (t *Tabula) drawAtAlign(i draw.Image, obj image.Image, x float32, y float32, size float32, inset int, vert VerticalAlignment, horiz HorizontalAlignment, offset image.Point) {
+	log.Debugf("drawing %v object at (%.2f,%.2f), size %.2f, inset %d, valign %v, halign %v, offset %v", obj.Bounds(), x, y, size, inset, vert, horiz, offset)
 	oX := obj.Bounds().Dx()
 	oY := obj.Bounds().Dy()
 	targetSize := uint(size*t.Dpi - 2*float32(inset))
@@ -225,14 +226,16 @@ func (t *Tabula) drawAtAlign(i draw.Image, obj image.Image, x float32, y float32
 		left = int(size*t.Dpi) - 2*inset - targetWidth
 	}
 
-	log.Debugf("should draw emoji %dx%d at (%d,%d)", targetWidth, targetHeight, left, top)
+	objRect := image.Rect(
+		int(x*t.Dpi)+offset.X+int(inset)+left, int(y*t.Dpi)+offset.Y+int(inset)+top,
+		int((x+1)*t.Dpi*size)+offset.X-int(inset)+left, int((y+1)*t.Dpi*size)+offset.Y-int(inset)+top,
+	)
+
+	log.Debugf("should draw emoji %dx%d in %v", targetWidth, targetHeight, objRect)
 
 	draw.Draw(
 		i,
-		image.Rect(
-			int(x*t.Dpi)+offset.X+int(inset)+left, int(y*t.Dpi)+offset.Y+int(inset)+top,
-			int((x+1)*t.Dpi*size)+offset.X-int(inset)+left, int((y+1)*t.Dpi*size)+offset.Y-int(inset)+top,
-		),
+		objRect,
 		scaled,
 		image.Pt(0, 0),
 		draw.Over,
