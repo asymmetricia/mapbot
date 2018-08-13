@@ -17,6 +17,14 @@ I'm experimenting with providing mapbot as a service. You can reach the running
 instance of mapbot at https://mapbot.cernu.us and add it to your own Slack
 team. Give it a try, and please let me know if you have any feedback.
 
+After that, I recommend reading the following sections:
+
+* [Creating a Map](#creating-a-map)
+* [Aligning the Grid](#aligning-the-grid)
+* [What Can Mapbot Do?](#what-can-mapbot-do)
+
+### How do I run it myself?
+
 If you're interested in running your own instance of mapbot, please see "How
 do I run it?" below. If you've already done that, or someone else has done it
 for you, read on...
@@ -41,7 +49,17 @@ Maps are *yours*! Nobody else can use your maps unless you make them active in a
 
 ![Map Add Screenshot](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-add-map.png)
 
-#### Sizing and Aligning the Grid
+#### Aligning the Grid
+
+**New feature**: Mapbot can now guide you through the process of aligning a
+grid to your map. This is intended to be much easier and much less
+trial-and-error than the old, manual process. To get started, after you've
+added a map, just use the `align` command to begin, like: `map add test
+https://…` and then `map align test`.
+
+As always, I welcome any feedback or suggestions around this process.
+
+##### Manual Alignment
 
 This is unfortunately the most painful part of the process at present, since it involves a lot of small changes and trial and error.
 
@@ -92,6 +110,167 @@ Once you've selected the map, you (and anyone else in the channel!) can add toke
 ![Map Place Token](https://raw.githubusercontent.com/wiki/pdbogen/mapbot/mapbot-screen-place-token.png)
 
 Token names must be unique; but you can use either short words or emoji; an emoji token will be rendered in the full square.
+
+## What Can Mapbot Do?
+
+New features are added from time to time; for the gory details, feel free to read the commit log. What follows is an overview of mapbot's major features.
+
+### Move and Place Tokens
+
+The heart of mapbot is the ability to move tokens around on a cartesian grid,
+with a background image- a map. Once a map is made active in a channel (`map
+select <map-name>`), any person in that channel can manipulate any of the
+tokens on the map.
+
+#### Adding and Moving Tokens
+
+Adding and moving tokens uses the same command and the same process: `token
+add <name> <location>[ <location2> … <locationN>]` or `token move <name> <location>` (these commands do
+the exact same thing; the aliases help make interaction more natural.)
+
+Examples:
+
+* Add token `:simple_smile:` to the map at location A1: `token add
+:simple_smile: a1`
+
+* Move the token `:simple_smile:` to location Z10: `token add :simple_smile:
+z10` or `token move :simple_smile: z10`
+
+* Show a series of movements; from the starting location (implied, if the
+token is on the current map), to x9, c9, c1, a1, in order): `token move
+:simple_smile: x9 c9 c1 a1`
+
+When moving a token, Mapbot will show a trail representing the token's path,
+and calculate the distance moved according to Pathfinder rules.
+
+**Advanced**: As a player, you typically only move around your own token.
+Mapbot makes this easier- if you don't specify a token for an `add` or `move`
+operation, it will effect whatever the last token you moved was: `token move
+a1`
+
+**Extra Advanced**: To help out GMs, you can add multiple tokens at once. Just
+provide additional `<token name> <location>` pairs, like this example: `token
+add foo a1 bar a2 fizz b3 buzz b4`
+
+#### Removing Tokens
+
+Removing a token is easy- `token remove <token_name>`. You can remove multiple
+tokens at a time, too; just list out the names, like this example: `token
+remove foo bar fizz buzz`
+
+If you want to remove _all_ the tokens on the map, you can use the `clear`
+sub-command: `token clear`.
+
+Sometimes you want to _replace_ a token- maybe you mistyped the name, or maybe
+there's a dramatic reveal! You can use the `swap` or `replace` sub-commands to
+change the name of a token while keeping everything else the same: `token swap
+foo bar`.
+
+#### Token Special Effects
+
+Here are some additional tips:
+
+* If you want to use the same emoji multiple times (maybe you're fighting
+three trolls?) you can append a string label after the emoji to differentiate
+them, like this: `:troll:1` `:troll:2` `:troll:bob`. Make sure there are no
+spaces!
+
+* Need large, huge, giant tokens? No problem! Use `token size <name> <N>` to
+tell mapbot that the token should take up multiple squares. The top-left
+square is always treated as the main square, for moving tokens around and the
+like.
+
+* Need to represent auras or the effect of lights? Use `token light <name>
+<radius>`. In fact, you can specify up to three radii- but be aware that the
+second radius will conceal the first; and the third radius will conceal the
+second. For example, `token light fizz 10 20 30` will only show the last, 30ft
+radius! But `token light fizz 30 20 10` will show three concentric circles.
+
+### Map Special Effects
+
+Mapbot can do a few things on the map to help with your gameplay: Marks, which
+can outline squares, draw lines, and indicate auras and areas-of-effect; and
+Checks, which are exactly the same- but temporary.
+
+#### Mark Squares
+
+The easiest type of mark is marking a list of squares. Mark has pretty
+flexible syntax, but we'll start easy:
+
+* `mark a1 red` -- Marks the square at A1 red. By default, colors are
+translucent, allowing you to see the map behind the color. You can always get
+a solid version of the color by using `solidred` instead of `red`. You can
+also use an HTML color code, like `#FF0000` for solid red; or `#FF0000C0` for
+translucent red.
+
+You can mark multiple squares at once, too:
+
+* `mark a1 a2 b1 b2 red`
+
+And you can even mark multiple squares different colors:
+
+* `mark a1 red a2 green b1 b2 orange`
+
+You can mark the edges or corners of squares by adding a cardinal direction to the coordinate:
+
+* `mark a1ne red` marks the northeast corner of square a1 red. (This is also
+the northwest corner of square b2, etc.)
+
+* `mark a1e red` marks the entire eastern side of square a1 red. This is also
+the western side of square b2.
+
+You can _un_ mark a square by using the special color `clear`:
+
+* `mark a1 clear`
+
+Or you can unmark _every_ square by using the special _subcommand_ `clear`:
+
+* `mark clear`
+
+#### Marking Shapes
+
+Instead of specifying one color at a time, you can also mark shapes- squares, circles, cones; and simple lines.
+
+You can make squares by specifying the two corners:
+
+* `mark square(a1,d4) red`
+
+You can mark circles by specifying the center and a **radius**:
+
+* `mark circle(c3,10) red`
+
+In Pathfinder, circles often (but not always) originate at a grid intersection
+instead of a square. Mapbot can calculate this for you, too. Just indicate
+which corner fo the square is the center by adding `ne`, `se`, `sw`, or `nw`
+(for northeast, southeast, southwest, or northwest) to the coordinate:
+
+* `mark circle(c3se,10) red`
+
+Cones are similar to circles, though they must start from a corner /
+intersection instead of an entire square. You also need to specify the
+direction, which can be any of `n`, `ne`, `e`, `se`, `s`, `sw`, `w`, or `nw`.
+
+Mapbot should be able to draw arbitrarily-sized cones following the spirit of
+the Pathfinder rules for cones; and the cones for sizes documented in the
+books are guaranteed to match. But, if you identiy any problems, don't
+hesitate to reach out!
+
+* `mark cone(c3se,e,15) red`
+
+To check cover or charge lanes, you can use the `lines` shape. Lines can be
+drawn from a corner or a square, to another corner or square.
+
+Draw lines from a corner to a square to check for ranged cover:
+
+* `mark lines(a1se,f10) red`
+
+Draw lines from a corner to a corner to check for line of effect / line of sight:
+
+* `mark lines(a1se,f10nw) red`
+
+Draw lines from a square to a square to check for a charge lane:
+
+* `mark lines(a1,f10) red`
 
 ## How do I run it?
 
