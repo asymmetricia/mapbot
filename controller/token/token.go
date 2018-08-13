@@ -87,6 +87,11 @@ func cmdLight(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
+	if _, ok := tab.Tokens[c.Context.Id()][args[0]]; !ok {
+		h.Error(c, fmt.Sprintf("There's no token `%s` on the map!", args[0]))
+		return
+	}
+
 	dim, err := strconv.Atoi(args[1])
 	if err != nil {
 		h.Error(c, fmt.Sprintf("`%s` is not a number of feet: %s", args[1], err))
