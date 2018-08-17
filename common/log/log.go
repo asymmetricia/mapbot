@@ -10,3 +10,9 @@ var format = logging.MustStringFormatter(
 func init() {
 	logging.SetFormatter(format)
 }
+
+func Errorf(fmt string, a ...interface{}) {
+	Log.ExtraCalldepth++
+	Log.Errorf(fmt, a...)
+	Log.ExtraCalldepth--
+}

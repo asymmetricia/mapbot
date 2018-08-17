@@ -14,8 +14,10 @@ import (
 	markCtrl "github.com/pdbogen/mapbot/controller/mark"
 	maskController "github.com/pdbogen/mapbot/controller/mask"
 	tokenController "github.com/pdbogen/mapbot/controller/token"
+	"github.com/pdbogen/mapbot/controller/web"
 	workflowController "github.com/pdbogen/mapbot/controller/workflow"
 	"github.com/pdbogen/mapbot/hub"
+	httpUi "github.com/pdbogen/mapbot/ui/http"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
@@ -78,6 +80,7 @@ func main() {
 	tokenController.Register(hub)
 	workflowController.Register(hub)
 	markCtrl.Register(hub)
+	web.Register(hub, *Tls, *Domain)
 
 	slackUi, err := slack.New(
 		*SlackClientToken,
@@ -104,12 +107,15 @@ func main() {
 		blobserv.Instance = &blobserv.BlobServ{UrlBase: "http://" + *Domain + "/blob/"}
 	}
 
+	httpUi := httpUi.New(dbHandle, hub)
+
 	router := http.NewServeMux()
 	router.HandleFunc("/action", slackUi.Action)
 	router.HandleFunc("/oauth", slackUi.OAuthPost)
 	router.HandleFunc("/install", slackUi.OAuthAutoStart)
 	router.HandleFunc("/blob/", blobserv.Instance.Serve)
 	router.HandleFunc("/", slackUi.OAuthGet)
+	router.Handle("/ui/", httpUi)
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", *Port),

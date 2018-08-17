@@ -190,6 +190,17 @@ var schema = []Migration{
 			`)`},
 		map[string]string{"any": `DROP TABLE last_token`},
 	},
+	Migration{
+		21,
+		map[string]string{"any": `
+			CREATE TABLE IF NOT EXISTS web_sessions (
+				session_id VARCHAR(64),
+				context_id VARCHAR(128) REFERENCES contexts(context_id) ON DELETE CASCADE,
+				PRIMARY KEY (session_id)
+			)
+		`},
+		map[string]string{"any": `DROP TABLE IF EXISTS web_sessions`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {
