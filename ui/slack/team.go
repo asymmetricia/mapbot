@@ -379,7 +379,7 @@ func (t *Team) Context(ChannelId string) context.Context {
 		EmojiCache: t.EmojiCache,
 	}
 	ret.ContextId = types.ContextId(t.Info.ID + "-" + ChannelId)
-	if err := ret.Load(); err != nil {
+	if err := ret.Load(db.Instance); err != nil {
 		log.Errorf("failed while hydrating context %s from the db: %s", ret.ContextId, err)
 	}
 

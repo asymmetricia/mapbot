@@ -3,6 +3,7 @@ package databaseContext
 import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
+	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/types"
 	"image"
@@ -155,7 +156,15 @@ func (dc *DatabaseContext) loadLastTokens() error {
 	return nil
 }
 
-func (dc *DatabaseContext) Load() error {
+func Load(db anydb.AnyDb, id types.ContextId) (*DatabaseContext, error) {
+	ret := &DatabaseContext{ContextId: id}
+	if err := ret.Load(db); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (dc *DatabaseContext) Load(db anydb.AnyDb) error {
 	if err := dc.loadMarks(); err != nil {
 		return err
 	}
@@ -164,7 +173,7 @@ func (dc *DatabaseContext) Load() error {
 		return err
 	}
 
-	res, err := db.Instance.Query("SELECT active_tabula, MinX, MinY, MaxX, MaxY FROM contexts WHERE context_id=$1", dc.ContextId)
+	res, err := db.Query("SELECT active_tabula, MinX, MinY, MaxX, MaxY FROM contexts WHERE context_id=$1", dc.ContextId)
 	if err != nil {
 		return err
 	}
