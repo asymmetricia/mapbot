@@ -63,7 +63,7 @@ func (t *Tabula) String() string {
 
 var tabulaeInMemory = map[types.TabulaId]*Tabula{}
 
-func Get(db anydb.AnyDb, id types.TabulaId) (*Tabula, error) {
+func Load(db anydb.AnyDb, id types.TabulaId) (*Tabula, error) {
 	if t, ok := tabulaeInMemory[id]; ok {
 		return t, nil
 	}

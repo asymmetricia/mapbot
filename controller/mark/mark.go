@@ -40,7 +40,7 @@ func clearMarks(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -108,7 +108,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)

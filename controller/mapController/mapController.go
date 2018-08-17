@@ -88,7 +88,7 @@ func cmdAutoZoom(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -178,7 +178,7 @@ loop:
 		return
 	}
 
-	t, err := tabula.Get(db.Instance, *tabId)
+	t, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "error loading active map")
 		log.Errorf("error loading active map %d: %s", tabId, err)
@@ -273,7 +273,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		}
 
 		var err error
-		t, err = tabula.Get(db.Instance, *tabId)
+		t, err = tabula.Load(db.Instance, *tabId)
 		if err != nil {
 			h.Error(c, "error loading active map")
 			log.Errorf("error loading active map %d: %s", tabId, err)
@@ -390,7 +390,7 @@ func cmdShow(h *hub.Hub, c *hub.Command) {
 			}
 
 			var err error
-			t, err = tabula.Get(db.Instance, *tabId)
+			t, err = tabula.Load(db.Instance, *tabId)
 			if err != nil {
 				h.Error(c, "error loading active map")
 				log.Errorf("error loading active map %d: %s", tabId, err)

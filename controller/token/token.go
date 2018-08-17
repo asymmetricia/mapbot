@@ -65,7 +65,7 @@ func cmdLight(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -160,7 +160,7 @@ func cmdSize(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -218,7 +218,7 @@ func cmdSwap(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -277,7 +277,7 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -322,7 +322,7 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -392,7 +392,7 @@ func cmdRemove(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -431,7 +431,7 @@ func cmdClear(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
@@ -524,7 +524,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	tab, err := tabula.Get(db.Instance, *tabId)
+	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
 		h.Error(c, "an error occured loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)

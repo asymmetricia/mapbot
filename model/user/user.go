@@ -151,7 +151,7 @@ func Get(db anydb.AnyDb, id types.UserId) (*User, error) {
 			return nil, fmt.Errorf("retrieving results: %s", err)
 		}
 
-		tab, err := tabula.Get(db, tid)
+		tab, err := tabula.Load(db, tid)
 		if err != nil {
 			log.Errorf("retrieving tabula %d: %s", tid, err)
 			continue
