@@ -133,3 +133,22 @@ func TestPointToCoords(t *testing.T) {
 		}
 	}
 }
+
+func TestToLetter(t *testing.T) {
+	type test struct {
+		in  int
+		out string
+	}
+	tests := []test{
+		{0, "A"},
+		{-1, "-B"},
+		{1, "B"},
+		{26, "BA"},
+	}
+	for i, test := range tests {
+		res := ToLetter(test.in)
+		if res != test.out {
+			t.Fatalf("test %d: expected toLetter(%d) to produce %q, but result was %q", i, test.in, test.out, res)
+		}
+	}
+}
