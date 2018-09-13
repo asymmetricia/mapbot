@@ -217,6 +217,12 @@
 			"revisionTime": "2017-11-19T17:43:26Z"
 		},
 		{
+			"checksumSHA1": "/youEgKjS8zQUPvHBUY7kr17TmY=",
+			"path": "github.com/shurcooL/vfsgen",
+			"revision": "12c1e538e8c6d4445816c38e2ac9c233619bd838",
+			"revisionTime": "2018-09-09T23:32:25Z"
+		},
+		{
 			"checksumSHA1": "YMGD3aMJlxhrWBzLlTqPhTLyxG4=",
 			"path": "github.com/spf13/cobra",
 			"revision": "99dc123558852f67743bd0b2caf8383cb3c6d720",
