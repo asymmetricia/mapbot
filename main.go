@@ -17,6 +17,9 @@ import (
 	"github.com/pdbogen/mapbot/controller/web"
 	workflowController "github.com/pdbogen/mapbot/controller/workflow"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/context"
+	"github.com/pdbogen/mapbot/model/context/databaseContext"
+	"github.com/pdbogen/mapbot/model/types"
 	httpUi "github.com/pdbogen/mapbot/ui/http"
 	"github.com/pdbogen/mapbot/ui/slack"
 	"golang.org/x/crypto/acme/autocert"
@@ -74,13 +77,6 @@ func main() {
 	}
 
 	hub := &hub.Hub{}
-	mapController.Register(hub)
-	maskController.Register(hub)
-	helpController.Register(hub)
-	tokenController.Register(hub)
-	workflowController.Register(hub)
-	markCtrl.Register(hub)
-	web.Register(hub, *Tls, *Domain)
 
 	slackUi, err := slack.New(
 		*SlackClientToken,
@@ -96,6 +92,21 @@ func main() {
 		log.Fatalf("unable to start Slack module: %s", err)
 	}
 
+	prov := &context.ContextProvider{
+		map[types.ContextType]context.ContextProviderFunc{
+			"slack": slackUi.GetContext,
+			"db":    databaseContext.GetContext(dbHandle),
+		},
+	}
+
+	mapController.Register(hub)
+	maskController.Register(hub)
+	helpController.Register(hub)
+	tokenController.Register(hub)
+	workflowController.Register(hub)
+	markCtrl.Register(hub)
+	web.Register(hub, *Tls, *Domain)
+
 	mgr := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(*Domain),
@@ -107,7 +118,7 @@ func main() {
 		blobserv.Instance = &blobserv.BlobServ{UrlBase: "http://" + *Domain + "/blob/"}
 	}
 
-	httpUi := httpUi.New(dbHandle, hub)
+	httpUi := httpUi.New(dbHandle, hub, prov)
 
 	router := http.NewServeMux()
 	router.HandleFunc("/action", slackUi.Action)

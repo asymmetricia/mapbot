@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
+	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/types"
 	"image"
@@ -16,6 +17,16 @@ type DatabaseContext struct {
 	MinX, MinY, MaxX, MaxY int
 	Marks                  map[types.TabulaId]map[image.Point]map[string]mark.Mark
 	LastTokens             map[types.UserId]string
+}
+
+func GetContext(db anydb.AnyDb) context.ContextProviderFunc {
+	return func(id types.ContextId) (context.Context, error) {
+		return Load(db, id)
+	}
+}
+
+func (DatabaseContext) Type() types.ContextType {
+	return types.ContextType("db")
 }
 
 func (dc *DatabaseContext) Id() types.ContextId {

@@ -24,6 +24,7 @@ type Mask struct {
 	Clear  bool
 }
 
+type ContextType string
 type ContextId string
 
 func (c ContextId) Value() (driver.Value, error) {

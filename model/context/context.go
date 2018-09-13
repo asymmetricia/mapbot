@@ -7,6 +7,7 @@ import (
 )
 
 type Context interface {
+	Type() types.ContextType
 	Id() types.ContextId
 	GetActiveTabulaId() *types.TabulaId
 	SetActiveTabulaId(*types.TabulaId)

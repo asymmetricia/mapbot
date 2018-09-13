@@ -20,7 +20,7 @@ func GenerateWebSession(tls bool, domain string) func(h *hub.Hub, c *hub.Command
 		proto = "https"
 	}
 	return func(h *hub.Hub, c *hub.Command) {
-		s, err := webSession.NewWebSession(db.Instance, c.Context.Id())
+		s, err := webSession.NewWebSession(db.Instance, c.Context.Id(), c.Context.Type())
 		if err != nil {
 			h.Error(c, "sorry, unable to generate a web session for you")
 			log.Errorf("unable to generate web session: %v", err)

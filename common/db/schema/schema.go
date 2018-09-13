@@ -201,6 +201,11 @@ var schema = []Migration{
 		`},
 		map[string]string{"any": `DROP TABLE IF EXISTS web_sessions`},
 	},
+	Migration{
+		22,
+		map[string]string{"any": `ALTER TABLE web_sessions ADD COLUMN context_type VARCHAR(32)`},
+		map[string]string{"any": `ALTER TABLE web_sessions DROP COLUMN context_type`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {

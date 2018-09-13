@@ -5,6 +5,7 @@ import (
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/webSession"
 	"image/png"
@@ -12,17 +13,18 @@ import (
 )
 
 type Http struct {
-	db  anydb.AnyDb
-	hub *hub.Hub
-	mux *http.ServeMux
+	db   anydb.AnyDb
+	hub  *hub.Hub
+	mux  *http.ServeMux
+	prov *context.ContextProvider
 }
 
 func (h *Http) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	h.mux.ServeHTTP(rw, req)
 }
 
-func New(db anydb.AnyDb, hub *hub.Hub) *Http {
-	ret := &Http{db: db, hub: hub}
+func New(db anydb.AnyDb, hub *hub.Hub, prov *context.ContextProvider) *Http {
+	ret := &Http{db: db, hub: hub, prov: prov}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", ret.GetMap)
 	ret.mux = mux
@@ -55,7 +57,7 @@ func (h *Http) GetMap(rw http.ResponseWriter, req *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, err := sess.GetContext(h.db)
+	ctx, err := sess.GetContext(h.prov)
 	if err != nil {
 		http.Error(rw, "internal server error", http.StatusInternalServerError)
 		log.Errorf("retrieving context for session %v: %v", sess, err)

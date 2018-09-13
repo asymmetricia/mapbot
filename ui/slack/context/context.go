@@ -7,6 +7,7 @@ import (
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	contextModel "github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/context/databaseContext"
+	"github.com/pdbogen/mapbot/model/types"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -24,6 +25,10 @@ type SlackContext struct {
 	databaseContext.DatabaseContext
 	Emoji      map[string]string
 	EmojiCache map[string]image.Image
+}
+
+func (SlackContext) Type() types.ContextType {
+	return types.ContextType("slack")
 }
 
 func (sc *SlackContext) IsEmoji(name string) bool {

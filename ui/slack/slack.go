@@ -7,8 +7,11 @@ import (
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/common/rand"
 	"github.com/pdbogen/mapbot/hub"
+	"github.com/pdbogen/mapbot/model/context"
+	"github.com/pdbogen/mapbot/model/types"
 	"golang.org/x/oauth2"
 	SlackOAuth "golang.org/x/oauth2/slack"
+	"strings"
 	"sync"
 )
 
@@ -75,4 +78,17 @@ type SlackUi struct {
 	teamWg            sync.WaitGroup
 	botHub            *hub.Hub
 	verificationToken string
+}
+
+func (s *SlackUi) GetContext(id types.ContextId) (context.Context, error) {
+	teamComps := strings.Split(string(id), "-")
+	if len(teamComps) != 2 {
+		return nil, fmt.Errorf("slack context ID expected to be TEAM-CHANNEL, but was %s", id)
+	}
+	for _, team := range s.Teams {
+		if team.Info.ID == teamComps[0] {
+			return team.Context(teamComps[1]), nil
+		}
+	}
+	return nil, fmt.Errorf("team %q not found", teamComps[0])
 }

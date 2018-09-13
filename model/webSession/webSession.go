@@ -5,19 +5,20 @@ import (
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/common/rand"
 	"github.com/pdbogen/mapbot/model/context"
-	"github.com/pdbogen/mapbot/model/context/databaseContext"
 	"github.com/pdbogen/mapbot/model/types"
 )
 
 type WebSession struct {
-	SessionId string
-	ContextId types.ContextId
+	SessionId   string
+	ContextId   types.ContextId
+	ContextType types.ContextType
 }
 
-func NewWebSession(db anydb.AnyDb, ctx types.ContextId) (*WebSession, error) {
+func NewWebSession(db anydb.AnyDb, ctx types.ContextId, ctxTyp types.ContextType) (*WebSession, error) {
 	ret := &WebSession{
-		SessionId: rand.RandHex(32),
-		ContextId: ctx,
+		SessionId:   rand.RandHex(32),
+		ContextId:   ctx,
+		ContextType: ctxTyp,
 	}
 
 	if err := ret.Save(db); err != nil {
@@ -28,7 +29,9 @@ func NewWebSession(db anydb.AnyDb, ctx types.ContextId) (*WebSession, error) {
 }
 
 func (w WebSession) Save(db anydb.AnyDb) error {
-	_, err := db.Exec("INSERT INTO web_sessions (session_id, context_id) VALUES ($1,$2)", w.SessionId, w.ContextId)
+	_, err := db.Exec(
+		"INSERT INTO web_sessions (session_id, context_id, context_type) VALUES ($1,$2,$3)",
+		w.SessionId, w.ContextId, w.ContextType)
 	if err != nil {
 		return fmt.Errorf("saving session %q: %v", w.SessionId, err)
 	}
@@ -38,7 +41,7 @@ func (w WebSession) Save(db anydb.AnyDb) error {
 type NotFound error
 
 func Load(db anydb.AnyDb, sessionId string) (*WebSession, error) {
-	res, err := db.Query("SELECT session_id, context_id FROM web_Sessions WHERE session_id=$1", sessionId)
+	res, err := db.Query("SELECT session_id, context_id, context_type FROM web_Sessions WHERE session_id=$1", sessionId)
 	if err != nil {
 		return nil, fmt.Errorf("querying web_sessions for session %q: %v", sessionId, err)
 	}
@@ -46,12 +49,16 @@ func Load(db anydb.AnyDb, sessionId string) (*WebSession, error) {
 		return nil, NotFound(fmt.Errorf("session %q not found", sessionId))
 	}
 	ret := &WebSession{}
-	res.Scan(&ret.SessionId, &ret.ContextId)
+	res.Scan(&ret.SessionId, &ret.ContextId, &ret.ContextType)
 	return ret, nil
 }
 
-func (w WebSession) GetContext(db anydb.AnyDb) (context.Context, error) {
-	ctx, err := databaseContext.Load(db, w.ContextId)
+func (w WebSession) GetContext(prov *context.ContextProvider) (context.Context, error) {
+	provFunc, ok := prov.ContextTypes[w.ContextType]
+	if !ok {
+		return nil, fmt.Errorf("no context provider function for type %s", w.ContextType)
+	}
+	ctx, err := provFunc(w.ContextId)
 	if err != nil {
 		return nil, err
 	}
