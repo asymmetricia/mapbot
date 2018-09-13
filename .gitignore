@@ -13,3 +13,7 @@
 /emoji
 /emoji.zip
 /.emoji*
+
+# Generated files
+/static/mapbot.js*
+/ui/http/assets.go

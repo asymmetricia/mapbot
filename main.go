@@ -118,7 +118,7 @@ func main() {
 		blobserv.Instance = &blobserv.BlobServ{UrlBase: "http://" + *Domain + "/blob/"}
 	}
 
-	httpUi := httpUi.New(dbHandle, hub, prov)
+	httpUi := httpUi.New(dbHandle, hub, prov, "/ui")
 
 	router := http.NewServeMux()
 	router.HandleFunc("/action", slackUi.Action)

@@ -133,6 +133,14 @@
 			"versionExact": "go1.10"
 		},
 		{
+			"checksumSHA1": "yIkYzW7bzAD81zHyuCNmEj4+oxQ=",
+			"path": "github.com/gopherjs/gopherjs/js",
+			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
+			"revisionTime": "2018-08-20T05:23:04Z",
+			"version": "go1.10",
+			"versionExact": "go1.10"
+		},
+		{
 			"checksumSHA1": "g/V4qrXjUGG9B+e3hB+4NAYJ5Gs=",
 			"path": "github.com/gorilla/context",
 			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
@@ -377,6 +385,12 @@
 			"path": "google.golang.org/appengine/urlfetch",
 			"revision": "2e4a801b39fc199db615bfca7d0b9f8cd9580599",
 			"revisionTime": "2017-02-06T20:30:24Z"
+		},
+		{
+			"checksumSHA1": "Rje4V1RFSLQ8jOC1He1dBbvUbdI=",
+			"path": "honnef.co/go/js/dom",
+			"revision": "6da835bec70f84cd4f0c0b8a7239a9260b6bc37f",
+			"revisionTime": "2018-03-23T15:41:44Z"
 		}
 	],
 	"rootPath": "github.com/pdbogen/mapbot"

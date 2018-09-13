@@ -3,7 +3,7 @@ package http
 import (
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db/anydb"
-	"github.com/pdbogen/mapbot/common/log"
+	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
@@ -13,20 +13,31 @@ import (
 )
 
 type Http struct {
-	db   anydb.AnyDb
-	hub  *hub.Hub
-	mux  *http.ServeMux
-	prov *context.ContextProvider
+	db     anydb.AnyDb
+	hub    *hub.Hub
+	mux    *http.ServeMux
+	prov   *context.ContextProvider
+	prefix string
 }
+
+var log = mbLog.Log
 
 func (h *Http) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	h.mux.ServeHTTP(rw, req)
+	logRequests(http.StripPrefix(h.prefix, h.mux)).ServeHTTP(rw, req)
 }
 
-func New(db anydb.AnyDb, hub *hub.Hub, prov *context.ContextProvider) *Http {
-	ret := &Http{db: db, hub: hub, prov: prov}
+func logRequests(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		log.Debugf("%s %s", req.Method, req.RequestURI)
+		handler.ServeHTTP(rw, req)
+	})
+}
+
+func New(db anydb.AnyDb, hub *hub.Hub, prov *context.ContextProvider, prefix string) *Http {
+	ret := &Http{db: db, hub: hub, prov: prov, prefix: prefix}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", ret.GetMap)
+	mux.Handle("/", http.FileServer(assets))
+	mux.HandleFunc("/map", ret.GetMap)
 	ret.mux = mux
 	return ret
 }

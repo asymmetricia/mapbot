@@ -24,6 +24,7 @@ push: .push
 
 mapbot: ${shell find -name \*.go} ui/slack/context/emoji.go
 	go fmt github.com/pdbogen/mapbot/...
+	go generate
 	go build -o mapbot
 
 release: mapbot.darwin_amd64 mapbot.linux_amd64 mapbot.windows_amd64.exe
