@@ -195,6 +195,7 @@ loop:
 		Payload: t,
 		User:    c.User,
 	})
+	h.PublishUpdate(c.Context)
 }
 
 func cmdDpi(h *hub.Hub, c *hub.Command) {
@@ -349,6 +350,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		Payload: t,
 		User:    c.User,
 	})
+	h.PublishUpdate(c.Context)
 }
 
 func cmdSelect(h *hub.Hub, c *hub.Command) {
@@ -373,6 +375,7 @@ func cmdSelect(h *hub.Hub, c *hub.Command) {
 			Payload: t,
 			User:    c.User,
 		})
+		h.PublishUpdate(c.Context)
 	} else {
 		h.Error(c, "usage: map select <name>")
 	}

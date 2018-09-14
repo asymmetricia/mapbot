@@ -203,8 +203,10 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 			h.Error(c, ":warning: lines are not supported as permanent marks")
 		}
 		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithLines(coloredLines)))
+		h.PublishUpdate(c.Context)
 	} else {
 		log.Debugf("rendering with %d temporary marks", len(coloredMarks))
+		// TODO: Figure out a way to make temporary marks available to asynchronous UIs
 		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab.WithMarks(coloredMarks).WithLines(coloredLines)))
 	}
 }

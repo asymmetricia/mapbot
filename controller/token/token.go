@@ -124,6 +124,7 @@ func cmdLight(h *hub.Hub, c *hub.Command) {
 	}
 
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	h.PublishUpdate(c.Context)
 }
 
 func cmdSize(h *hub.Hub, c *hub.Command) {
@@ -188,6 +189,7 @@ func cmdSize(h *hub.Hub, c *hub.Command) {
 	}
 
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	h.PublishUpdate(c.Context)
 }
 
 func cmdSwap(h *hub.Hub, c *hub.Command) {
@@ -247,6 +249,7 @@ func cmdSwap(h *hub.Hub, c *hub.Command) {
 	}
 
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	h.PublishUpdate(c.Context)
 }
 
 func cmdColor(h *hub.Hub, c *hub.Command) {
@@ -311,6 +314,7 @@ func cmdColor(h *hub.Hub, c *hub.Command) {
 	}
 
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	h.PublishUpdate(c.Context)
 }
 
 var emojiToken = regexp.MustCompile(`^(:[^:]+:)`)
@@ -410,6 +414,7 @@ func cmdRemove(h *hub.Hub, c *hub.Command) {
 	}
 
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	h.PublishUpdate(c.Context)
 }
 
 func cmdClear(h *hub.Hub, c *hub.Command) {
@@ -446,6 +451,7 @@ func cmdClear(h *hub.Hub, c *hub.Command) {
 	}
 
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(tab))
+	h.PublishUpdate(c.Context)
 }
 
 func parseMovements(args []string, lastToken string) (map[string][]image.Point, error) {
@@ -581,7 +587,7 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 	}
 
 	if err := c.User.Save(db.Instance); err != nil {
-		h.Error(c, "an error occured saving your user record")
+		h.Error(c, "an error occurred saving your user record")
 		log.Errorf("error saving user record %v: %s", c.User, err)
 	}
 
@@ -600,4 +606,5 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		WithType(hub.CommandType(c.From)).
 		WithPayload(tab.WithLines(lines).WithNote(strings.Join(notes, "; "))),
 	)
+	h.PublishUpdate(c.Context)
 }

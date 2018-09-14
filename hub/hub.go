@@ -12,7 +12,36 @@ import (
 var log = mbLog.Log
 
 type Hub struct {
-	Subscribers map[CommandType][]Subscriber
+	Subscribers     map[CommandType][]Subscriber
+	OnceSubscribers map[CommandType][]Subscriber
+}
+
+type Waiter struct {
+	waitCh chan<- *Command
+}
+
+func (w *Waiter) Subscriber(hub *Hub, cmd *Command) {
+	w.waitCh <- cmd
+	close(w.waitCh)
+}
+
+func (h *Hub) Wait(c CommandType) <-chan *Command {
+	res := make(chan *Command)
+	waiter := &Waiter{res}
+	h.SubscribeOnce(c, waiter.Subscriber)
+	return res
+}
+
+func (h *Hub) SubscribeOnce(c CommandType, s Subscriber) {
+	c = c.Canonical()
+	log.Debugf("subscribeOnce: %s", c)
+	if h.OnceSubscribers == nil {
+		h.OnceSubscribers = map[CommandType][]Subscriber{
+			c: []Subscriber{},
+		}
+	}
+
+	h.OnceSubscribers[c] = append(h.OnceSubscribers[c], s)
 }
 
 func (h *Hub) Subscribe(c CommandType, s Subscriber) {
@@ -24,11 +53,11 @@ func (h *Hub) Subscribe(c CommandType, s Subscriber) {
 		}
 	}
 
-	if subs, ok := h.Subscribers[c]; ok {
-		h.Subscribers[c] = append(subs, s)
-	} else {
-		h.Subscribers[c] = []Subscriber{s}
-	}
+	h.Subscribers[c] = append(h.Subscribers[c], s)
+}
+
+func (h *Hub) PublishUpdate(ctx context.Context) {
+	h.Publish(&Command{Type: CommandType("internal:update:" + ctx.Id())})
 }
 
 // Publish searches publishers for a subscriber to the given command's type, and executes the subscriber in a goroutine.
@@ -46,6 +75,16 @@ func (h *Hub) Publish(c *Command) {
 				found = true
 				go sub(h, c)
 			}
+		}
+	}
+
+	for cmd, subs := range h.OnceSubscribers {
+		if glob.Glob(string(cmd), string(typ)) {
+			for _, sub := range subs {
+				found = true
+				go sub(h, c)
+			}
+			delete(h.OnceSubscribers, cmd)
 		}
 	}
 
