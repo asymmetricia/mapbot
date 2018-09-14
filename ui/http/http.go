@@ -2,6 +2,7 @@ package http
 
 import (
 	"fmt"
+	"github.com/gorilla/websocket"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/hub"
@@ -38,6 +39,7 @@ func New(db anydb.AnyDb, hub *hub.Hub, prov *context.ContextProvider, prefix str
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(assets))
 	mux.HandleFunc("/map", ret.GetMap)
+	mux.HandleFunc("/ws", ret.WebSocket)
 	ret.mux = mux
 	return ret
 }
@@ -61,6 +63,33 @@ func (h *Http) GetSession(rw http.ResponseWriter, req *http.Request) (*webSessio
 		}
 	}
 	return ret, true
+}
+
+func (h *Http) WebSocket(rw http.ResponseWriter, req *http.Request) {
+	sess, ok := h.GetSession(rw, req)
+	if !ok {
+		return
+	}
+	ctx, err := sess.GetContext(h.prov)
+	if err != nil {
+		http.Error(rw, "internal server error", http.StatusInternalServerError)
+		log.Errorf("retrieving context for session %v: %v", sess, err)
+		return
+	}
+
+	conn, err := (&websocket.Upgrader{
+		CheckOrigin: func(*http.Request) bool { return true },
+	}).Upgrade(rw, req, nil)
+	if err != nil {
+		log.Errorf("upgrading websocket connection: %v", err)
+	}
+	for {
+		<-h.hub.Wait(hub.CommandType("internal:update:" + string(ctx.Id())))
+		if err := conn.WriteJSON(map[string]string{"cmd": "update"}); err != nil {
+			log.Errorf("sending update over websocket: %v", err)
+			return
+		}
+	}
 }
 
 func (h *Http) GetMap(rw http.ResponseWriter, req *http.Request) {

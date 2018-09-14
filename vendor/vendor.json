@@ -141,6 +141,18 @@
 			"versionExact": "go1.10"
 		},
 		{
+			"checksumSHA1": "Nt1tz98X4Ms/4hzXKdmrctM9054=",
+			"path": "github.com/gopherjs/websocket",
+			"revision": "87ee47603f137e7f8419765b3621b3c36e715a08",
+			"revisionTime": "2017-05-22T00:44:12Z"
+		},
+		{
+			"checksumSHA1": "vfg+r7tm7oduVgdb3evDfMiyCVU=",
+			"path": "github.com/gopherjs/websocket/websocketjs",
+			"revision": "87ee47603f137e7f8419765b3621b3c36e715a08",
+			"revisionTime": "2017-05-22T00:44:12Z"
+		},
+		{
 			"checksumSHA1": "g/V4qrXjUGG9B+e3hB+4NAYJ5Gs=",
 			"path": "github.com/gorilla/context",
 			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
@@ -151,6 +163,12 @@
 			"path": "github.com/gorilla/mux",
 			"revision": "392c28fe23e1c45ddba891b0320b3b5df220beea",
 			"revisionTime": "2017-01-18T13:43:44Z"
+		},
+		{
+			"checksumSHA1": "VKx/YhlIAbIJ9dXAxCCHOkjom4U=",
+			"path": "github.com/gorilla/websocket",
+			"revision": "66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d",
+			"revisionTime": "2018-08-25T15:15:06Z"
 		},
 		{
 			"checksumSHA1": "40vJyUB4ezQSn/NSadsKEOrudMc=",
@@ -391,6 +409,18 @@
 			"path": "honnef.co/go/js/dom",
 			"revision": "6da835bec70f84cd4f0c0b8a7239a9260b6bc37f",
 			"revisionTime": "2018-03-23T15:41:44Z"
+		},
+		{
+			"checksumSHA1": "yJy8Z1H4oXdW/jxT2F+VzrEViXE=",
+			"path": "honnef.co/go/js/util",
+			"revision": "96b8dd9d16214b6cd9d8c8e84b3a375da4688108",
+			"revisionTime": "2015-02-16T22:39:35Z"
+		},
+		{
+			"checksumSHA1": "BivnYL12uO9W35pVwnGzhCe7utg=",
+			"path": "honnef.co/go/js/xhr",
+			"revision": "00e3346113aed89b501ead4e863c7c3d04fa0c5b",
+			"revisionTime": "2015-03-07T03:10:22Z"
 		}
 	],
 	"rootPath": "github.com/pdbogen/mapbot"

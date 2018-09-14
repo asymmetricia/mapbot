@@ -17,3 +17,4 @@
 # Generated files
 /static/mapbot.js*
 /ui/http/assets.go
+/gopherjs
