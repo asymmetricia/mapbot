@@ -76,9 +76,9 @@ func ready(dom.Event) {
 					}
 					img.Src = MapUrl(uri)
 				}
+			} else {
+				print("websocket to ", WsUrl(uri), " error: ", err.Error())
 			}
-
-			print("websocket to ", WsUrl(uri), " error: ", err.Error())
 
 			time.Sleep(time.Second)
 		}
