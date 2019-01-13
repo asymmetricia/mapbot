@@ -45,100 +45,76 @@
 			"revisionTime": "2016-11-17T03:31:26Z"
 		},
 		{
-			"checksumSHA1": "4QL6efAodsylB1v/7FdJnDsFNK0=",
+			"checksumSHA1": "dxwSD/Df6t5e4pirFkkr9Pu3+es=",
 			"path": "github.com/gopherjs/gopherjs",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
-			"checksumSHA1": "v3VgwtOnxKWkOTZ1uFG3YCnhoCg=",
+			"checksumSHA1": "Ke58EZlm6LNfbGxH+gdwhVd7dF8=",
 			"path": "github.com/gopherjs/gopherjs/build",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
-			"checksumSHA1": "+6rJ3BujWbHVezl/MGckH4uQdcQ=",
+			"checksumSHA1": "HrDNvEI+RMrn1V3R3AGw2il3zrY=",
 			"path": "github.com/gopherjs/gopherjs/compiler",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
 			"checksumSHA1": "eqUNry8V1WbHqfJVsvT21OsfM4Q=",
 			"path": "github.com/gopherjs/gopherjs/compiler/analysis",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
 			"checksumSHA1": "M+Qs56Oai9ErHofgX+nAgG/rsuI=",
 			"path": "github.com/gopherjs/gopherjs/compiler/astutil",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
 			"checksumSHA1": "IXPufDyzfy5415YsAUh1FLiW/N8=",
 			"path": "github.com/gopherjs/gopherjs/compiler/filter",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
-			"checksumSHA1": "YppEcqOaKssO5r0OjbQyYCV90DY=",
+			"checksumSHA1": "Jthp7b+/7/rFrrOY1XlAIKrvhSs=",
 			"path": "github.com/gopherjs/gopherjs/compiler/gopherjspkg",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
-			"checksumSHA1": "fx5ko0G9iGrB8JHBfMxg7eDPGI8=",
+			"checksumSHA1": "zDeLjNPJIJJBp+ujBlfA3EOZJp4=",
 			"path": "github.com/gopherjs/gopherjs/compiler/natives",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
-			"checksumSHA1": "HhoU0uxat1XU88q7Yzgdxn6o2ow=",
+			"checksumSHA1": "20ysgsZVtJH2JLywOGejSRGIZxA=",
 			"path": "github.com/gopherjs/gopherjs/compiler/prelude",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
 			"checksumSHA1": "GeCslaoQUHp4PjYVIEpfefT4sZ8=",
 			"path": "github.com/gopherjs/gopherjs/compiler/typesutil",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
 			"checksumSHA1": "W4IdPSqYK64B3/eSSZLBGld4+AE=",
 			"path": "github.com/gopherjs/gopherjs/internal/sysutil",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
 			"checksumSHA1": "yIkYzW7bzAD81zHyuCNmEj4+oxQ=",
 			"path": "github.com/gopherjs/gopherjs/js",
-			"revision": "89baedc74dd74098df0c4ba8792e3cf6d722d4d0",
-			"revisionTime": "2018-08-20T05:23:04Z",
-			"version": "go1.10",
-			"versionExact": "go1.10"
+			"revision": "d547d1d9531ed93dbdebcbff7f83e7c876a1e0ee",
+			"revisionTime": "2018-11-03T18:53:06Z"
 		},
 		{
 			"checksumSHA1": "Nt1tz98X4Ms/4hzXKdmrctM9054=",
