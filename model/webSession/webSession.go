@@ -45,11 +45,14 @@ func Load(db anydb.AnyDb, sessionId string) (*WebSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying web_sessions for session %q: %v", sessionId, err)
 	}
+	defer res.Close()
 	if !res.Next() {
 		return nil, NotFound(fmt.Errorf("session %q not found", sessionId))
 	}
 	ret := &WebSession{}
-	res.Scan(&ret.SessionId, &ret.ContextId, &ret.ContextType)
+	if err := res.Scan(&ret.SessionId, &ret.ContextId, &ret.ContextType); err != nil {
+		return nil, fmt.Errorf("scanning session row: %s", err)
+	}
 	return ret, nil
 }
 
