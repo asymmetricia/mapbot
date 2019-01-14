@@ -83,6 +83,8 @@ func (h *Http) WebSocket(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Errorf("upgrading websocket connection: %v", err)
 	}
+	defer conn.Close()
+
 	for {
 		<-h.hub.Wait(hub.CommandType("internal:update:" + string(ctx.Id())))
 		if err := conn.WriteJSON(map[string]string{"cmd": "update"}); err != nil {
