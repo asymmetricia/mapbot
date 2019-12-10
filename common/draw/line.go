@@ -1,7 +1,6 @@
 package draw
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -38,8 +37,6 @@ func Line(i draw.Image, a, b image.Point, col color.Color) {
 	x1 := b.X
 	y1 := b.Y
 
-	fmt.Printf("line from (%d,%d) to (%d,%d)\n", x0, y0, x1, y1)
-
 	if y0 > y1 {
 		y0, y1 = y1, y0
 		x0, x1 = x1, x0
@@ -56,8 +53,6 @@ func Line(i draw.Image, a, b image.Point, col color.Color) {
 	}
 
 	dy := y1 - y0
-
-	fmt.Printf("dx=%d, dy=%d\n", dx, dy)
 
 	// Horizontal
 	if dy == 0 {
@@ -94,7 +89,6 @@ func Line(i draw.Image, a, b image.Point, col color.Color) {
 	if dy > dx {
 		// The fraction of (256) that x should increase for each y. Guaranteed less than 256, since dx < dy. 256 * dx / dy
 		errAdj := uint8(uint32(dx) << 8 / uint32(dy))
-		fmt.Printf("y-major, errAdj=%d\n", errAdj)
 		for dy > 1 {
 			// Y-major; we move up one Y at a time, increasing X whenever we move up enough to warrant it.
 			dy--
@@ -110,7 +104,6 @@ func Line(i draw.Image, a, b image.Point, col color.Color) {
 		}
 	} else {
 		errAdj := uint8(uint32(dy) << 8 / uint32(dx))
-		fmt.Printf("x-major, errAdj=%d\n", errAdj)
 		for dx > 1 {
 			dx--
 			errAccumTemp := errAccum
