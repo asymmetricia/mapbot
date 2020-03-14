@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/pdbogen/mapbot/common/db/anydb"
@@ -11,6 +12,7 @@ import (
 	"github.com/pdbogen/mapbot/model/webSession"
 	"image/png"
 	"net/http"
+	"time"
 )
 
 type Http struct {
@@ -85,13 +87,59 @@ func (h *Http) WebSocket(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer conn.Close()
 
+	if err := h.sendMapUpdate(ctx, conn); err != nil {
+		log.Errorf("sending initial map update across websocket: %s", err)
+		return
+	}
+
+	var update <-chan *hub.Command
+	var keepalive <-chan time.Time
 	for {
-		<-h.hub.Wait(hub.CommandType("internal:update:" + string(ctx.Id())))
-		if err := conn.WriteJSON(map[string]string{"cmd": "update"}); err != nil {
+		if update == nil {
+			update = h.hub.Wait(hub.CommandType("internal:update:" + string(ctx.Id())))
+		}
+		if keepalive == nil {
+			keepalive = time.After(time.Second * 5)
+		}
+		var err error
+		select {
+		case <-update:
+			err = h.sendMapUpdate(ctx, conn)
+			update = nil
+		case <-keepalive:
+			err = conn.WriteJSON(map[string]string{"cmd": "ping"})
+			keepalive = nil
+		}
+		if err != nil {
 			log.Errorf("sending update over websocket: %v", err)
 			return
 		}
 	}
+}
+
+func (h *Http) sendMapUpdate(ctx context.Context, conn *websocket.Conn) error {
+	var err error
+	var tab *tabula.Tabula
+
+	tabId := ctx.GetActiveTabulaId()
+	if tabId == nil {
+		return errors.New("refusing to send update for context with no active tabula")
+	}
+
+	tab, err = tabula.Load(h.db, *tabId)
+	if err != nil {
+		return fmt.Errorf("could not load tabula with id %q: %v", *tabId, err)
+	}
+
+	payload := map[string]interface{}{
+		"cmd":     "update",
+		"OffsetX": tab.OffsetX,
+		"OffsetY": tab.OffsetY,
+		"Dpi":     tab.Dpi,
+	}
+	payload["MinX"], payload["MinY"], payload["MaxX"], payload["MaxY"] = ctx.GetZoom()
+
+	return conn.WriteJSON(map[string]string{"cmd": "update"})
 }
 
 func (h *Http) GetMap(rw http.ResponseWriter, req *http.Request) {
@@ -125,5 +173,6 @@ func (h *Http) GetMap(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("loading tabula bg with id %q: %v", *tabId, err)
 		return
 	}
+
 	png.Encode(rw, img)
 }
