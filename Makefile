@@ -17,7 +17,7 @@ push: .push
 	touch .push
 
 .docker: mapbot Dockerfile run.sh emoji
-	docker build -t mapbot .
+	docker build --pull -t mapbot .
 	docker tag mapbot ${IMAGE_URL}
 	touch .docker
 
