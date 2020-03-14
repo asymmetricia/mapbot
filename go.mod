@@ -5,8 +5,6 @@ go 1.13
 require (
 	github.com/golang/freetype v0.0.0-20161208064710-d9be45aaf745
 	github.com/golang/protobuf v0.0.0-20161117033126-8ee79997227b // indirect
-	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
-	github.com/gopherjs/websocket v0.0.0-20170522004412-87ee47603f13
 	github.com/gorilla/websocket v1.4.0
 	github.com/lib/pq v0.0.0-20170206200638-0477eb88c5ca
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
@@ -21,5 +19,4 @@ require (
 	golang.org/x/oauth2 v0.0.0-20170209002143-de0725b330ab
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	google.golang.org/appengine v1.0.1-0.20170206203024-2e4a801b39fc // indirect
-	honnef.co/go/js/dom v0.0.0-20180323154144-6da835bec70f
 )
