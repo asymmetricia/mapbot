@@ -22,10 +22,14 @@ push: .push
 	touch .docker
 
 
-mapbot: ${shell find -name \*.go} ui/slack/context/emoji.go
+mapbot: ${shell find -name \*.go} ui/slack/context/emoji.go static/js/main.js
 	go fmt github.com/pdbogen/mapbot/...
 	go generate
 	go build -o mapbot
+
+static/js/main.js: ${shell find ts/}
+	docker build -t ts - < Dockerfile.ts
+	docker run -v $$PWD:/work -u $$(id -u) ts -p ts
 
 release: mapbot.darwin_amd64 mapbot.linux_amd64 mapbot.windows_amd64.exe
 
