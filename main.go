@@ -37,10 +37,10 @@ func main() {
 	Domain := flag.String("domain", "map.haversack.io", "domain name to receive redirects, construct URLs, and request ACME certs")
 	Port := flag.Int("port", 8443, "port to listen on for web requests and slack oauth responses")
 	Tls := flag.Bool("tls", false, "if set, mapbot will use ACME to obtain a cert from Let's Encrypt for the above-configured domain")
-	DbType := flag.String("db-type", "postgres", "database type to use: postgres, sqlite3, or inmemory")
+	DbType := flag.String("db-type", "postgres", "database type to use: postgres or sqlite3")
 	ESKey := flag.String("elephant-sql-key", "", "API Key for elephant sql, to create/access DB in lieu of --db-* parameters")
 	ESType := flag.String("elephant-sql-type", "turtle", "instance type to create on ElephantSQL; 'turtle' is free-tier (postgres)")
-	DbHost := flag.String("db-host", "localhost", "fqdn of a postgresql server (postgres)")
+	DbHost := flag.String("db-host", "localhost", "fqdn of a postgresql server (postgres), or path to a sqlite3 file")
 	DbPort := flag.Int("db-port", 5432, "port to use on db-host (postgres)")
 	DbUser := flag.String("db-user", "postgres", "postgresql user to use for authentication (postgres)")
 	DbPass := flag.String("db-pass", "postgres", "postgresql pass to use for authentication (postgres)")
@@ -53,8 +53,8 @@ func main() {
 	var dbHandle anydb.AnyDb
 	var err error
 	switch *DbType {
-	case "inmemory":
-		dbHandle, err = db.OpenInMemory(*DbReset, *DbResetFrom)
+	case "sqlite3":
+		dbHandle, err = db.OpenSqlite3(*DbReset, *DbResetFrom, *DbHost)
 	case "postgres":
 		if *ESKey != "" {
 			dbHandle, err = db.OpenElephant(*ESKey, *ESType, *DbReset, *DbResetFrom)
@@ -65,6 +65,8 @@ func main() {
 			}
 			dbHandle, err = db.OpenPsql(*DbHost, *DbUser, *DbPass, *DbName, *DbPort, *DbReset, *DbResetFrom, sslmode)
 		}
+	default:
+		log.Fatalf("unrecognized db-type %q", *DbType)
 	}
 
 	if err != nil {

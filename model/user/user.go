@@ -48,7 +48,7 @@ func (u *User) String() string {
 func (u *User) Hydrate(db anydb.AnyDb) error {
 	res, err := db.Query("SELECT prefAutoShow FROM users WHERE id=$1", &u.Id)
 	if err != nil {
-		return fmt.Errorf("querying: %s", err)
+		return fmt.Errorf("querying %s: %s", db.Name(), err)
 	}
 	defer res.Close()
 
