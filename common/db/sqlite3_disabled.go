@@ -9,10 +9,14 @@ import (
 
 type Sqlite struct{}
 
-func (s *Sqlite) Dialect() string {
-	return "sqlite3"
+func (s *Sqlite) Name() string {
+	return ""
 }
 
-func OpenInMemory(reset bool, resetFrom int) (anydb.AnyDb, error) {
-	return nil, fmt.Errorf("sqlite3 not supported on darwin")
+func (s *Sqlite) Dialect() string {
+	return ""
+}
+
+func OpenSqlite3(reset bool, resetFrom int) (anydb.AnyDb, error) {
+	return nil, fmt.Errorf("sqlite3 not supported on darwin or windows")
 }

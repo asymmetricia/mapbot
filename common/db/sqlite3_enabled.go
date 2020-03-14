@@ -10,16 +10,24 @@ import (
 
 type Sqlite struct {
 	*sql.DB
+	file string
+}
+
+func (s *Sqlite) Name() string {
+	return "sqlite3:" + s.file
 }
 
 func (s *Sqlite) Dialect() string {
 	return "sqlite3"
 }
 
-func OpenInMemory(reset bool, resetFrom int) (anydb.AnyDb, error) {
-	dbConn, err := sql.Open("sqlite3", ":memory:")
+func OpenSqlite3(reset bool, resetFrom int, file string) (anydb.AnyDb, error) {
+	if file == "" {
+		file = ":memory:"
+	}
+	dbConn, err := sql.Open("sqlite3", "file:"+file)
 	if err != nil {
 		return nil, err
 	}
-	return scheme(&Sqlite{dbConn}, reset, resetFrom)
+	return scheme(&Sqlite{dbConn, file}, reset, resetFrom)
 }

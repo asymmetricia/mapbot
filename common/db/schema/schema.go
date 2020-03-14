@@ -144,12 +144,41 @@ var schema = []Migration{
 	},
 	Migration{
 		15,
-		map[string]string{"any": `ALTER TABLE context_marks ADD COLUMN direction VARCHAR(2) NOT NULL DEFAULT '';` +
-			`ALTER TABLE context_marks DROP CONSTRAINT context_marks_pkey;` +
-			`ALTER TABLE context_marks ADD PRIMARY KEY (context_id, tabula_id, square_x, square_y, direction);`},
-		map[string]string{"any": `ALTER TABLE context_marks DROP CONSTRAINT context_marks_pkey;` +
-			`ALTER TABLE context_marks DROP COLUMN direction;` +
-			`ALTER TABLE context_marks ADD PRIMARY KEY (context_id, tabula_id, square_x, square_y);`},
+		map[string]string{
+			"sqlite3": `CREATE TABLE context_marks2 (` +
+				`context_id VARCHAR(128) REFERENCES contexts(context_id) ON DELETE CASCADE, ` +
+				`tabula_id  BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
+				`square_x   SMALLINT,` +
+				`square_y   SMALLINT,` +
+				`red        SMALLINT,` +
+				`green      SMALLINT,` +
+				`blue       SMALLINT,` +
+				`alpha      SMALLINT,` +
+				`direction VARCHAR(2) NOT NULL DEFAULT '',` +
+				`PRIMARY KEY (context_id, tabula_id, square_x, square_y, direction));` +
+				`INSERT INTO context_marks2 (context_id,tabula_id,square_x,square_y,red,green,blue,alpha) SELECT * FROM context_marks;` +
+				`DROP TABLE context_marks;` +
+				`ALTER TABLE context_marks2 RENAME TO context_marks`,
+			"any": `ALTER TABLE context_marks ADD COLUMN direction VARCHAR(2) NOT NULL DEFAULT '';` +
+				`ALTER TABLE context_marks DROP CONSTRAINT context_marks_pkey;` +
+				`ALTER TABLE context_marks ADD PRIMARY KEY (context_id, tabula_id, square_x, square_y, direction);`},
+		map[string]string{
+			"sqlite3": `CREATE TABLE context_marks2 (` +
+				`context_id VARCHAR(128) REFERENCES contexts(context_id) ON DELETE CASCADE, ` +
+				`tabula_id  BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
+				`square_x   SMALLINT,` +
+				`square_y   SMALLINT,` +
+				`red        SMALLINT,` +
+				`green      SMALLINT,` +
+				`blue       SMALLINT,` +
+				`alpha      SMALLINT,` +
+				`PRIMARY KEY (context_id, tabula_id, square_x, square_y));` +
+				`INSERT INTO context_marks2 (context_id,tabula_id,square_x,square_y,red,green,blue,alpha) SELECT * FROM context_marks;` +
+				`DROP TABLE context_marks;` +
+				`ALTER TABLE context_marks2 RENAME TO context_marks`,
+			"any": `ALTER TABLE context_marks DROP CONSTRAINT context_marks_pkey;` +
+				`ALTER TABLE context_marks DROP COLUMN direction;` +
+				`ALTER TABLE context_marks ADD PRIMARY KEY (context_id, tabula_id, square_x, square_y);`},
 	},
 	Migration{
 		16,
@@ -158,11 +187,16 @@ var schema = []Migration{
 	},
 	Migration{
 		17,
-		map[string]string{"any": `ALTER TABLE tabula_tokens ` +
-			`ADD COLUMN light_low INT NOT NULL DEFAULT 0, ` +
-			`ADD COLUMN light_normal INT NOT NULL DEFAULT 0, ` +
-			`ADD COLUMN light_bright INT NOT NULL DEFAULT 0`},
-		map[string]string{"any": `ALTER TABLE tabula_tokens DROP COLUMN light_low, DROP COLUMN light_normal, DROP COLUMN light_bright`},
+		map[string]string{"any":
+		`ALTER TABLE tabula_tokens ADD COLUMN light_low INT NOT NULL DEFAULT 0; ` +
+			`ALTER TABLE tabula_tokens ADD COLUMN light_normal INT NOT NULL DEFAULT 0; ` +
+			`ALTER TABLE tabula_tokens ADD COLUMN light_bright INT NOT NULL DEFAULT 0; `,
+		},
+		map[string]string{"any":
+		`ALTER TABLE tabula_tokens DROP COLUMN light_low;` +
+			`ALTER TABLE tabula_tokens DROP COLUMN light_normal;` +
+			`ALTER TABLE tabula_tokens DROP COLUMN light_bright;`,
+		},
 	},
 	Migration{
 		18,

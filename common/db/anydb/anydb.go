@@ -9,6 +9,7 @@ import (
 )
 
 type AnyDb interface {
+	Name() string
 	Dialect() string
 	Exec(string, ...interface{}) (sql.Result, error)
 	Query(string, ...interface{}) (*sql.Rows, error)

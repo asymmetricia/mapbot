@@ -13,6 +13,11 @@ import (
 
 type PostgreSql struct {
 	*sql.DB
+	name string
+}
+
+func (p *PostgreSql) Name() string {
+	return p.name
 }
 
 func (p *PostgreSql) Dialect() string {
@@ -54,7 +59,7 @@ func OpenElephant(key, instance_type string, reset bool, resetFrom int) (anydb.A
 	if err != nil {
 		return nil, fmt.Errorf("connecting to instance %s:%d: %s", instance.DbHost, instance.DbPort, err)
 	}
-	return scheme(&anydb.WithRetries{&PostgreSql{conn}}, reset, resetFrom)
+	return scheme(&anydb.WithRetries{&PostgreSql{conn, "elephantsql:mapbot"}}, reset, resetFrom)
 }
 
 func OpenPsql(host, user, pass, db string, port int, reset bool, resetFrom int, sslmode string) (anydb.AnyDb, error) {
@@ -73,7 +78,7 @@ func OpenPsql(host, user, pass, db string, port int, reset bool, resetFrom int, 
 	if err != nil {
 		return nil, err
 	}
-	return scheme(&anydb.WithRetries{&PostgreSql{dbConn}}, reset, resetFrom)
+	return scheme(&anydb.WithRetries{&PostgreSql{dbConn, "psql:" + host}}, reset, resetFrom)
 }
 
 func scheme(dbConn anydb.AnyDb, reset bool, resetFrom int) (anydb.AnyDb, error) {
