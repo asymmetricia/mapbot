@@ -1,0 +1,25 @@
+module github.com/pdbogen/mapbot
+
+go 1.13
+
+require (
+	github.com/golang/freetype v0.0.0-20161208064710-d9be45aaf745
+	github.com/golang/protobuf v0.0.0-20161117033126-8ee79997227b // indirect
+	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
+	github.com/gopherjs/websocket v0.0.0-20170522004412-87ee47603f13
+	github.com/gorilla/websocket v1.4.0
+	github.com/lib/pq v0.0.0-20170206200638-0477eb88c5ca
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
+	github.com/nlopes/slack v0.0.2-0.20170211112627-6519657c021b
+	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
+	github.com/ryanuber/go-glob v0.0.0-20170128012129-256dc444b735
+	github.com/stretchr/testify v1.5.1 // indirect
+	golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
+	golang.org/x/image v0.0.0-20170210230806-df2aa51d4407
+	golang.org/x/net v0.0.0-20170211013127-61557ac0112b
+	golang.org/x/oauth2 v0.0.0-20170209002143-de0725b330ab
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
+	google.golang.org/appengine v1.0.1-0.20170206203024-2e4a801b39fc // indirect
+	honnef.co/go/js/dom v0.0.0-20180323154144-6da835bec70f
+)
