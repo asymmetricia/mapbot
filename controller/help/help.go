@@ -12,7 +12,8 @@ func Register(h *hub.Hub) {
 
 func helpAll(h *hub.Hub, cmd *hub.Command) {
 	handlers := []string{}
-	for k, _ := range h.Subscribers {
+	h.HubMu.RLock()
+	for k := range h.Subscribers {
 		if strings.HasPrefix(string(k), "user:") {
 			parts := strings.Split(string(k), ":")
 			if parts[1] != "help" && parts[1] != "howdy" {
@@ -20,6 +21,7 @@ func helpAll(h *hub.Hub, cmd *hub.Command) {
 			}
 		}
 	}
+	h.HubMu.RUnlock()
 
 	response := "The following top-level commands are registered:\n" +
 		strings.Join(handlers, "\n") +
@@ -28,14 +30,21 @@ func helpAll(h *hub.Hub, cmd *hub.Command) {
 }
 
 func helpSingle(h *hub.Hub, cmd *hub.Command) {
+	var helpCmd *hub.Command
 	args := cmd.Payload.([]string)
-	for k, _ := range h.Subscribers {
-		if strings.HasPrefix(string(k), "user:"+args[0]) {
-			h.Publish(cmd.WithType(k).WithPayload([]string{"help"}))
-			return
+	h.HubMu.RLock()
+	for cmdType := range h.Subscribers {
+		if strings.HasPrefix(string(cmdType), "user:"+args[0]) {
+			helpCmd = cmd.WithType(cmdType).WithPayload([]string{"help"})
 		}
 	}
-	h.Error(cmd, fmt.Sprintf("no top-level command %s found", args[0]))
+	h.HubMu.RUnlock()
+
+	if helpCmd == nil {
+		h.Error(cmd, fmt.Sprintf("no top-level command %s found", args[0]))
+		return
+	}
+	h.Publish(helpCmd)
 }
 
 func help(h *hub.Hub, cmd *hub.Command) {

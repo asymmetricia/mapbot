@@ -7,11 +7,13 @@ import (
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/ryanuber/go-glob"
 	"strings"
+	"sync"
 )
 
 var log = mbLog.Log
 
 type Hub struct {
+	HubMu           sync.RWMutex
 	Subscribers     map[CommandType][]Subscriber
 	OnceSubscribers map[CommandType][]Subscriber
 }
@@ -35,10 +37,11 @@ func (h *Hub) Wait(c CommandType) <-chan *Command {
 func (h *Hub) SubscribeOnce(c CommandType, s Subscriber) {
 	c = c.Canonical()
 	log.Debugf("subscribeOnce: %s", c)
+	h.HubMu.Lock()
+	defer h.HubMu.Unlock()
+
 	if h.OnceSubscribers == nil {
-		h.OnceSubscribers = map[CommandType][]Subscriber{
-			c: []Subscriber{},
-		}
+		h.OnceSubscribers = map[CommandType][]Subscriber{}
 	}
 
 	h.OnceSubscribers[c] = append(h.OnceSubscribers[c], s)
@@ -47,10 +50,11 @@ func (h *Hub) SubscribeOnce(c CommandType, s Subscriber) {
 func (h *Hub) Subscribe(c CommandType, s Subscriber) {
 	c = c.Canonical()
 	log.Debugf("subscribe: %s", c)
+	h.HubMu.Lock()
+	defer h.HubMu.Unlock()
+
 	if h.Subscribers == nil {
-		h.Subscribers = map[CommandType][]Subscriber{
-			c: []Subscriber{},
-		}
+		h.Subscribers = map[CommandType][]Subscriber{}
 	}
 
 	h.Subscribers[c] = append(h.Subscribers[c], s)
@@ -63,17 +67,15 @@ func (h *Hub) PublishUpdate(ctx context.Context) {
 // Publish searches publishers for a subscriber to the given command's type, and executes the subscriber in a goroutine.
 func (h *Hub) Publish(c *Command) {
 	log.Debugf("publish: %s->%s (%s): %v", c.From, string(c.Type), c.User, c.Payload)
-	if h.Subscribers == nil {
-		h.Subscribers = map[CommandType][]Subscriber{}
-	}
+
+	var recipients []Subscriber
 
 	typ := c.Type.Canonical()
-	found := false
+	h.HubMu.Lock()
 	for cmd, subs := range h.Subscribers {
 		if glob.Glob(string(cmd), string(typ)) {
 			for _, sub := range subs {
-				found = true
-				go sub(h, c)
+				recipients = append(recipients, sub)
 			}
 		}
 	}
@@ -81,20 +83,27 @@ func (h *Hub) Publish(c *Command) {
 	for cmd, subs := range h.OnceSubscribers {
 		if glob.Glob(string(cmd), string(typ)) {
 			for _, sub := range subs {
-				found = true
-				go sub(h, c)
+				recipients = append(recipients, sub)
 			}
 			delete(h.OnceSubscribers, cmd)
 		}
 	}
+	h.HubMu.Unlock()
 
-	if !found && c.From != "" {
-		h.Publish(&Command{
-			Type:    CommandType(c.From),
-			Payload: fmt.Sprintf("No handler for command '%s'", typ),
-			User:    c.User,
-			Context: c.Context,
-		})
+	if len(recipients) == 0 {
+		if c.From != "" {
+			h.Publish(&Command{
+				Type:    CommandType(c.From),
+				Payload: fmt.Sprintf("No handler for command '%s'", typ),
+				User:    c.User,
+				Context: c.Context,
+			})
+		}
+		return
+	}
+
+	for _, sub := range recipients {
+		sub(h, c)
 	}
 }
 
