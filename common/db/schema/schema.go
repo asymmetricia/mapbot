@@ -22,14 +22,23 @@ var schema = []Migration{
 	},
 	Migration{
 		2,
-		map[string]string{"any": "CREATE TABLE tabulas (" +
-			"id BIGSERIAL PRIMARY KEY, " +
-			"name VARCHAR(128), " +
-			"url VARCHAR(256)," +
-			"offset_x integer default 0," +
-			"offset_y integer default 0," +
-			"dpi real default 0" +
-			")"},
+		map[string]string{
+			"sqlite3": "CREATE TABLE tabulas (" +
+				"id INTEGER PRIMARY KEY, " +
+				"name VARCHAR(128), " +
+				"url VARCHAR(256)," +
+				"offset_x integer default 0," +
+				"offset_y integer default 0," +
+				"dpi real default 0" +
+				")",
+			"any": "CREATE TABLE tabulas (" +
+				"id BIGSERIAL PRIMARY KEY, " +
+				"name VARCHAR(128), " +
+				"url VARCHAR(256)," +
+				"offset_x integer default 0," +
+				"offset_y integer default 0," +
+				"dpi real default 0" +
+				")"},
 		map[string]string{"any": "DROP TABLE IF EXISTS tabulas"},
 	},
 	Migration{
@@ -187,13 +196,11 @@ var schema = []Migration{
 	},
 	Migration{
 		17,
-		map[string]string{"any":
-		`ALTER TABLE tabula_tokens ADD COLUMN light_low INT NOT NULL DEFAULT 0; ` +
+		map[string]string{"any": `ALTER TABLE tabula_tokens ADD COLUMN light_low INT NOT NULL DEFAULT 0; ` +
 			`ALTER TABLE tabula_tokens ADD COLUMN light_normal INT NOT NULL DEFAULT 0; ` +
 			`ALTER TABLE tabula_tokens ADD COLUMN light_bright INT NOT NULL DEFAULT 0; `,
 		},
-		map[string]string{"any":
-		`ALTER TABLE tabula_tokens DROP COLUMN light_low;` +
+		map[string]string{"any": `ALTER TABLE tabula_tokens DROP COLUMN light_low;` +
 			`ALTER TABLE tabula_tokens DROP COLUMN light_normal;` +
 			`ALTER TABLE tabula_tokens DROP COLUMN light_bright;`,
 		},
