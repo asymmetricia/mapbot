@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/nlopes/slack"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/model/workflow"
+	"github.com/slack-go/slack"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -51,7 +51,7 @@ func (s *SlackUi) Action(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("no payloads in request")
 		return
 	}
-	var payload *slack.AttachmentActionCallback
+	var payload *slack.InteractionCallback
 
 	if err := json.Unmarshal([]byte(payloads[0]), &payload); err != nil || payload == nil {
 		writeResponse(rw, "error parsing payload")
@@ -66,11 +66,13 @@ func (s *SlackUi) Action(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	var team *Team
+	s.TeamsMu.RLock()
 	for _, t := range s.Teams {
 		if t.Info.ID == payload.Team.ID {
 			team = t
 		}
 	}
+	s.TeamsMu.RUnlock()
 
 	if team == nil {
 		writeResponse(rw, "your team is not recognized. mapbot may need to be reinstalled.")
@@ -80,7 +82,7 @@ func (s *SlackUi) Action(rw http.ResponseWriter, req *http.Request) {
 	team.Action(payload, rw, req)
 }
 
-func (t *Team) Action(payload *slack.AttachmentActionCallback, rw http.ResponseWriter, req *http.Request) {
+func (t *Team) Action(payload *slack.InteractionCallback, rw http.ResponseWriter, req *http.Request) {
 	userObj, err := user.Get(db.Instance, types.UserId(payload.User.ID))
 	if err != nil {
 		writeResponse(rw, "could not retrieve user")
@@ -96,7 +98,7 @@ func (t *Team) Action(payload *slack.AttachmentActionCallback, rw http.ResponseW
 		User:    userObj,
 		From:    fmt.Sprintf("internal:updateAction:slack:%s:%s:%s", t.Info.ID, payload.Channel.ID, payload.ResponseURL),
 		Context: t.Context(payload.Channel.ID),
-		Payload: []string{"respond", payload.CallbackID, payload.Actions[0].Value},
+		Payload: []string{"respond", payload.CallbackID, payload.ActionCallback.AttachmentActions[0].Value},
 		Type:    "user:workflow",
 	})
 }
@@ -114,7 +116,7 @@ func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
 
 	switch msg := c.Payload.(type) {
 	case *workflow.WorkflowMessage:
-		err := enc.Encode(t.renderWorkflowMessage(msg, comps[4]))
+		err := enc.Encode(t.renderWorkflowMessage(msg))
 		if err != nil {
 			log.Errorf("marshaling %q: %s", msg, err)
 		}

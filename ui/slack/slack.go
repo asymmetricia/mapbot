@@ -28,7 +28,6 @@ func New(id string, secret string, db anydb.AnyDb, proto string, domain string, 
 		return nil, errors.New("db handle must be non-nil")
 	}
 	ret := &SlackUi{
-		Teams: []*Team{},
 		oauth: oauth2.Config{
 			ClientID:     id,
 			ClientSecret: secret,
@@ -70,6 +69,7 @@ func CmdHowdy(h *hub.Hub, c *hub.Command) {
 type SlackUi struct {
 	clientId          string
 	clientSecret      string
+	TeamsMu           sync.RWMutex
 	Teams             []*Team
 	oauth             oauth2.Config
 	csrf              []string
@@ -78,6 +78,10 @@ type SlackUi struct {
 	teamWg            sync.WaitGroup
 	botHub            *hub.Hub
 	verificationToken string
+	pendingTeams      []struct {
+		token string
+		bot   *BotToken
+	}
 }
 
 func (s *SlackUi) GetContext(id types.ContextId) (context.Context, error) {
@@ -85,6 +89,9 @@ func (s *SlackUi) GetContext(id types.ContextId) (context.Context, error) {
 	if len(teamComps) != 2 {
 		return nil, fmt.Errorf("slack context ID expected to be TEAM-CHANNEL, but was %s", id)
 	}
+
+	s.TeamsMu.RLock()
+	defer s.TeamsMu.RUnlock()
 	for _, team := range s.Teams {
 		if team.Info.ID == teamComps[0] {
 			return team.Context(teamComps[1]), nil

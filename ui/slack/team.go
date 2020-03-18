@@ -3,7 +3,6 @@ package slack
 import (
 	"bytes"
 	"fmt"
-	"github.com/nlopes/slack"
 	"github.com/pdbogen/mapbot/common/blobserv"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
@@ -14,14 +13,17 @@ import (
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/model/workflow"
 	slackContext "github.com/pdbogen/mapbot/ui/slack/context"
+	"github.com/slack-go/slack"
 	"image"
 	"image/png"
 	"io/ioutil"
+	"math/rand"
 	"mime"
 	"os"
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func (s *SlackUi) runTeams() error {
@@ -38,47 +40,74 @@ func (s *SlackUi) runTeams() error {
 			return fmt.Errorf("loading team row: %s", err)
 		}
 
-		if err := s.addTeam(token, botToken); err != nil {
-			log.Errorf("error adding team with token %s; but will try others", token)
-		}
+		s.addTeam(token, botToken)
 	}
 	return nil
 }
 
-func (s *SlackUi) addTeam(token string, bot_token *BotToken) error {
-	log.Infof("Adding team with token %s, %s", token, bot_token)
-	if s.Teams == nil {
-		s.Teams = []*Team{}
-	}
-	team := &Team{
-		Channels:  []Channel{},
-		token:     token,
-		client:    slack.New(token),
-		botClient: slack.New(bot_token.BotToken),
-		botToken:  bot_token,
-		hub:       s.botHub,
-	}
+const (
+	initialDelay      = time.Second
+	maxDelay          = 300 * time.Second
+	jitterDelayFactor = 10 // larger number == smaller jitter
+)
 
-	ti, err := team.client.GetTeamInfo()
-	if err != nil {
-		return fmt.Errorf("obtaining info: %s", err)
-	}
-	team.Info = ti
-	team.run()
-	s.Teams = append(s.Teams, team)
+func (s *SlackUi) addTeam(token string, botToken *BotToken) {
+	go func(token string, botToken *BotToken) {
+		delay := time.Duration(0)
+		for {
+			// no delay first time through, then exponential delay w/ some jitter
+			if delay == 0 {
+				delay = initialDelay
+			} else {
+				d := delay + time.Duration(rand.Int63n(int64(delay/jitterDelayFactor))) + 1
+				log.Errorf("sleeping for %0.2fs before retry", d.Seconds())
+				time.Sleep(d)
+				delay *= 2
+				if delay > maxDelay {
+					delay = maxDelay
+				}
+			}
 
-	s.botHub.Subscribe(
-		hub.CommandType(fmt.Sprintf("internal:send:slack:%s:*", team.Info.ID)),
-		team.Send,
-	)
-	s.botHub.Subscribe(
-		hub.CommandType(fmt.Sprintf("internal:updateAction:slack:%s:*", team.Info.ID)),
-		team.updateAction,
-	)
+			log.Infof("Adding team with token %s, %s", token, botToken)
+			team := &Team{
+				Channels:  []Channel{},
+				token:     token,
+				client:    slack.New(token),
+				botClient: slack.New(botToken.BotToken),
+				botToken:  botToken,
+				hub:       s.botHub,
+			}
 
-	go team.updateEmoji()
+			ti, err := team.client.GetTeamInfo()
+			if err != nil {
+				log.Errorf("obtaining info for token %s: %v", token, err)
+				continue
+			}
+			team.Info = ti
+			team.run()
 
-	return team.Save(s.db)
+			if err := team.Save(s.db); err != nil {
+				log.Errorf("saving team %s to DB: %v", token, err)
+				continue
+			}
+
+			s.TeamsMu.Lock()
+			s.Teams = append(s.Teams, team)
+			s.TeamsMu.Unlock()
+
+			s.botHub.Subscribe(
+				hub.CommandType(fmt.Sprintf("internal:send:slack:%s:*", team.Info.ID)),
+				team.Send,
+			)
+			s.botHub.Subscribe(
+				hub.CommandType(fmt.Sprintf("internal:updateAction:slack:%s:*", team.Info.ID)),
+				team.updateAction,
+			)
+
+			team.updateEmoji()
+			break
+		}
+	}(token, botToken)
 }
 
 func (t *Team) updateEmoji() {
@@ -160,49 +189,79 @@ func (t *Team) manageMessages() {
 				go t.updateEmoji()
 			case "message":
 				go func() {
-					if msg, ok := event.Data.(*slack.MessageEvent); ok {
-						if msg.User == t.botToken.BotId || msg.User == "" {
-							return
+					msg, ok := event.Data.(*slack.MessageEvent)
+					if !ok {
+						log.Warningf("Received message, but type was %s, not *slack.MessageEvent",
+							reflect.TypeOf(event.Data))
+						return
+					}
+					if msg.User == t.botToken.BotId || msg.User == "" {
+						return
+					}
+
+					argv := strings.Fields(msg.Text)
+
+					// de-linkify links
+					for i, arg := range argv {
+						if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
+							argv[i] = matches[1]
 						}
+					}
 
-						argv := strings.Fields(msg.Text)
-						for i, arg := range argv {
-							if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
-								argv[i] = matches[1]
-							}
-						}
+					// the message is for us if it's a DM or if it begins with `@mapbot`
+					if msg.Channel[0] != 'D' && (len(argv) < 1 || argv[0] != "<@"+t.botToken.BotId+">") {
+						log.Debugf("skipping un-prefixed non-direct message %q", msg.Text)
+						return
+					}
 
-						if msg.Channel[0] != 'D' {
-							if len(argv) < 1 || argv[0] != "<@"+t.botToken.BotId+">" {
-								log.Debugf("Skipping non-direct message %q", msg.Text)
-								return
-							}
-							argv = argv[1:]
-						}
+					// strip any `@mapbot` prefix, even in DMs
+					if len(argv) > 0 && argv[0] == "<@"+t.botToken.BotId+">" {
+						argv = argv[1:]
+					}
 
-						log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
+					log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
+					log.Debugf("Message Object: %+v", msg)
 
-						u, err := user.Get(db.Instance, types.UserId(msg.User))
-						if err != nil {
-							log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
-							return
-						}
+					u, err := user.Get(db.Instance, types.UserId(msg.User))
+					if err != nil {
+						log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
+						return
+					}
 
-						if u == nil {
-							log.Errorf("nil obtaining/creating user %q, but no error?!", msg.User)
-							return
-						}
+					if u == nil {
+						log.Errorf("nil obtaining/creating user %q, but no error?!", msg.User)
+						return
+					}
 
+					if msg.Upload {
 						t.hub.Publish(&hub.Command{
 							From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
-							Type:    hub.CommandType("user:" + argv[0]),
-							Payload: argv[1:],
+							Type:    "user:map",
+							Payload: []string{"add", msg.Files[0].ID, msg.Files[0].URLPrivateDownload},
 							User:    u,
 							Context: t.Context(msg.Channel),
 						})
-					} else {
-						log.Warningf("Received message, but type was %s", reflect.TypeOf(event.Data))
+						t.hub.Publish(&hub.Command{
+							From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
+							Type:    "user:workflow",
+							Payload: []string{"start", "rename", msg.Files[0].ID},
+							User:    u,
+							Context: t.Context(msg.Channel),
+						})
+						return
 					}
+
+					if len(argv) < 2 {
+						argv = append(argv, "")
+					}
+
+					t.hub.Publish(&hub.Command{
+						From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
+						Type:    hub.CommandType("user:" + argv[0]),
+						Payload: argv[1:],
+						User:    u,
+						Context: t.Context(msg.Channel),
+					})
 				}()
 			case "latency_report":
 			case "reconnect_url":
@@ -235,17 +294,15 @@ func attachImage(a *[]slack.Attachment, i image.Image) {
 	*a = append(*a, slack.Attachment{ImageURL: url})
 }
 
-func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage, channel string) *slack.PostMessageParameters {
+func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) []slack.MsgOption {
 	if msg.Text == "" {
 		return nil
 	}
 
-	params := &slack.PostMessageParameters{
-		Text:     msg.Text,
-		Markdown: true,
-	}
+	ret := []slack.MsgOption{slack.MsgOptionText(msg.Text, false)}
 
-	params.Attachments = []slack.Attachment{}
+	var attachments []slack.Attachment
+
 	if msg.ChoiceSets == nil {
 		msg.ChoiceSets = [][]string{}
 	}
@@ -269,12 +326,12 @@ func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage, channel stri
 				Type:  "button",
 			}
 		}
-		params.Attachments = append(params.Attachments, attachment)
+		attachments = append(attachments, attachment)
 	}
 
-	attachImage(&params.Attachments, msg.Image)
+	attachImage(&attachments, msg.Image)
 
-	return params
+	return append(ret, slack.MsgOptionAttachments(attachments...))
 }
 
 func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.WorkflowMessage) {
@@ -286,9 +343,9 @@ func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.Wor
 
 	channel := comps[4]
 
-	rendered := t.renderWorkflowMessage(msg, channel)
-	if rendered != nil {
-		_, _, err := t.botClient.PostMessage(channel, msg.Text, *rendered)
+	opts := t.renderWorkflowMessage(msg)
+	if len(opts) > 0 {
+		_, _, err := t.botClient.PostMessage(channel, opts...)
 
 		if err != nil {
 			log.Errorf("%s: error posting workflow message to channel %q: %s", t.Info.ID, comps[4], err)
@@ -309,12 +366,10 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 	case string:
 		_, _, err := t.botClient.PostMessage(
 			channel,
-			msg,
-			slack.PostMessageParameters{
-				Text:     msg,
-				Username: "mapbot",
-				AsUser:   true,
-			})
+			slack.MsgOptionText(msg, false),
+			slack.MsgOptionUsername("mapbot"),
+			slack.MsgOptionAsUser(true),
+		)
 		if err != nil {
 			log.Errorf("%s: error posting message %q to channel %q: %s", t.Info.ID, msg, comps[4], err)
 		}

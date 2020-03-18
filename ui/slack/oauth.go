@@ -10,19 +10,19 @@ import (
 	"time"
 )
 
-func (ui *SlackUi) OAuthAutoStart(rw http.ResponseWriter, req *http.Request) {
-	nonce, err := ui.newNonce()
+func (s *SlackUi) OAuthAutoStart(rw http.ResponseWriter, req *http.Request) {
+	nonce, err := s.newNonce()
 	if err != nil {
 		log.Errorf("error generating nonce: %s", err)
 		http.Error(rw, "error generating nonce", http.StatusInternalServerError)
 		return
 	}
 
-	http.Redirect(rw, req, ui.oauth.AuthCodeURL(nonce), http.StatusFound)
+	http.Redirect(rw, req, s.oauth.AuthCodeURL(nonce), http.StatusFound)
 }
 
-func (ui *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
-	nonce, err := ui.newNonce()
+func (s *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
+	nonce, err := s.newNonce()
 	if err != nil {
 		log.Errorf("error generating nonce: %s", err)
 		http.Error(rw, "error generating nonce", http.StatusInternalServerError)
@@ -32,25 +32,25 @@ func (ui *SlackUi) OAuthGet(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Add("content-type", "text/html")
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("Welcome to MapBot.<br/>"))
-	rw.Write([]byte(fmt.Sprintf("<a href='%s'>Add To Slack</a>", ui.oauth.AuthCodeURL(nonce))))
+	rw.Write([]byte(fmt.Sprintf("<a href='%s'>Add To Slack</a>", s.oauth.AuthCodeURL(nonce))))
 }
 
-func (ui *SlackUi) newNonce() (string, error) {
+func (s *SlackUi) newNonce() (string, error) {
 	nonce := rand.RandHex(32)
-	_, err := ui.db.Exec("INSERT INTO slack_nonces (nonce, expiry) VALUES ($1,$2)", nonce, time.Now().Add(time.Hour))
+	_, err := s.db.Exec("INSERT INTO slack_nonces (nonce, expiry) VALUES ($1,$2)", nonce, time.Now().Add(time.Hour))
 	if err != nil {
 		return "", err
 	}
 	return nonce, nil
 }
 
-func (ui *SlackUi) validateNonce(nonce string) (bool, error) {
-	_, err := ui.db.Exec("DELETE FROM slack_nonces WHERE expiry < $1", time.Now())
+func (s *SlackUi) validateNonce(nonce string) (bool, error) {
+	_, err := s.db.Exec("DELETE FROM slack_nonces WHERE expiry < $1", time.Now())
 	if err != nil {
 		return false, fmt.Errorf("expiring nonces: %s", err)
 	}
 
-	results, err := ui.db.Query("SELECT * FROM slack_nonces WHERE nonce=$1", nonce)
+	results, err := s.db.Query("SELECT * FROM slack_nonces WHERE nonce=$1", nonce)
 	if err != nil {
 		return false, fmt.Errorf("querying nonces: %s", err)
 	}
@@ -59,15 +59,15 @@ func (ui *SlackUi) validateNonce(nonce string) (bool, error) {
 	return results.Next(), nil
 }
 
-func (ui *SlackUi) invalidateNonce(nonce string) error {
-	if _, err := ui.db.Exec("DELETE FROM slack_nonces WHERE nonce=$1", nonce); err != nil {
+func (s *SlackUi) invalidateNonce(nonce string) error {
+	if _, err := s.db.Exec("DELETE FROM slack_nonces WHERE nonce=$1", nonce); err != nil {
 		return fmt.Errorf("invalidating nonce: %s", err)
 	}
 
 	return nil
 }
 
-func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
+func (s *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
 	code := req.FormValue("code")
 	nonce := req.FormValue("state")
 	if code == "" {
@@ -81,7 +81,7 @@ func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if ok, err := ui.validateNonce(nonce); err != nil {
+	if ok, err := s.validateNonce(nonce); err != nil {
 		log.Errorf("%s: error validating nonce %q: %s", req.RemoteAddr, nonce, err)
 		http.Error(rw, "error checking nonce", http.StatusInternalServerError)
 		return
@@ -91,7 +91,7 @@ func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	token, err := ui.oauth.Exchange(context.Background(), code)
+	token, err := s.oauth.Exchange(context.Background(), code)
 	if err != nil {
 		log.Errorf("%s: failed to exchange token: %s", req.RemoteAddr, err)
 		http.Error(rw, "token exchange failed", http.StatusInternalServerError)
@@ -103,18 +103,14 @@ func (ui *SlackUi) OAuthPost(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("oauth token did not contain bot authentication data: %s", err)
 	}
 
-	if err := ui.invalidateNonce(nonce); err != nil {
+	if err := s.invalidateNonce(nonce); err != nil {
 		log.Errorf("%s: handling oauth redirect: %s", req.RemoteAddr, err)
 		http.Error(rw, "nonce invalidation failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Note that, per https://api.slack.com/docs/oauth, slack access tokens do not currently expire
-	if err := ui.addTeam(token.AccessToken, bot_token); err != nil {
-		log.Errorf("saving team to DB: %s", err)
-		http.Error(rw, "error saving token", http.StatusInternalServerError)
-		return
-	}
+	s.addTeam(token.AccessToken, bot_token)
+
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("done!"))
 }

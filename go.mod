@@ -9,9 +9,9 @@ require (
 	github.com/lib/pq v0.0.0-20170206200638-0477eb88c5ca
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
-	github.com/nlopes/slack v0.0.2-0.20170211112627-6519657c021b
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/ryanuber/go-glob v0.0.0-20170128012129-256dc444b735
+	github.com/slack-go/slack v0.6.3
 	github.com/stretchr/testify v1.5.1 // indirect
 	golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
 	golang.org/x/image v0.0.0-20170210230806-df2aa51d4407
