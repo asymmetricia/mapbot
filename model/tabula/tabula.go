@@ -152,10 +152,18 @@ func (t *Tabula) Save(db anydb.AnyDb) error {
 	r, g, b, a := t.GridColor.RGBA()
 
 	if t.Id == nil {
-		result, err := db.Query(
-			"INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version) "+
-				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "+
-				"RETURNING id",
+		var q string
+		switch db.Dialect() {
+		case "sqlite3":
+			q = "INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version) " +
+				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) " +
+				"; SELECT last_insert_rowid()"
+		case "postgresql":
+			q = "INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version) " +
+				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) " +
+				"RETURNING id"
+		}
+		result, err := db.Query(q,
 			string(t.Name), t.Url, t.OffsetX, t.OffsetY, t.Dpi, r, g, b, a, t.Version,
 		)
 		if err != nil {
