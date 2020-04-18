@@ -37,8 +37,29 @@ func (m *Mask) Up(db *sql.DB) error {
 }
 
 func (m *Mask) Save(db anydb.AnyDb, id int64) error {
+	tx, err := db.Begin()
+
+	if err == nil {
+		err = m.SaveTx(db.Dialect(), tx, id)
+	}
+
+	if err == nil {
+		err = tx.Commit()
+	}
+
+	if err != nil && tx != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			err = fmt.Errorf("%v and during rollback: %v", rbErr)
+		}
+	}
+
+	return err
+}
+func (m *Mask) SaveTx(dialect string, tx *sql.Tx, id int64) error {
+	var err error
+
 	if m.Order == nil {
-		res, err := db.Query(`SELECT MAX("order")+1 FROM tabula_masks WHERE tabula_id=$1`, id)
+		res, err := tx.Query(`SELECT MAX("order")+1 FROM tabula_masks WHERE tabula_id=$1`, id)
 		if err != nil {
 			return fmt.Errorf("determining next order: %s", err)
 		}
@@ -53,7 +74,7 @@ func (m *Mask) Save(db anydb.AnyDb, id int64) error {
 	}
 
 	var query string
-	switch dia := db.Dialect(); dia {
+	switch dialect {
 	case "postgresql":
 		query = `INSERT INTO tabula_masks (name, "order", tabula_id, red, green, blue, alpha, top, "left", width, height) ` +
 			`VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ` +
@@ -64,9 +85,10 @@ func (m *Mask) Save(db anydb.AnyDb, id int64) error {
 		query = "REPLACE INTO tabula_masks (name, order, tabula_id, red, green, blue, alpha, top, left, width, height)" +
 			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11"
 	default:
-		return fmt.Errorf("no Mask.Save query for SQL dialect %s", dia)
+		return fmt.Errorf("no Mask.Save query for SQL dialect %s", dialect)
 	}
-	_, err := db.Exec(
+
+	_, err = tx.Exec(
 		query,
 		m.Name, *m.Order, id, m.Color.R, m.Color.G, m.Color.B, m.Color.A, m.Top, m.Left, m.Width, m.Height,
 	)

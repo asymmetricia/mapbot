@@ -246,6 +246,14 @@ var schema = []Migration{
 		map[string]string{"any": `ALTER TABLE web_sessions ADD COLUMN context_type VARCHAR(32)`},
 		map[string]string{"any": `ALTER TABLE web_sessions DROP COLUMN context_type`},
 	},
+	{
+		Id: 23,
+		Up: map[string]string{"any": `CREATE TABLE tabula_data (` +
+			`tabula_id  BIGSERIAL REFERENCES tabulas (id) ON DELETE CASCADE,` +
+			`data BYTEA` +
+			`)`},
+		Down: map[string]string{"any": `DROP TABLE tabula_data`},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {

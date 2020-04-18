@@ -489,12 +489,42 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 
 		h.Publish(&hub.Command{
 			Type:    hub.CommandType(c.From),
-			Payload: fmt.Sprintf("map %q saved", args[0]),
+			Payload: fmt.Sprintf("map %q URL updated", args[0]),
 			User:    c.User,
 		})
-	} else {
-		h.Error(c, "usage: map add <name> <url>")
+		return
 	}
+
+	h.Publish(&hub.Command{
+		Type:    hub.CommandType(c.From),
+		Payload: "Getting background image.. this could take a moment.",
+		User:    c.User,
+	})
+	t, err := tabula.New(args[0], args[1])
+	if err != nil {
+		h.Error(c, fmt.Sprintf("error creating map: %s", err))
+		return
+	}
+
+	tx, err := db.Instance.Begin()
+	if err != nil {
+		h.Error(c, fmt.Sprintf("error beginning transaction: %v", err))
+	}
+	if err := t.SaveTx(db.Instance.Dialect(), tx); err != nil {
+		h.Error(c, fmt.Sprintf("error saving map to database: %s", err))
+		return
+	}
+
+	if err := c.User.AssignTx(db.Instance.Dialect(), tx, t); err != nil {
+		h.Error(c, fmt.Sprintf("error saving user record to database: %s", err))
+		return
+	}
+
+	h.Publish(&hub.Command{
+		Type:    hub.CommandType(c.From),
+		Payload: fmt.Sprintf("map %q saved", args[0]),
+		User:    c.User,
+	})
 }
 
 func notFound(n tabula.TabulaName) string {

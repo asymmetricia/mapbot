@@ -1,6 +1,7 @@
 package tabula
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/nfnt/resize"
@@ -96,13 +97,30 @@ func (t *Tabula) loadTokens(db anydb.AnyDb) error {
 }
 
 func (t *Tabula) saveTokens(db anydb.AnyDb) error {
+	tx, err := db.Begin()
+
+	if err == nil {
+		err = t.saveTokensTx(db.Dialect(), tx)
+	}
+
+	if err == nil {
+		err = tx.Commit()
+	}
+
+	if err != nil && tx != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			err = fmt.Errorf("%v and rollback failed: %v", err, rbErr)
+		}
+	}
+
+	return err
+}
+
+func (t *Tabula) saveTokensTx(dialect string, tx *sql.Tx) error {
 	if t.Id == nil {
 		return errors.New("cannot save tokens for tabula with nil ID")
 	}
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("preparing transaction: %s", err)
-	}
+
 	// Read list of existing tokens
 	res, err := tx.Query("SELECT name, context_id FROM tabula_tokens WHERE tabula_id=$1", t.Id)
 	if err != nil {
@@ -151,7 +169,7 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 
 	// Add Or Replace existing tokens
 	var query string
-	switch dia := db.Dialect(); dia {
+	switch dialect {
 	case "postgresql":
 		query = "INSERT INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a, light_dim, light_normal, light_bright) " +
 			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12, $13) " +
@@ -160,7 +178,7 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 		query = "REPLACE INTO tabula_tokens (name, context_id, tabula_id, size, x, y, r, g, b, a, light_dim, light_normal, light_bright) " +
 			"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12, $13)"
 	default:
-		return fmt.Errorf("no Tabula.saveTokens query for SQL dialect %s", dia)
+		return fmt.Errorf("no Tabula.saveTokens query for SQL dialect %s", dialect)
 	}
 
 	add, err := tx.Prepare(query)
@@ -176,9 +194,7 @@ func (t *Tabula) saveTokens(db anydb.AnyDb) error {
 			}
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing changes: %s", err)
-	}
+
 	log.Debugf("Token save for tabula %d complete", t.Id)
 	return nil
 }

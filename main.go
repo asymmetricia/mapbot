@@ -147,6 +147,7 @@ func main() {
 		log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
 		log.Fatal(server.ListenAndServeTLS("", ""))
 	} else {
+		log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
 		log.Fatal(server.ListenAndServe())
 	}
 }

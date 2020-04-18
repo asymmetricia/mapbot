@@ -1,6 +1,7 @@
 package user
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -181,6 +182,22 @@ func (u *User) TabulaByName(name tabula.TabulaName) (*tabula.Tabula, bool) {
 }
 
 func (u *User) Assign(db anydb.AnyDb, t *tabula.Tabula) error {
+	tx, err := db.Begin()
+	if err == nil {
+		err = u.AssignTx(db.Dialect(), tx, t)
+	}
+	if err == nil {
+		err = tx.Commit()
+	}
+	if err != nil && tx != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			err = fmt.Errorf("%v and could not rollback: %v", err, rbErr)
+		}
+	}
+	return err
+}
+
+func (u *User) AssignTx(dialect string, tx *sql.Tx, t *tabula.Tabula) error {
 	if u == nil {
 		return errors.New("Assign called on nil User")
 	}
@@ -199,7 +216,7 @@ func (u *User) Assign(db anydb.AnyDb, t *tabula.Tabula) error {
 	}
 
 	var usersQuery, userTabulaeQuery string
-	switch dia := db.Dialect(); dia {
+	switch dialect {
 	case "postgresql":
 		usersQuery = "INSERT INTO users (id, prefAutoShow) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET prefAutoShow=$2"
 		userTabulaeQuery = "INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
@@ -207,21 +224,14 @@ func (u *User) Assign(db anydb.AnyDb, t *tabula.Tabula) error {
 		usersQuery = "REPLACE INTO users (id, prefAutoShow) VALUES ($1, $2)"
 		userTabulaeQuery = "INSERT INTO user_tabulas (user_id, tabula_id) VALUES ($1, $2)"
 	default:
-		return fmt.Errorf("no User.Assign query for SQL dialect %s", dia)
+		return fmt.Errorf("no User.Assign query for SQL dialect %s", dialect)
 	}
-	_, err := db.Exec(
-		usersQuery,
-		&u.Id, u.AutoShow,
-	)
+	_, err := tx.Exec(usersQuery, &u.Id, u.AutoShow)
 	if err != nil {
 		return fmt.Errorf("upserting user: %s", err)
 	}
 
-	_, err = db.Exec(
-		userTabulaeQuery,
-		&u.Id, t.Id,
-	)
-
+	_, err = tx.Exec(userTabulaeQuery, &u.Id, t.Id)
 	return err
 }
 

@@ -5,6 +5,7 @@ package tabula
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/golang/freetype"
@@ -12,6 +13,7 @@ import (
 	"github.com/nfnt/resize"
 	"github.com/pdbogen/mapbot/common/cache"
 	"github.com/pdbogen/mapbot/common/conv"
+	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbDraw "github.com/pdbogen/mapbot/common/draw"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -146,6 +148,26 @@ func (t *Tabula) Delete(db anydb.AnyDb) error {
 }
 
 func (t *Tabula) Save(db anydb.AnyDb) error {
+	tx, err := db.Begin()
+
+	if err == nil {
+		err = t.SaveTx(db.Dialect(), tx)
+	}
+
+	if err == nil {
+		err = tx.Commit()
+	}
+
+	if err != nil && tx != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			err = fmt.Errorf("%v and during rollback: %v", rbErr)
+		}
+	}
+
+	return err
+}
+
+func (t *Tabula) SaveTx(dialect string, tx *sql.Tx) error {
 	if t.GridColor == nil {
 		t.GridColor = &color.NRGBA{A: 255}
 	}
@@ -153,7 +175,7 @@ func (t *Tabula) Save(db anydb.AnyDb) error {
 
 	if t.Id == nil {
 		var q string
-		switch db.Dialect() {
+		switch dialect {
 		case "sqlite3":
 			q = "INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version) " +
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) " +
@@ -162,10 +184,14 @@ func (t *Tabula) Save(db anydb.AnyDb) error {
 			q = "INSERT INTO tabulas (name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a, version) " +
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) " +
 				"RETURNING id"
+		default:
+			return fmt.Errorf("no Tabula.Save (update) query for SQL dialect %s", dialect)
 		}
-		result, err := db.Query(q,
+
+		result, err := tx.Query(q,
 			string(t.Name), t.Url, t.OffsetX, t.OffsetY, t.Dpi, r, g, b, a, t.Version,
 		)
+
 		if err != nil {
 			return err
 		}
@@ -184,7 +210,7 @@ func (t *Tabula) Save(db anydb.AnyDb) error {
 		}
 	} else {
 		var query string
-		switch dia := db.Dialect(); dia {
+		switch dialect {
 		case "postgresql":
 			query = "INSERT INTO tabulas (id, name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) " +
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) " +
@@ -194,9 +220,10 @@ func (t *Tabula) Save(db anydb.AnyDb) error {
 			query = "REPLACE INTO tabula (id, name, url, offset_x, offset_y, dpi, grid_r, grid_g, grid_b, grid_a) " +
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
 		default:
-			return fmt.Errorf("no Tabula.Save query for SQL dialect %s", dia)
+			return fmt.Errorf("no Tabula.Save query for SQL dialect %s", dialect)
 		}
-		_, err := db.Exec(query,
+
+		_, err := tx.Exec(query,
 			int64(*t.Id), string(t.Name), t.Url, t.OffsetX, t.OffsetY, t.Dpi, r, g, b, a,
 		)
 		if err != nil {
@@ -206,14 +233,14 @@ func (t *Tabula) Save(db anydb.AnyDb) error {
 
 	if t.Masks != nil {
 		for _, m := range t.Masks {
-			if err := m.Save(db, int64(*t.Id)); err != nil {
+			if err := m.SaveTx(dialect, tx, int64(*t.Id)); err != nil {
 				return err
 			}
 		}
 	}
 
 	if t.Tokens != nil {
-		if err := t.saveTokens(db); err != nil {
+		if err := t.saveTokensTx(dialect, tx); err != nil {
 			return err
 		}
 	}
@@ -231,7 +258,7 @@ func New(name, url string) (*Tabula, error) {
 	}, nil
 }
 
-func (t *Tabula) Hydrate() error {
+func (t *Tabula) Hydrate(db anydb.AnyDb) error {
 	if t.Background != nil {
 		return nil
 	}
@@ -240,18 +267,37 @@ func (t *Tabula) Hydrate() error {
 		Timeout: 30 * time.Second,
 	}
 
-	res, err := c.Get(t.Url)
+	var imgData []byte
+
+	res, err := db.Query("SELECT data FROM tabula_data WHERE tabula_id=$1", int64(*t.Id))
 	if err != nil {
-		return err
+		log.Errorf("querying database for saved tabula data: %v", err)
+		res = nil
+	} else {
+		defer res.Close()
+		if res.Next() {
+			if err := res.Scan(&imgData); err != nil {
+				log.Errorf("querying database for saved tabula data: %v", err)
+				imgData = nil
+			}
+		}
 	}
-	defer res.Body.Close()
 
-	imgBuf := &bytes.Buffer{}
-	if _, err := io.Copy(imgBuf, res.Body); err != nil {
-		return fmt.Errorf("error reading from HTTP response: %s", err)
+	if imgData == nil {
+		res, err := c.Get(t.Url)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+
+		imgBuf := &bytes.Buffer{}
+		if _, err := io.Copy(imgBuf, res.Body); err != nil {
+			return fmt.Errorf("error reading from HTTP response: %s", err)
+		}
+
+		imgData = imgBuf.Bytes()
 	}
 
-	imgData := imgBuf.Bytes()
 	img, _, err := image.Decode(bytes.NewReader(imgData))
 	if err != nil {
 		n := 16
@@ -611,7 +657,7 @@ func (t *Tabula) addCoordinates(i draw.Image, first_x, first_y int, offset image
 }
 
 // Returns the tabula BackgroundImage, scaled so that its largest dimension is 2000px.
-func (t *Tabula) BackgroundImage(sendStatusMessage func(string)) (image.Image, error) {
+func (t *Tabula) BackgroundImage(db anydb.AnyDb, sendStatusMessage func(string)) (image.Image, error) {
 	if t.Background == nil {
 		bg, ok := cache.Get(t.Url)
 		if ok && bg.Version == t.Version {
@@ -620,7 +666,7 @@ func (t *Tabula) BackgroundImage(sendStatusMessage func(string)) (image.Image, e
 			if sendStatusMessage != nil {
 				sendStatusMessage("I have to retrieve the background image; this could take a moment.")
 			}
-			if err := t.Hydrate(); err != nil {
+			if err := t.Hydrate(db); err != nil {
 				return nil, fmt.Errorf("retrieving background: %s", err)
 			}
 			cache.Put(t.Url, &cache.CacheEntry{t.Version, copyImage(t.Background)})
@@ -683,7 +729,7 @@ func (t *Tabula) Render(ctx context.Context, sendStatusMessage func(string)) (im
 		gridded = copyImage(cached.Image)
 	} else {
 		log.Infof("Cache miss: %s", cacheKey)
-		resized, err := t.BackgroundImage(sendStatusMessage)
+		resized, err := t.BackgroundImage(db.Instance, sendStatusMessage)
 		if err != nil {
 			return nil, fmt.Errorf("retrieving background: %s", err)
 		}
