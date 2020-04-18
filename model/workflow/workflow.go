@@ -23,29 +23,40 @@ type Workflow struct {
 	OpaqueFromJson func([]byte) (interface{}, error)
 }
 
-// Challenge is called upon entering a state; the state issues a challenge to
-// the user. Challenge looks up the state by name, and if a state is found and
-// it has a challenge, returns the result of calling that state's Challenge.
-// If the state cannot be found or it does not have a defined Challenge, a non-nil WorkflowMessage will provide a
-// message for the user describing the problem (but this typically indicates misuse of a debugging utility or a
+// StateEnter is called upon entering a state;. StateEnter looks up the state by
+// name, and if a state is found and it has an OnStateEnter, returns the result
+// of calling that state's OnStateEnter.
+//
+// If the state cannot be found or it does not have a defined OnStateEnter, a
+// non-nil WorkflowMessage will provide a message for the user describing the
+// problem (but this typically indicates misuse of a debugging utility or a
 // programming error).
-// A nil WorkflowMessage is not an error, but indicates that there is no response for the user.
+//
+// A nil WorkflowMessage is not an error, but indicates that there is no
+// response for the user.
 
-func (wf *Workflow) Challenge(key string, state string, opaque interface{}) *WorkflowMessage {
+func (wf *Workflow) StateEnter(workflowName string, state string, opaque interface{}) (
+	newState *string, newOpaque interface{}, msg *WorkflowMessage,
+) {
 	stateObj, ok := wf.States[strings.ToLower(state)]
 	if !ok {
-		return &WorkflowMessage{Workflow: key, Text: fmt.Sprintf("invalid state %q", state)}
+		return nil, nil, &WorkflowMessage{
+			Workflow: workflowName,
+			Text:     fmt.Sprintf("invalid state %q", state),
+		}
 	}
-	if stateObj.Challenge == nil {
-		return &WorkflowMessage{Workflow: key, Text: fmt.Sprintf("no challenge associated with state %q", state)}
-	}
-	msg := stateObj.Challenge(opaque)
-	if msg == nil {
-		return &WorkflowMessage{Workflow: key}
+	if stateObj.Challenge == nil && stateObj.OnStateEnter == nil {
+		return nil, nil, &WorkflowMessage{
+			Workflow: workflowName,
+			Text:     fmt.Sprintf("no challenge associated with state %q", state),
+		}
 	}
 
-	msg.Workflow = key
-	return msg
+	if stateObj.Challenge != nil {
+		return nil, nil, stateObj.Challenge(opaque)
+	}
+
+	return stateObj.OnStateEnter(opaque)
 }
 
 // Response is called when a user responds to a challenge, either via a message
@@ -75,12 +86,38 @@ func (wf *Workflow) Response(state user.WorkflowState, choice *string) (string, 
 }
 
 type WorkflowState struct {
+	// Deprecated; use OnUserAction
 	Challenge ChallengeFunc
-	Response  ResponseFunc
+	// Deprecated; use OnStateEnter
+	Response ResponseFunc
+
+	OnUserAction OnUserActionFunc
+	OnStateEnter OnStateEnterFunc
 }
 
-// Challenge idempotently retrieves the challenge for the named state with the given opaque data
+// StateEnter idempotently retrieves the challenge for the named state with the given opaque data
 type ChallengeFunc func(opaque interface{}) *WorkflowMessage
+
+// OnStateEnter fires when a state is entered. All returns are optional.
+//
+// If `state` is non-nil, the given state will be entered.
+//
+// If `opaqueOut` is non-nil, the user's opaque data for this workflow will be
+// replaced with the new value.
+//
+// If `message` is non-nil, the message will be sent to the user.
+type OnStateEnterFunc func(opaqueIn interface{}) (state *string, opaqueOut interface{}, message *WorkflowMessage)
+
+// OnUserAction fires when the workflow is in this state and the user takes some
+// action on a previous workflow message. All returns are optional.
+//
+// If `state` is non-nil, the given state will be entered.
+//
+// If `opaqueOut` is non-nil, the user's opaque data for this workflow will be
+// replaced with the new value.
+//
+// If `message` is non-nil, the message will be sent to the user.
+type OnUserActionFunc func(opaqueIn interface{}, choice *string) (state *string, opaqueOut interface{}, message *WorkflowMessage)
 
 // Response is idempotent from the state machine perspective but may have side
 // effects like modifying Tabula or tokens. It executes the action associated
