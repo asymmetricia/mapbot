@@ -455,36 +455,39 @@ func cmdAdd(h *hub.Hub, c *hub.Command) {
 		log.Errorf("received command with nil user")
 		return
 	}
-	if args, ok := c.Payload.([]string); ok && len(args) == 2 {
-		t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
-		if ok {
-			t.Url = args[1]
 
-			if err := t.Save(db.Instance); err != nil {
-				h.Error(c, fmt.Sprintf("error saving map to database: %s", err))
-				return
-			}
-		} else {
-			h.Publish(&hub.Command{
-				Type:    hub.CommandType(c.From),
-				Payload: "Getting background image.. this could take a moment.",
-				User:    c.User,
-			})
-			t, err := tabula.New(args[0], args[1])
-			if err != nil {
-				h.Error(c, fmt.Sprintf("error creating map: %s", err))
-				return
-			}
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "usage: map add <name> <url>")
+		return
+	}
 
-			if err := t.Save(db.Instance); err != nil {
-				h.Error(c, fmt.Sprintf("error saving map to database: %s", err))
-				return
-			}
+	// If name is blank or prefixed with `@`, automatically pick a unique name
+	if len(args[0]) == 0 || args[0][0] == '@' {
+		if len(args[0]) > 0 {
+			args[0] = args[0][1:]
+		}
 
-			if err := c.User.Assign(db.Instance, t); err != nil {
-				h.Error(c, fmt.Sprintf("error saving user record to database: %s", err))
-				return
+		i := 1
+		name := args[0]
+		for {
+			_, ok := c.User.TabulaByName(tabula.TabulaName(name))
+			if !ok {
+				break
 			}
+			i++
+			name = fmt.Sprintf("%s-%d", args[0], i)
+		}
+		args[0] = name
+	}
+
+	t, ok := c.User.TabulaByName(tabula.TabulaName(args[0]))
+	if ok {
+		t.Url = args[1]
+
+		if err := t.Save(db.Instance); err != nil {
+			h.Error(c, fmt.Sprintf("error saving map to database: %s", err))
+			return
 		}
 
 		h.Publish(&hub.Command{

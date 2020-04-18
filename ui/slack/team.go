@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"mime"
+	"net/http"
 	"os"
 	"reflect"
 	"regexp"
@@ -188,81 +189,7 @@ func (t *Team) manageMessages() {
 			case "emoji_changed":
 				go t.updateEmoji()
 			case "message":
-				go func() {
-					msg, ok := event.Data.(*slack.MessageEvent)
-					if !ok {
-						log.Warningf("Received message, but type was %s, not *slack.MessageEvent",
-							reflect.TypeOf(event.Data))
-						return
-					}
-					if msg.User == t.botToken.BotId || msg.User == "" {
-						return
-					}
-
-					argv := strings.Fields(msg.Text)
-
-					// de-linkify links
-					for i, arg := range argv {
-						if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
-							argv[i] = matches[1]
-						}
-					}
-
-					// the message is for us if it's a DM or if it begins with `@mapbot`
-					if msg.Channel[0] != 'D' && (len(argv) < 1 || argv[0] != "<@"+t.botToken.BotId+">") {
-						log.Debugf("skipping un-prefixed non-direct message %q", msg.Text)
-						return
-					}
-
-					// strip any `@mapbot` prefix, even in DMs
-					if len(argv) > 0 && argv[0] == "<@"+t.botToken.BotId+">" {
-						argv = argv[1:]
-					}
-
-					log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
-					log.Debugf("Message Object: %+v", msg)
-
-					u, err := user.Get(db.Instance, types.UserId(msg.User))
-					if err != nil {
-						log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
-						return
-					}
-
-					if u == nil {
-						log.Errorf("nil obtaining/creating user %q, but no error?!", msg.User)
-						return
-					}
-
-					if msg.Upload {
-						t.hub.Publish(&hub.Command{
-							From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
-							Type:    "user:map",
-							Payload: []string{"add", msg.Files[0].ID, msg.Files[0].URLPrivateDownload},
-							User:    u,
-							Context: t.Context(msg.Channel),
-						})
-						t.hub.Publish(&hub.Command{
-							From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
-							Type:    "user:workflow",
-							Payload: []string{"start", "rename", msg.Files[0].ID},
-							User:    u,
-							Context: t.Context(msg.Channel),
-						})
-						return
-					}
-
-					if len(argv) < 2 {
-						argv = append(argv, "")
-					}
-
-					t.hub.Publish(&hub.Command{
-						From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
-						Type:    hub.CommandType("user:" + argv[0]),
-						Payload: argv[1:],
-						User:    u,
-						Context: t.Context(msg.Channel),
-					})
-				}()
+				go t.handleMessage(event)
 			case "latency_report":
 			case "reconnect_url":
 			case "presence_change":
@@ -271,6 +198,72 @@ func (t *Team) manageMessages() {
 			}
 		}
 	}
+}
+
+func (t *Team) handleMessage(event slack.RTMEvent) {
+	msg, ok := event.Data.(*slack.MessageEvent)
+	if !ok {
+		log.Warningf("Received message, but type was %s, not *slack.MessageEvent",
+			reflect.TypeOf(event.Data))
+		return
+	}
+	if msg.User == t.botToken.BotId || msg.User == "" {
+		return
+	}
+
+	argv := strings.Fields(msg.Text)
+
+	// de-linkify links
+	for i, arg := range argv {
+		if matches := slackUrlRe.FindStringSubmatch(arg); matches != nil {
+			argv[i] = matches[1]
+		}
+	}
+
+	// the message is for us if it's a DM or if it begins with `@mapbot`
+	if msg.Channel[0] != 'D' && (len(argv) < 1 || argv[0] != "<@"+t.botToken.BotId+">") {
+		log.Debugf("skipping un-prefixed non-direct message %q", msg.Text)
+		return
+	}
+
+	// strip any `@mapbot` prefix, even in DMs
+	if len(argv) > 0 && argv[0] == "<@"+t.botToken.BotId+">" {
+		argv = argv[1:]
+	}
+
+	log.Debugf("Received MessageEvent: <%s> %s", msg.User, msg.Text)
+	log.Debugf("Message Object: %+v", msg)
+
+	u, err := user.Get(db.Instance, types.UserId(msg.User))
+	if err != nil {
+		log.Errorf("unable to publish received message; cannot obtain/create user %q: %s", msg.User, err)
+		return
+	}
+
+	if u == nil {
+		log.Errorf("nil obtaining/creating user %q, but no error?!", msg.User)
+		return
+	}
+
+	// Accept maps uploaded via DM
+	if msg.Upload && len(msg.Files) > 0 && msg.Channel[0] == 'D' {
+		t.handleUpload(u, msg)
+		return
+	}
+
+	cmd := argv[0]
+	var args []string
+	if len(argv) >= 2 {
+		args = argv[1:]
+	}
+
+	t.hub.Publish(&hub.Command{
+		From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, msg.User),
+		Type:    hub.CommandType("user:" + cmd),
+		Payload: args,
+		User:    u,
+		Context: t.Context(msg.Channel),
+	})
 }
 
 func attachImage(a *[]slack.Attachment, i image.Image) {
@@ -439,6 +432,41 @@ func (t *Team) Context(ChannelId string) context.Context {
 	}
 
 	return ret
+}
+
+func (t *Team) handleUpload(user *user.User, msg *slack.MessageEvent) {
+	file := msg.Files[0]
+
+	req, err := http.NewRequest("GET", file.URLPrivateDownload, nil)
+	if err != nil {
+		log.Errorf("building new request object: %v", err)
+		return
+	}
+	req.Header.Add("Authorization", "Bearer "+t.botToken.BotToken)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Errorf("sending request for uploaded file %v: %v", file.URLPrivateDownload, err)
+		return
+	}
+	defer res.Body.Close()
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Errorf("reading data from remote server for %v: %v", file.URLPrivateDownload, err)
+		return
+	}
+
+	nonalnum := regexp.MustCompile(`[^a-z0-9]`)
+	file.Name = nonalnum.ReplaceAllString(strings.ToLower(file.Name), "-")
+	t.hub.Publish(&hub.Command{
+		From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, user.Id),
+		Type:    "user:map",
+		Payload: []string{"add", "@" + file.Name, "raw"},
+		User:    user,
+		Context: t.Context("@mapbot"),
+		Data:    data,
+	})
 }
 
 type Team struct {
