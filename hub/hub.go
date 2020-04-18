@@ -66,7 +66,7 @@ func (h *Hub) PublishUpdate(ctx context.Context) {
 
 // Publish searches publishers for a subscriber to the given command's type, and executes the subscriber in a goroutine.
 func (h *Hub) Publish(c *Command) {
-	log.Debugf("publish: %s->%s (%s): %v", c.From, string(c.Type), c.User, c.Payload)
+	log.Debugf("publish: %s->%s (%s): %v (%d bytes data)", c.From, string(c.Type), c.User, c.Payload, len(c.Data))
 
 	var recipients []Subscriber
 
@@ -136,6 +136,9 @@ type Command struct {
 	Payload interface{}
 	User    *user.User
 	Context context.Context
+
+	// Raw data send along with the command. Should never be logged.
+	Data []byte
 }
 
 // WithType returns a copy of the command with the type replaced by the given type. The payload is not deep-copied.
