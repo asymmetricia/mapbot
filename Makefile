@@ -7,7 +7,7 @@ EMOJI_POINT ?= 2
 EMOJI_VERSION = ${EMOJI_MAJOR}.${EMOJI_MINOR}.${EMOJI_POINT}
 
 restart: .push
-	ssh core@mapbot.cernu.us sudo systemctl restart mapbot
+	ssh -At mapbot.cernu.us sudo systemctl restart mapbot
 
 push: .push
 .push: .docker
@@ -43,8 +43,8 @@ mapbot.windows_amd64.exe: mapbot
 	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
 
 tail:
-	ssh core@mapbot.cernu.us 'for i in 1 2 3 4 5; do docker logs --tail 1 mapbot >/dev/null && exit 0; sleep $$i; done; exit 1'
-	ssh core@mapbot.cernu.us docker logs -f --tail 100 mapbot
+	ssh -At mapbot.cernu.us 'for i in 1 2 3 4 5; do docker logs --tail 1 mapbot >/dev/null && exit 0; sleep $$i; done; exit 1'
+	ssh -At mapbot.cernu.us docker logs -f --tail 100 mapbot
 
 clean:
 	$(RM) .push .docker mapbot
