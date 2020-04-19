@@ -253,7 +253,7 @@ func New(name, url string) (*Tabula, error) {
 	return &Tabula{
 		Name: TabulaName(name),
 		Url:  url,
-		Dpi: 50,
+		Dpi:  50,
 	}, nil
 }
 
