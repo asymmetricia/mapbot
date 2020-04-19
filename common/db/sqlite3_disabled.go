@@ -17,6 +17,6 @@ func (s *Sqlite) Dialect() string {
 	return ""
 }
 
-func OpenSqlite3(reset bool, resetFrom int) (anydb.AnyDb, error) {
+func OpenSqlite3(reset bool, resetFrom int, file string) (anydb.AnyDb, error) {
 	return nil, fmt.Errorf("sqlite3 not supported on darwin or windows")
 }
