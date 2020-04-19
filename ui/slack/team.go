@@ -1,6 +1,8 @@
 package slack
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
@@ -405,12 +407,13 @@ func (t *Team) handleUpload(user *user.User, msg *slack.MessageEvent) {
 		return
 	}
 
+	sum := sha256.Sum256(data)
 	nonalnum := regexp.MustCompile(`[^a-z0-9]`)
 	file.Name = nonalnum.ReplaceAllString(strings.ToLower(file.Name), "-")
 	t.hub.Publish(&hub.Command{
 		From:    fmt.Sprintf("internal:send:slack:%s:%s:%s", t.Info.ID, msg.Channel, user.Id),
 		Type:    "user:map",
-		Payload: []string{"add", "@" + file.Name, "raw"},
+		Payload: []string{"add", "@" + file.Name, "raw:" + hex.EncodeToString(sum[:])},
 		User:    user,
 		Context: t.Context("@mapbot"),
 		Data:    data,

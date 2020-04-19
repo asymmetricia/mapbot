@@ -45,7 +45,6 @@ func (wf *Workflow) State(log *logrus.Entry, workflowName string, state string,
 	log = log.WithFields(logrus.Fields{
 		"workflow": workflowName,
 		"state":    state,
-		"choice":   choice,
 	})
 
 	log.Trace("computing state change")
@@ -82,6 +81,8 @@ func (wf *Workflow) State(log *logrus.Entry, workflowName string, state string,
 		log.Trace("state has OnStateEnter")
 		return stateObj.OnStateEnter(opaque)
 	}
+
+	log = log.WithField("choice", *choice)
 
 	log.Trace("non-nil choice means action event")
 	// we're handling state activity

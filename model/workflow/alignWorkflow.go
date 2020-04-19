@@ -75,8 +75,6 @@ type alignWorkflowOpaque struct {
 }
 
 func (a *alignWorkflowOpaque) MapImage(minX, minY, maxX, maxY int) draw.Image {
-	//ctx := &databaseContext.DatabaseContext{}
-
 	img, err := a.Tabula.BackgroundImage(db.Instance, nil)
 	if err != nil {
 		log.Errorf("failed to render tabula: %s", err)

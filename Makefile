@@ -9,12 +9,23 @@ EMOJI_VERSION = ${EMOJI_MAJOR}.${EMOJI_MINOR}.${EMOJI_POINT}
 restart: .push
 	ssh -At mapbot.cernu.us sudo systemctl restart mapbot
 
+dev: .push_dev
+	ssh -At mapbot.cernu.us sudo systemctl restart mapbot_dev
+
 push: .push
 .push: .docker
 	@ set -e; \
 	eval "$$(aws ecr get-login --no-include-email)" && \
 	docker push ${IMAGE_URL} && \
 	touch .push
+
+push_dev: .push_dev
+.push_dev: .docker
+	@ set -e; \
+	eval "$$(aws ecr get-login --no-include-email)" && \
+	docker tag ${IMAGE_URL} ${IMAGE_URL}:dev && \
+	docker push ${IMAGE_URL}:dev && \
+	touch .push_dev
 
 .docker: mapbot Dockerfile run.sh emoji
 	docker build --pull -t mapbot .
@@ -45,6 +56,10 @@ mapbot.windows_amd64.exe: mapbot
 tail:
 	ssh -At mapbot.cernu.us 'for i in 1 2 3 4 5; do docker logs --tail 1 mapbot >/dev/null && exit 0; sleep $$i; done; exit 1'
 	ssh -At mapbot.cernu.us docker logs -f --tail 100 mapbot
+
+tail_dev:
+	ssh -At mapbot.cernu.us 'for i in 1 2 3 4 5; do docker logs --tail 1 mapbot_dev >/dev/null && exit 0; sleep $$i; done; exit 1'
+	ssh -At mapbot.cernu.us docker logs -f --tail 100 mapbot_dev
 
 clean:
 	$(RM) .push .docker mapbot

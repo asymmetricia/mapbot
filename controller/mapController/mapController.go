@@ -43,6 +43,7 @@ func init() {
 			"mark":      cmdproc.Subcommand{"", "alias for non-map command `mark`; see `mark help` for more", cmdMark},
 			"check":     cmdproc.Subcommand{"", "alias for non-map command `check`; see `check help` for more", cmdMark},
 			"autozoom":  cmdproc.Subcommand{"", "sets the zoom so that all current tokens are visible, with a small margin", cmdAutoZoom},
+			"rename":    {"<name> <new-name>", "shorthand for set, to set the map name", cmdRename},
 		},
 	}
 }
@@ -212,6 +213,22 @@ func cmdDpi(h *hub.Hub, c *hub.Command) {
 	}
 }
 
+func cmdRename(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok || len(args) == 0 || len(args) > 2 {
+		h.Error(c, "usage: map rename "+processor.Commands["rename"].Args)
+		return
+	}
+
+	if len(args) == 1 {
+		args = []string{"name", args[0]}
+	} else {
+		args = []string{args[0], "name", args[1]}
+	}
+
+	cmdSet(h, c.WithPayload(args))
+}
+
 func cmdGridColor(h *hub.Hub, c *hub.Command) {
 	if args, ok := c.Payload.([]string); ok && (len(args) == 1 || len(args) == 2) {
 		if len(args) == 1 {
@@ -290,8 +307,18 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		args = args[1:]
 	}
 
+	// so if we rename, our report looks right
+	name := t.Name
+
 	for i := 0; i < len(args); i += 2 {
 		switch strings.ToLower(args[i]) {
+		case "name":
+			name := tabula.TabulaName(args[i+1])
+			if _, ok := c.User.TabulaByName(name); ok {
+				h.Error(c, fmt.Sprintf("name `%s` is already in use", name))
+				return
+			}
+			t.Name = name
 		case "gridcolor":
 			if col, ok := colors.Colors[strings.ToLower(args[i+1])]; ok {
 				t.GridColor = &col
@@ -341,7 +368,7 @@ func cmdSet(h *hub.Hub, c *hub.Command) {
 		}
 		h.Publish(&hub.Command{
 			Type:    hub.CommandType(c.From),
-			Payload: fmt.Sprintf("map `%s` %s set to `%s`", t.Name, args[i], args[i+1]),
+			Payload: fmt.Sprintf("map `%s` %s set to `%s`", name, args[i], args[i+1]),
 			User:    c.User,
 		})
 	}

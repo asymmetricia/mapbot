@@ -45,7 +45,8 @@ func (a ActionValue) Id() string {
 		return j
 	}
 
-	return hex.EncodeToString(sha256.New().Sum([]byte(j)))
+	sum := sha256.Sum256([]byte(j))
+	return hex.EncodeToString(sum[:])
 }
 
 func writeResponse(rw http.ResponseWriter, msg string) {
