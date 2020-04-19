@@ -4,7 +4,6 @@ package workflow
 import (
 	"fmt"
 	. "github.com/pdbogen/mapbot/common/log"
-	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/ui/slack/context"
 	"image"
 	"strings"
@@ -23,19 +22,21 @@ type Workflow struct {
 	OpaqueFromJson func([]byte) (interface{}, error)
 }
 
-// StateEnter is called upon entering a state;. StateEnter looks up the state by
-// name, and if a state is found and it has an OnStateEnter, returns the result
-// of calling that state's OnStateEnter.
+// State is called when we first enter a state (with nil `choice`) and when
+// activity occurs on the state (non-nil `choice`).
 //
-// If the state cannot be found or it does not have a defined OnStateEnter, a
-// non-nil WorkflowMessage will provide a message for the user describing the
-// problem (but this typically indicates misuse of a debugging utility or a
-// programming error).
+// State looks up the state by name, and calls the appropriate callbacks, or
+// else returns a non-nil WorkflowMessage will provide a message for the user
+// describing the problem (but this typically indicates misuse of a debugging
+// utility or a programming error).
 //
 // A nil WorkflowMessage is not an error, but indicates that there is no
 // response for the user.
+//
+// newState and newOpaque should be updated in the user's entry for this
+// workflow if they are non-nil.
 
-func (wf *Workflow) StateEnter(workflowName string, state string, opaque interface{}) (
+func (wf *Workflow) State(workflowName string, state string, opaque interface{}, choice *string) (
 	newState *string, newOpaque interface{}, msg *WorkflowMessage,
 ) {
 	stateObj, ok := wf.States[strings.ToLower(state)]
@@ -45,44 +46,41 @@ func (wf *Workflow) StateEnter(workflowName string, state string, opaque interfa
 			Text:     fmt.Sprintf("invalid state %q", state),
 		}
 	}
-	if stateObj.Challenge == nil && stateObj.OnStateEnter == nil {
+
+	if choice == nil {
+		// we're handling a state entry
+		if stateObj.Challenge == nil && stateObj.OnStateEnter == nil {
+			return nil, nil, &WorkflowMessage{
+				Workflow: workflowName,
+				Text:     fmt.Sprintf("no on-enter associated with state %q", state),
+			}
+		}
+
+		if stateObj.Challenge != nil {
+			msg := stateObj.Challenge(opaque)
+			if msg.State == "" {
+				return nil, nil, msg
+			}
+			return &msg.State, nil, msg
+		}
+
+		return stateObj.OnStateEnter(opaque)
+	}
+
+	// we're handling state activity
+	if stateObj.Response == nil && stateObj.OnUserAction == nil {
 		return nil, nil, &WorkflowMessage{
 			Workflow: workflowName,
-			Text:     fmt.Sprintf("no challenge associated with state %q", state),
+			Text:     fmt.Sprintf("no on-action associated with state %q", state),
 		}
 	}
 
-	if stateObj.Challenge != nil {
-		return nil, nil, stateObj.Challenge(opaque)
+	if stateObj.Response != nil {
+		newState, newOpaque := stateObj.Response(opaque, choice)
+		return &newState, newOpaque, nil
 	}
 
-	return stateObj.OnStateEnter(opaque)
-}
-
-// Response is called when a user responds to a challenge, either via a message
-// action or via debugging commands. Response looks up the state by name, and
-// if a state is found and it has a Response, returns the result of calling
-// that state's Response.
-// Error will be non-nil if the state cannot be found or it does not have a Response.
-func (wf *Workflow) Response(state user.WorkflowState, choice *string) (string, interface{}, error) {
-	stateObj, ok := wf.States[strings.ToLower(state.State)]
-	if !ok {
-		return "", nil, fmt.Errorf("state %q not found", state)
-	}
-	if stateObj.Response == nil {
-		return "", nil, fmt.Errorf("state %q does not have a response", state)
-	}
-
-	if wf.OpaqueFromJson != nil && state.Opaque == nil && len(state.OpaqueRaw) > 0 {
-		var err error
-		state.Opaque, err = wf.OpaqueFromJson(state.OpaqueRaw)
-		if err != nil {
-			return "", nil, fmt.Errorf("could not unmarshal opaque data: %s", err)
-		}
-	}
-
-	newState, newOpaque := stateObj.Response(state.Opaque, choice)
-	return newState, newOpaque, nil
+	return stateObj.OnUserAction(opaque, choice)
 }
 
 type WorkflowState struct {
@@ -119,7 +117,7 @@ type OnStateEnterFunc func(opaqueIn interface{}) (state *string, opaqueOut inter
 // If `message` is non-nil, the message will be sent to the user.
 type OnUserActionFunc func(opaqueIn interface{}, choice *string) (state *string, opaqueOut interface{}, message *WorkflowMessage)
 
-// Response is idempotent from the state machine perspective but may have side
+// UserAction is idempotent from the state machine perspective but may have side
 // effects like modifying Tabula or tokens. It executes the action associated
 // with a state for the given choice. Usually the 'choice' is one of the
 // options provided in the corresponding state's challenge's WorkflowMessage,
@@ -173,4 +171,10 @@ var Workflows = map[string]Workflow{
 			},
 		},
 	},
+}
+
+func String(s string) *string {
+	ret := new(string)
+	*ret = s
+	return ret
 }

@@ -36,7 +36,9 @@ func main() {
 	SlackVerificationToken := flag.String("slack-verification-token", "", "slack verification token; if unset or incorrect, message actions will not work")
 	Domain := flag.String("domain", "map.haversack.io", "domain name to receive redirects, construct URLs, and request ACME certs")
 	Port := flag.Int("port", 8443, "port to listen on for web requests and slack oauth responses")
+	AdvertisePort := flag.Int("advertise-port", -1, "port to tell Slack we run on; defaults to same as Port")
 	Tls := flag.Bool("tls", false, "if set, mapbot will use ACME to obtain a cert from Let's Encrypt for the above-configured domain")
+	AdvertiseTls := flag.Bool("advertise-tls", false, "if set, mapbot will inform Slack that we support TLS; implied if `-tls` is enabled")
 	DbType := flag.String("db-type", "postgres", "database type to use: postgres or sqlite3")
 	ESKey := flag.String("elephant-sql-key", "", "API Key for elephant sql, to create/access DB in lieu of --db-* parameters")
 	ESType := flag.String("elephant-sql-type", "turtle", "instance type to create on ElephantSQL; 'turtle' is free-tier (postgres)")
@@ -74,19 +76,22 @@ func main() {
 	}
 
 	proto := "http"
-	if *Tls {
+	if *Tls || *AdvertiseTls {
 		proto = "https"
 	}
 
 	hub := &hub.Hub{}
 
+	if *AdvertisePort == -1 {
+		*AdvertisePort = *Port
+	}
 	slackUi, err := slack.New(
 		*SlackClientToken,
 		*SlackClientSecret,
 		dbHandle,
 		proto,
 		*Domain,
-		*Port,
+		*AdvertisePort,
 		*SlackVerificationToken,
 		hub,
 	)
@@ -114,7 +119,7 @@ func main() {
 		HostPolicy: autocert.HostWhitelist(*Domain),
 	}
 
-	if *Tls {
+	if *AdvertiseTls {
 		blobserv.Instance = &blobserv.BlobServ{UrlBase: "https://" + *Domain + "/blob/"}
 	} else {
 		blobserv.Instance = &blobserv.BlobServ{UrlBase: "http://" + *Domain + "/blob/"}
@@ -144,10 +149,10 @@ func main() {
 		log.Infof("Listening for ACME challenges on http://%s:80", *Domain)
 		go func() { log.Fatal(httpChallengeServer.ListenAndServe()) }()
 
-		log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
+		log.Infof("Listening on %s://%s:%d", proto, *Domain, *AdvertisePort)
 		log.Fatal(server.ListenAndServeTLS("", ""))
 	} else {
-		log.Infof("Listening on %s://%s:%d", proto, *Domain, *Port)
+		log.Infof("Listening on %s://%s:%d", proto, *Domain, *AdvertisePort)
 		log.Fatal(server.ListenAndServe())
 	}
 }

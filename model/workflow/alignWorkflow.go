@@ -22,7 +22,7 @@ var log = mbLog.Log
 var alignWorkflow = Workflow{
 	States: map[string]WorkflowState{
 		"enter": {
-			Response: alignEnterResponse,
+			OnUserAction: alignEnterResponse,
 		},
 		"confirm": {
 			Challenge: alignConfirmChallenge,
@@ -47,9 +47,6 @@ var alignWorkflow = Workflow{
 		"top": {
 			Challenge: alignTopChallenge,
 			Response:  alignTopResponse,
-		},
-		"error": {
-			Challenge: alignErrorChallenge,
 		},
 		"exit": {
 			Challenge: alignExit,
@@ -134,23 +131,30 @@ func (a *alignWorkflowOpaque) Hydrate() error {
 
 func alignError(err string, fields ...interface{}) (string, string) {
 	log.Error(fmt.Sprintf(err, fields...))
-	return "error", fmt.Sprintf(err, fields...)
+	return "exit", fmt.Sprintf(err, fields...)
 }
 
-func alignEnterResponse(opaque interface{}, choice *string) (string, interface{}) {
+func alignErrorNew(err string, fields ...interface{}) (newState *string, newOpaque interface{}, msg *WorkflowMessage) {
+	log.Error(fmt.Sprintf(err, fields...))
+	return String("exit"), nil, &WorkflowMessage{
+		Text: fmt.Sprintf(err, fields...),
+	}
+}
+
+func alignEnterResponse(opaque interface{}, choice *string) (newState *string, newOpaque interface{}, msg *WorkflowMessage) {
 	if choice == nil {
-		return alignError("invalid choice on enter state, expected <userid> <tabulaid>")
+		return alignErrorNew("invalid choice on enter state, expected <userid> <tabulaid>")
 	}
 
 	parts := strings.Split(*choice, " ")
 
 	if len(parts) != 2 {
-		return alignError("invalid choice on enter state, expected <userid> <tabulaid>")
+		return alignErrorNew("invalid choice on enter state, expected <userid> <tabulaid>")
 	}
 
 	tid, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return alignError("could not parse tabula ID %q as integer: %s", parts[1], err)
+		return alignErrorNew("could not parse tabula ID %q as integer: %s", parts[1], err)
 	}
 
 	state := &alignWorkflowOpaque{
@@ -159,10 +163,10 @@ func alignEnterResponse(opaque interface{}, choice *string) (string, interface{}
 	}
 
 	if err := state.Hydrate(); err != nil {
-		return alignError("could not hydrate initial opaque state: %s", err)
+		return alignErrorNew("could not hydrate initial opaque state: %s", err)
 	}
 
-	return "confirm", state
+	return String("confirm"), state, nil
 }
 
 var alignConfirmYes = "Yep! Let's go."
@@ -217,7 +221,7 @@ func alignConfirmResponse(opaque interface{}, choice *string) (string, interface
 		state.VerticalA = (state.Max + state.Min) / 2
 		return "vertical_a", state
 	case alignConfirmNo:
-		return "error", "Ok! See you later."
+		return "exit", "Ok! See you later."
 	default:
 		return alignError("I don't know what you meant by %s", *choice)
 	}
@@ -365,7 +369,7 @@ func alignVerticalBChallenge(opaque interface{}) *WorkflowMessage {
 	VerticalLine(img, state.VerticalB-state.Left, color.NRGBA{0, 0, 255, 255})
 
 	return &WorkflowMessage{
-		Text:  "Choose a pair of vertical lines. Is the **blue** line left-of or right-of the **right** line? _(If you don't see a good pair of map lines, you can use the Pan buttons to shift the view.)_",
+		Text:  "Choose a pair of vertical lines. Is the *blue* line left-of or right-of the *right* line? _(If you don't see a good pair of map lines, you can use the Pan buttons to shift the view.)_",
 		State: "vertical_b",
 		Image: img,
 		ChoiceSets: [][]string{

@@ -2,25 +2,55 @@ package slack
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/pdbogen/mapbot/common/blobserv"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/model/workflow"
 	"github.com/slack-go/slack"
-	"io"
+	"image"
+	"image/png"
 	"net/http"
-	"net/http/httputil"
 	"strings"
 )
+
+type ActionValue struct {
+	WorkflowName string
+	Choice       string
+}
+
+// Json returns the workflow/choice pair encoded as JSON, which really shouldn't
+// ever fail.
+func (a ActionValue) Json() string {
+	b, err := json.Marshal(a)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+// Id returns a string that should (but _could_ not be) unique to this specific
+// workflow/choice pair.
+func (a ActionValue) Id() string {
+	j := a.Json()
+	if len(j) <= 255 {
+		return j
+	}
+
+	return hex.EncodeToString(sha256.New().Sum([]byte(j)))
+}
 
 func writeResponse(rw http.ResponseWriter, msg string) {
 	rw.Header().Add("content-type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	body, err := json.Marshal(slack.Msg{
-		Text: msg,
+		Text:            msg,
+		ReplaceOriginal: true,
 	})
 	if err != nil {
 		log.Errorf("marshalling JSON: %s", err)
@@ -90,15 +120,27 @@ func (t *Team) Action(payload *slack.InteractionCallback, rw http.ResponseWriter
 		return
 	}
 
-	writeResponse(rw, "Okay, hold on...")
+	if payload.Type != "block_actions" || len(payload.ActionCallback.BlockActions) == 0 {
+		writeResponse(rw, "cannot handle action callback type "+string(payload.Type))
+		log.Errorf("unhandled action callback %v", payload)
+		return
 
-	log.Debug(payload)
+	}
+
+	actionCallbackValue := payload.ActionCallback.BlockActions[0].Value
+	var av ActionValue
+	if err := json.Unmarshal([]byte(actionCallbackValue), &av); err != nil {
+		writeResponse(rw, "could not parse action callback")
+		log.Errorf("could not parse action callback value %q: %v",
+			actionCallbackValue, err)
+		return
+	}
 
 	t.hub.Publish(&hub.Command{
 		User:    userObj,
 		From:    fmt.Sprintf("internal:updateAction:slack:%s:%s:%s", t.Info.ID, payload.Channel.ID, payload.ResponseURL),
 		Context: t.Context(payload.Channel.ID),
-		Payload: []string{"respond", payload.CallbackID, payload.ActionCallback.AttachmentActions[0].Value},
+		Payload: []string{"action", av.WorkflowName, av.Choice},
 		Type:    "user:workflow",
 	})
 }
@@ -111,48 +153,86 @@ func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
 	}
 	responseUrl := strings.Join(comps[5:], ":")
 
-	body := &bytes.Buffer{}
-	enc := json.NewEncoder(body)
-
+	var opts []slack.MsgOption
 	switch msg := c.Payload.(type) {
 	case *workflow.WorkflowMessage:
-		err := enc.Encode(t.renderWorkflowMessage(msg))
-		if err != nil {
-			log.Errorf("marshaling %q: %s", msg, err)
-		}
+		opts = t.renderWorkflowMessage(msg)
 	case string:
-		err := enc.Encode(slack.Msg{Text: msg})
-		if err != nil {
-			log.Errorf("marshaling %q: %s", msg, err)
-		}
+		opts = []slack.MsgOption{slack.MsgOptionText(msg, false)}
 	default:
 		log.Errorf("uh, no clue how to handle a %T payload", c.Payload)
 		return
 	}
 
-	req, err := http.NewRequest("POST", responseUrl, body)
+	opts = append(opts,
+		slack.MsgOptionReplaceOriginal(responseUrl),
+	)
+
+	ch, ts, txt, err := t.botClient.SendMessage(comps[4], opts...)
 	if err != nil {
-		log.Errorf("creating request: %s", err)
-		return
+		log.Errorf("POSTing action update: %v", err)
 	}
-	req.Header.Add("content-type", "application/json")
+	log.Debugf("ch=%v, ts=%v, txt=%v", ch, ts, txt)
+}
 
-	bs, _ := httputil.DumpRequest(req, false)
-	log.Debug(string(bs))
-	log.Debug(body.String())
+func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) []slack.MsgOption {
+	if msg.Text == "" {
+		return nil
+	}
 
-	res, err := http.DefaultClient.Do(req)
+	var blocks []slack.Block
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", msg.Text, false, false),
+		nil,
+		nil,
+	))
+
+	if msg.Choices != nil {
+		msg.ChoiceSets = append(msg.ChoiceSets, msg.Choices)
+	}
+
+	for _, choices := range msg.ChoiceSets {
+		var btns []slack.BlockElement
+		for _, choice := range choices {
+			av := ActionValue{msg.Id(), choice}
+			btns = append(btns, slack.NewButtonBlockElement(
+				av.Id(),
+				av.Json(),
+				slack.NewTextBlockObject("plain_text", choice, false, false),
+			))
+		}
+		blocks = append(blocks, slack.NewActionBlock("", btns...))
+	}
+
+	if msg.Image != nil {
+		b, err := imageBlock(msg.Image)
+		if err != nil {
+			log.Errorf("failed to attach non-nil image: %v", err)
+		} else {
+			blocks = append(blocks, b)
+		}
+	}
+	return []slack.MsgOption{slack.MsgOptionBlocks(blocks...)}
+}
+
+func imageBlock(i image.Image) (slack.Block, error) {
+	log.Debugf("attaching image to workflow message")
+
+	imgData := &bytes.Buffer{}
+	if err := png.Encode(imgData, i); err != nil {
+		return nil, fmt.Errorf("encoding png: %v", err)
+	}
+
+	url, err := blobserv.Upload(imgData.Bytes())
 	if err != nil {
-		log.Errorf("POSTing to %q: %s", responseUrl, err)
-		return
+		return nil, fmt.Errorf("uploading to blobserv: %v", err)
 	}
-	defer res.Body.Close()
+	log.Debugf("image uploaded with URL %q", url)
 
-	if res.StatusCode/100 != 2 {
-		log.Errorf("non-2XX POSTing to %s: %s", responseUrl, res.Status)
-		body := &bytes.Buffer{}
-		io.Copy(body, res.Body)
-		log.Errorf("body: %q", body.String())
-		return
-	}
+	return slack.NewImageBlock(
+		url,
+		"here there be dragons",
+		"",
+		slack.NewTextBlockObject("plain_text", "map section", false, false),
+	), nil
 }

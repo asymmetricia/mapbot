@@ -1,9 +1,7 @@
 package slack
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/pdbogen/mapbot/common/blobserv"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	"github.com/pdbogen/mapbot/hub"
@@ -93,14 +91,20 @@ func (s *SlackUi) addTeam(token string, botToken *BotToken) {
 			}
 
 			s.TeamsMu.Lock()
-			s.Teams = append(s.Teams, team)
+			if s.Teams == nil {
+				s.Teams = map[string]*Team{}
+			}
+			if old, ok := s.Teams[team.Info.ID]; ok {
+				close(old.Quit)
+			}
+			s.Teams[team.Info.ID] = team
 			s.TeamsMu.Unlock()
 
-			s.botHub.Subscribe(
+			s.botHub.SubscribeSole(
 				hub.CommandType(fmt.Sprintf("internal:send:slack:%s:*", team.Info.ID)),
 				team.Send,
 			)
-			s.botHub.Subscribe(
+			s.botHub.SubscribeSole(
 				hub.CommandType(fmt.Sprintf("internal:updateAction:slack:%s:*", team.Info.ID)),
 				team.updateAction,
 			)
@@ -157,7 +161,7 @@ func (t *Team) Save(db anydb.AnyDb) error {
 
 func (t *Team) run() {
 	if t.Quit == nil {
-		t.Quit = make(<-chan bool, 0)
+		t.Quit = make(chan bool, 0)
 	}
 	t.rtm = t.botClient.NewRTM()
 	go t.rtm.ManageConnection()
@@ -266,67 +270,6 @@ func (t *Team) handleMessage(event slack.RTMEvent) {
 	})
 }
 
-func attachImage(a *[]slack.Attachment, i image.Image) {
-	if i == nil {
-		return
-	}
-	log.Debugf("attaching image to workflow message")
-
-	imgData := &bytes.Buffer{}
-	if err := png.Encode(imgData, i); err != nil {
-		log.Errorf("encoding image as png: %s", err)
-		return
-	}
-	url, err := blobserv.Upload(imgData.Bytes())
-	if err != nil {
-		log.Errorf("uploading image in workflow message: %s", err)
-		return
-	}
-	log.Debugf("image uploaded with URL %q", url)
-
-	*a = append(*a, slack.Attachment{ImageURL: url})
-}
-
-func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) []slack.MsgOption {
-	if msg.Text == "" {
-		return nil
-	}
-
-	ret := []slack.MsgOption{slack.MsgOptionText(msg.Text, false)}
-
-	var attachments []slack.Attachment
-
-	if msg.ChoiceSets == nil {
-		msg.ChoiceSets = [][]string{}
-	}
-
-	if msg.Choices != nil {
-		msg.ChoiceSets = append(msg.ChoiceSets, msg.Choices)
-	}
-
-	for _, choices := range msg.ChoiceSets {
-		attachment := slack.Attachment{
-			CallbackID: msg.Id(),
-			Actions:    make([]slack.AttachmentAction, len(choices)),
-			Fallback:   "Your client does not support actions. :cry:",
-		}
-		for i, choice := range choices {
-			log.Debugf("adding choice %q", choice)
-			attachment.Actions[i] = slack.AttachmentAction{
-				Name:  "choice",
-				Text:  choice,
-				Value: choice,
-				Type:  "button",
-			}
-		}
-		attachments = append(attachments, attachment)
-	}
-
-	attachImage(&attachments, msg.Image)
-
-	return append(ret, slack.MsgOptionAttachments(attachments...))
-}
-
 func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.WorkflowMessage) {
 	comps := strings.Split(string(c.Type), ":")
 	if len(comps) < 5 {
@@ -367,6 +310,7 @@ func (t *Team) Send(h *hub.Hub, c *hub.Command) {
 			log.Errorf("%s: error posting message %q to channel %q: %s", t.Info.ID, msg, comps[4], err)
 		}
 	case *workflow.WorkflowMessage:
+		log.Debugf("got a workflow message via %s, but can deal..", c.Type)
 		t.sendWorkflowMessage(h, c, msg)
 	case *tabula.Tabula:
 		repErr := func(ctx string, err error) {
@@ -472,7 +416,7 @@ func (t *Team) handleUpload(user *user.User, msg *slack.MessageEvent) {
 type Team struct {
 	Info       *slack.TeamInfo
 	Channels   []Channel
-	Quit       <-chan bool
+	Quit       chan bool
 	token      string
 	client     *slack.Client
 	botClient  *slack.Client

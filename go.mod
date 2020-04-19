@@ -11,6 +11,9 @@ require (
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/ryanuber/go-glob v0.0.0-20170128012129-256dc444b735
+	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
+	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd // indirect
+	github.com/sirupsen/logrus v1.5.0 // indirect
 	github.com/slack-go/slack v0.6.3
 	github.com/stretchr/testify v1.5.1 // indirect
 	golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
@@ -18,5 +21,7 @@ require (
 	golang.org/x/net v0.0.0-20170211013127-61557ac0112b
 	golang.org/x/oauth2 v0.0.0-20170209002143-de0725b330ab
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	google.golang.org/appengine v1.0.1-0.20170206203024-2e4a801b39fc // indirect
+	google.golang.org/appengine v1.0.1-0.20170206203024-2e4a801b39fc
 )
+
+replace github.com/slack-go/slack => github.com/frozenbonito/slack v0.6.4-0.20200405161309-e7a7eaea721c

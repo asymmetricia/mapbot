@@ -24,10 +24,11 @@ func init() {
 	processor = &cmdproc.CommandProcessor{
 		Command: "workflow",
 		Commands: map[string]cmdproc.Subcommand{
-			"list":    cmdproc.Subcommand{"", "lists known workflows", cmdList},
-			"start":   cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; manually initiates the named workflow with the given <choice> as the `enter` choice", cmdStart},
-			"respond": cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; calls the named workflow's current state's Resopnd function with the given choice.", cmdRespond},
-			"clear":   cmdproc.Subcommand{"", "cancels any workflow associated with your user", cmdClear},
+			"list":       cmdproc.Subcommand{"", "lists known workflows", cmdList},
+			"transition": cmdproc.Subcommand{"<workflow name> <state>", "internal/debugging; enter given workflow state", cmdTransition},
+			"action":     cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; simulate given user action", cmdAction},
+			"start":      cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; start the given workflow with empty opaque data", cmdStart},
+			"clear":      cmdproc.Subcommand{"", "cancels any workflow associated with your user", cmdClear},
 		},
 	}
 }
@@ -42,28 +43,6 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 	}
 
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(strings.Join(response, "\n")))
-}
-
-func cmdStart(h *hub.Hub, c *hub.Command) {
-	args, ok := c.Payload.([]string)
-	if !ok {
-		h.Error(c, "unexpected payload")
-		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
-		return
-	}
-
-	if len(args) < 1 {
-		h.Error(c, "usage: workflow start <workflow name> <choice>")
-		return
-	}
-
-	c.User.Workflows[strings.ToLower(args[0])] = user.WorkflowState{State: "enter"}
-	if err := c.User.Save(db.Instance); err != nil {
-		h.Error(c, fmt.Sprintf("error saving user opaque data: %s", err))
-		return
-	}
-
-	cmdTransition(h, c.WithPayload(append([]string{args[0], "enter"}, args[1:]...)))
 }
 
 // move to the named state, trigger any OnStateEnter, & apply its results
@@ -93,11 +72,12 @@ func cmdTransition(h *hub.Hub, c *hub.Command) {
 	if !ok {
 		userState = user.WorkflowState{}
 	}
+	userState.Hydrate(wf.OpaqueFromJson)
 
 	transits := 1
 	for {
 		userState.State = strings.ToLower(wfStateName)
-		newState, newOpaque, msg := wf.StateEnter(wfName, wfStateName, userState.Opaque)
+		newState, newOpaque, msg := wf.State(wfName, wfStateName, userState.Opaque, nil)
 		if newOpaque != nil {
 			userState.Opaque = newOpaque
 		}
@@ -105,10 +85,11 @@ func cmdTransition(h *hub.Hub, c *hub.Command) {
 		c.User.Workflows[wfName] = userState
 
 		if msg != nil {
+			msg.Workflow = wfName
 			h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(msg))
 		}
 
-		if newState == nil {
+		if newState == nil || wfStateName == strings.ToLower(*newState) {
 			break
 		}
 		transits++
@@ -126,7 +107,7 @@ func cmdTransition(h *hub.Hub, c *hub.Command) {
 	}
 }
 
-func cmdRespond(h *hub.Hub, c *hub.Command) {
+func cmdStart(h *hub.Hub, c *hub.Command) {
 	args, ok := c.Payload.([]string)
 	if !ok {
 		h.Error(c, "unexpected payload")
@@ -134,39 +115,58 @@ func cmdRespond(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if len(args) < 1 {
-		h.Error(c, "usage: workflow respond <workflow name> <choice>")
+	if len(args) < 2 {
+		h.Error(c, "usage: workflow start <workflow name> <choice>")
 		return
 	}
 
 	wfName := strings.ToLower(args[0])
+
+	c.User.Workflows[wfName] = user.WorkflowState{State: "enter"}
+	cmdAction(h, c)
+}
+
+func cmdAction(h *hub.Hub, c *hub.Command) {
+	args, ok := c.Payload.([]string)
+	if !ok {
+		h.Error(c, "unexpected payload")
+		log.Errorf("expected []string payload, but received %s", reflect.TypeOf(c.Payload))
+		return
+	}
+
+	if len(args) < 2 {
+		h.Error(c, "usage: workflow action <workflow name> <choice>")
+		return
+	}
+	wfName := strings.ToLower(args[0])
+	choice := strings.Join(args[1:], " ")
+
 	wf, ok := workflow.Workflows[wfName]
 	if !ok {
 		h.Error(c, fmt.Sprintf("error: workflow %q does not exist", args[0]))
 		return
 	}
 
-	wfStateName := strings.ToLower(args[0])
-	wfState, ok := c.User.Workflows[wfStateName]
+	userWorkflowState, ok := c.User.Workflows[wfName]
 	if !ok {
-		h.Error(c, fmt.Sprintf(
-			"error: you don't have an active workflow %q; try `workflow start %s %s`?",
-			args[0], args[1], strings.Join(args[1:], " "),
-		))
-		return
+		userWorkflowState.State = "enter"
+	}
+	userWorkflowState.Hydrate(wf.OpaqueFromJson)
+
+	newState, opaque, msg := wf.State(wfName, userWorkflowState.State, userWorkflowState.Opaque, &choice)
+
+	if opaque != nil {
+		userWorkflowState.Opaque = opaque
 	}
 
-	choice := strings.Join(args[1:], " ")
-	newState, opaque, err := wf.Response(wfState, &choice)
-	if err != nil {
-		h.Error(c, fmt.Sprintf("action not accepted: %s", err))
-		return
+	if newState != nil {
+		userWorkflowState.State = *newState
 	}
 
-	if newState == "exit" {
-		delete(c.User.Workflows, strings.ToLower(args[0]))
+	if userWorkflowState.State == "exit" {
+		delete(c.User.Workflows, userWorkflowState.State)
 	} else {
-		c.User.Workflows[wfStateName] = user.WorkflowState{State: wfStateName, Opaque: opaque}
+		c.User.Workflows[wfName] = userWorkflowState
 	}
 
 	if err := c.User.Save(db.Instance); err != nil {
@@ -174,9 +174,25 @@ func cmdRespond(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if newState != "exit" {
-		cmdTransition(h, c.WithPayload([]string{wfName, newState}))
+	if msg != nil {
+		h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(msg))
+	}
+
+	if newState != nil && *newState != "exit" {
+		log.Debugf("transitioning %q's %q to %q", c.User.Id, wfName, *newState)
+		cmdTransition(h, c.WithPayload([]string{wfName, *newState}))
 	}
 }
 
-func cmdClear(h *hub.Hub, c *hub.Command) {}
+func cmdClear(h *hub.Hub, c *hub.Command) {
+	c.User.Workflows = map[string]user.WorkflowState{}
+	if err := c.User.Save(db.Instance); err != nil {
+		h.Error(c, fmt.Sprintf("error saving opaque data: %s", err))
+		return
+	}
+	h.Publish(&hub.Command{
+		Type:    hub.CommandType(c.From),
+		Payload: "done!",
+		Context: c.Context,
+	})
+}

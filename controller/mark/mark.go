@@ -110,7 +110,7 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 
 	tab, err := tabula.Load(db.Instance, *tabId)
 	if err != nil {
-		h.Error(c, "an error occured loading the active map for this channel")
+		h.Error(c, "an error occurred loading the active map for this channel")
 		log.Errorf("error loading tabula %d: %s", *tabId, err)
 		return
 	}
@@ -182,9 +182,11 @@ func cmdMark(h *hub.Hub, c *hub.Command) {
 		return
 	}
 
-	if len(marks) != 0 || len(lines) != 0 {
-		h.Error(c, ":warning: A list of marks should always end with a color!")
-		return
+	for _, m := range marks {
+		coloredMarks = append(coloredMarks, m.WithColor(colors.Colors["red"]))
+	}
+	for _, l := range lines {
+		coloredLines = append(coloredLines, l.WithColor(colors.Colors["red"]))
 	}
 
 	if cmdName == "mark" {

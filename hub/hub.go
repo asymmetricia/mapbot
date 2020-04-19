@@ -60,6 +60,19 @@ func (h *Hub) Subscribe(c CommandType, s Subscriber) {
 	h.Subscribers[c] = append(h.Subscribers[c], s)
 }
 
+func (h *Hub) SubscribeSole(c CommandType, s Subscriber) {
+	c = c.Canonical()
+	log.Debugf("subscribe: %s", c)
+	h.HubMu.Lock()
+	defer h.HubMu.Unlock()
+
+	if h.Subscribers == nil {
+		h.Subscribers = map[CommandType][]Subscriber{}
+	}
+
+	h.Subscribers[c] = []Subscriber{s}
+}
+
 func (h *Hub) PublishUpdate(ctx context.Context) {
 	h.Publish(&Command{Type: CommandType("internal:update:" + ctx.Id())})
 }
@@ -149,6 +162,7 @@ func (c *Command) WithType(n CommandType) *Command {
 		Payload: c.Payload,
 		User:    c.User,
 		Context: c.Context,
+		Data:    c.Data,
 	}
 }
 
@@ -159,6 +173,7 @@ func (c *Command) WithPayload(p interface{}) *Command {
 		Payload: p,
 		User:    c.User,
 		Context: c.Context,
+		Data:    c.Data,
 	}
 }
 

@@ -253,7 +253,6 @@ func New(name, url string) (*Tabula, error) {
 	return &Tabula{
 		Name: TabulaName(name),
 		Url:  url,
-		//Background: ret,
 		Dpi: 50,
 	}, nil
 }
@@ -276,6 +275,7 @@ func (t *Tabula) Hydrate(db anydb.AnyDb) error {
 	} else {
 		defer res.Close()
 		if res.Next() {
+			log.Debugf("found raw data in database for map %v", t.Id)
 			if err := res.Scan(&imgData); err != nil {
 				log.Errorf("querying database for saved tabula data: %v", err)
 				imgData = nil
@@ -667,7 +667,7 @@ func (t *Tabula) BackgroundImage(db anydb.AnyDb, sendStatusMessage func(string))
 				sendStatusMessage("I have to retrieve the background image; this could take a moment.")
 			}
 			if err := t.Hydrate(db); err != nil {
-				return nil, fmt.Errorf("retrieving background: %s", err)
+				return nil, fmt.Errorf("retrieving background: %v", err)
 			}
 			cache.Put(t.Url, &cache.CacheEntry{t.Version, copyImage(t.Background)})
 		}

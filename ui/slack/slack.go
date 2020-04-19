@@ -70,7 +70,7 @@ type SlackUi struct {
 	clientId          string
 	clientSecret      string
 	TeamsMu           sync.RWMutex
-	Teams             []*Team
+	Teams             map[string]*Team
 	oauth             oauth2.Config
 	csrf              []string
 	db                anydb.AnyDb

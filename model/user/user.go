@@ -31,6 +31,23 @@ type WorkflowState struct {
 	Opaque    interface{}
 }
 
+func (state *WorkflowState) Hydrate(OpaqueFromJson func([]byte) (interface{}, error)) {
+	if OpaqueFromJson == nil {
+		return
+	}
+	if len(state.OpaqueRaw) == 0 {
+		return
+	}
+	if state.Opaque != nil {
+		return
+	}
+	var err error
+	state.Opaque, err = OpaqueFromJson(state.OpaqueRaw)
+	if err != nil {
+		log.Errorf("could not hydrate opaque state from %q: %v", string(state.OpaqueRaw), err)
+	}
+}
+
 type User struct {
 	Id        types.UserId
 	Tabulas   []*tabula.Tabula
@@ -70,11 +87,11 @@ func (u *User) hydrateWorkflows(db anydb.AnyDb) error {
 	}
 	defer wfRes.Close()
 	for wfRes.Next() {
-		var name, state, opaque string
-		if err := wfRes.Scan(&name, &state, &opaque); err != nil {
+		var name, state, opaqueRaw string
+		if err := wfRes.Scan(&name, &state, &opaqueRaw); err != nil {
 			return fmt.Errorf("scanning user_workflows: %s", err)
 		}
-		u.Workflows[name] = WorkflowState{State: state, OpaqueRaw: []byte(opaque)}
+		u.Workflows[name] = WorkflowState{State: state, OpaqueRaw: []byte(opaqueRaw)}
 	}
 	return nil
 }
@@ -89,14 +106,13 @@ func (u *User) saveWorkflows(db anydb.AnyDb) (last_error error) {
 	}
 	for name, wf_state := range u.Workflows {
 		if wf_state.Opaque != nil {
-			opaqueJson, err := json.Marshal(wf_state.Opaque)
+			var err error
+			wf_state.OpaqueRaw, err = json.Marshal(wf_state.Opaque)
 			if err != nil {
 				log.Warningf("user=%s workflow=%s error marshaling opaque data: %s", u.Id, name, err)
-				opaqueJson = []byte("{}")
+				wf_state.OpaqueRaw = []byte("{}")
 				last_error = err
 			}
-			wf_state.OpaqueRaw = make([]byte, len(opaqueJson))
-			copy(wf_state.OpaqueRaw, opaqueJson)
 		}
 		if _, err := db.Exec(query, u.Id, name, wf_state.State, wf_state.OpaqueRaw); err != nil {
 			log.Warningf("user=%s workflow=%s error saving to database: %s", u.Id, name, err)

@@ -2,9 +2,12 @@ package cmdproc
 
 import (
 	"fmt"
+	mbLog "github.com/pdbogen/mapbot/common/log"
 	"github.com/pdbogen/mapbot/hub"
 	"strings"
 )
+
+var log = mbLog.Log
 
 type Subcommand struct {
 	Args  string
@@ -42,20 +45,26 @@ func (c *CommandProcessor) Route(h *hub.Hub, cmd *hub.Command) {
 		c.Commands = map[string]Subcommand{}
 	}
 
-	if args, ok := cmd.Payload.([]string); ok && len(args) > 0 {
-		cmdName := strings.ToLower(args[0])
-		if cmdName == "help" {
-			c.Help(h, cmd)
-		} else {
-			if s, ok := c.Commands[args[0]]; ok {
-				new_type := hub.CommandType(fmt.Sprintf("%s:%s", cmd.Type, args[0]))
-				new_payload := args[1:]
-				s.Cmd(h, cmd.WithType(new_type).WithPayload(new_payload))
-			} else {
-				h.Error(cmd, fmt.Sprintf("Sub-command %q not found; try 'help'", args[0]))
-			}
-		}
-	} else {
+	args, ok := cmd.Payload.([]string)
+	if !ok {
 		h.Error(cmd, "No sub-command specified. Try 'help'")
+		return
 	}
+
+	log.Debugf("command processor routing cmd %v w/ %d bytes data", args, len(cmd.Data))
+
+	cmdName := strings.ToLower(args[0])
+	if cmdName == "help" {
+		c.Help(h, cmd)
+		return
+	}
+
+	subC, ok := c.Commands[cmdName]
+	if !ok {
+		h.Error(cmd, fmt.Sprintf("Sub-command %q not found; try 'help'", args[0]))
+		return
+	}
+
+	newType := hub.CommandType(fmt.Sprintf("%s:%s", cmd.Type, args[0]))
+	subC.Cmd(h, cmd.WithType(newType).WithPayload(args[1:]))
 }
