@@ -3,12 +3,20 @@ package types
 import (
 	"database/sql/driver"
 	"image/color"
+	"strconv"
 )
 
 type TabulaId int64
 
 func (i *TabulaId) Value() (driver.Value, error) {
 	return int64(*i), nil
+}
+
+func (i *TabulaId) String() string {
+	if i == nil {
+		return "nil"
+	}
+	return strconv.FormatInt(int64(*i), 10)
 }
 
 var _ driver.Valuer = (*TabulaId)(nil)

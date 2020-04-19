@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/pdbogen/mapbot/common/db"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -8,6 +9,7 @@ import (
 	"github.com/pdbogen/mapbot/hub"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/model/workflow"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"strings"
 )
@@ -29,6 +31,7 @@ func init() {
 			"action":     cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; simulate given user action", cmdAction},
 			"start":      cmdproc.Subcommand{"<workflow name> <choice>", "internal/debugging; start the given workflow with empty opaque data", cmdStart},
 			"clear":      cmdproc.Subcommand{"", "cancels any workflow associated with your user", cmdClear},
+			"debug":      cmdproc.Subcommand{"", "list known workflows along with internal state", cmdDebug},
 		},
 	}
 }
@@ -45,8 +48,35 @@ func cmdList(h *hub.Hub, c *hub.Command) {
 	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(strings.Join(response, "\n")))
 }
 
+func cmdDebug(h *hub.Hub, c *hub.Command) {
+	response := []string{
+		"Known workflows:",
+	}
+
+	for wf := range workflow.Workflows {
+		us := c.User.Workflows[wf]
+		var opaque []byte
+		if us.Opaque != nil {
+			opaque, _ = json.Marshal(us.Opaque)
+		} else if len(us.OpaqueRaw) > 0 {
+			opaque = us.OpaqueRaw
+		} else {
+			opaque = []byte("{}")
+		}
+
+		response = append(response, fmt.Sprintf("* `%s`; state: `%s`; opaque: `%s`", wf, us.State, opaque))
+	}
+
+	h.Publish(c.WithType(hub.CommandType(c.From)).WithPayload(strings.Join(response, "\n")))
+}
+
 // move to the named state, trigger any OnStateEnter, & apply its results
 func cmdTransition(h *hub.Hub, c *hub.Command) {
+	var log = log.WithFields(logrus.Fields{
+		"user": c.User.Id,
+		"from": c.From,
+	})
+
 	args, ok := c.Payload.([]string)
 	if !ok {
 		h.Error(c, "unexpected payload")
@@ -77,7 +107,7 @@ func cmdTransition(h *hub.Hub, c *hub.Command) {
 	transits := 1
 	for {
 		userState.State = strings.ToLower(wfStateName)
-		newState, newOpaque, msg := wf.State(wfName, wfStateName, userState.Opaque, nil)
+		newState, newOpaque, msg := wf.State(log, wfName, wfStateName, userState.Opaque, nil)
 		if newOpaque != nil {
 			userState.Opaque = newOpaque
 		}
@@ -127,6 +157,11 @@ func cmdStart(h *hub.Hub, c *hub.Command) {
 }
 
 func cmdAction(h *hub.Hub, c *hub.Command) {
+	var log = log.WithFields(logrus.Fields{
+		"user": c.User.Id,
+		"from": c.From,
+	})
+
 	args, ok := c.Payload.([]string)
 	if !ok {
 		h.Error(c, "unexpected payload")
@@ -153,7 +188,11 @@ func cmdAction(h *hub.Hub, c *hub.Command) {
 	}
 	userWorkflowState.Hydrate(wf.OpaqueFromJson)
 
-	newState, opaque, msg := wf.State(wfName, userWorkflowState.State, userWorkflowState.Opaque, &choice)
+	newState, opaque, msg := wf.State(log, wfName, userWorkflowState.State, userWorkflowState.Opaque, &choice)
+
+	if newState == nil && opaque == nil && msg == nil {
+		log.Warningf("workflow %q state %q action %q provoked no response", wfName, userWorkflowState.State, choice)
+	}
 
 	if opaque != nil {
 		userWorkflowState.Opaque = opaque

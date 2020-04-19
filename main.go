@@ -22,6 +22,7 @@ import (
 	"github.com/pdbogen/mapbot/model/types"
 	httpUi "github.com/pdbogen/mapbot/ui/http"
 	"github.com/pdbogen/mapbot/ui/slack"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
 	"net/http"
 )
@@ -50,7 +51,14 @@ func main() {
 	DbSsl := flag.Bool("db-ssl", true, "if set, require SSL to postgresql")
 	DbReset := flag.Bool("db-reset", false, "USE WITH CARE: resets the schema by dropping ALL TABLES and re-executing migrations")
 	DbResetFrom := flag.Int("db-reset-from", -1, "if 0 or greater, roll back to just before the given migration and re-apply later migrations")
+	logLevel := flag.String("loglevel", "INFO", "logrus log level")
 	flag.Parse()
+
+	if lvl, err := logrus.ParseLevel(*logLevel); err == nil {
+		log.SetLevel(lvl)
+	} else {
+		log.Warningf("%q is not a valid loglevel; ignoring", *logLevel)
+	}
 
 	var dbHandle anydb.AnyDb
 	var err error

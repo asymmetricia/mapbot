@@ -1,18 +1,11 @@
 package log
 
-import "github.com/op/go-logging"
-
-var Log = logging.MustGetLogger("mapbot")
-var format = logging.MustStringFormatter(
-	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+import (
+	"github.com/sirupsen/logrus"
 )
 
-func init() {
-	logging.SetFormatter(format)
-}
+var Log = logrus.StandardLogger()
 
-func Errorf(fmt string, a ...interface{}) {
-	Log.ExtraCalldepth++
-	Log.Errorf(fmt, a...)
-	Log.ExtraCalldepth--
+func init() {
+	Log.ReportCaller = true
 }

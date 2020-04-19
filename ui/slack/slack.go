@@ -15,6 +15,8 @@ import (
 	"sync"
 )
 
+const mrkdwn = "mrkdwn"
+
 var log = mbLog.Log
 
 func New(id string, secret string, db anydb.AnyDb, proto string, domain string, port int, verificationToken string, botHub *hub.Hub) (*SlackUi, error) {

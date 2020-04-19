@@ -21,6 +21,7 @@ import (
 	"github.com/pdbogen/mapbot/model/mark"
 	"github.com/pdbogen/mapbot/model/mask"
 	"github.com/pdbogen/mapbot/model/types"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/image/math/fixed"
 	"image"
 	"image/color"
@@ -148,22 +149,35 @@ func (t *Tabula) Delete(db anydb.AnyDb) error {
 }
 
 func (t *Tabula) Save(db anydb.AnyDb) error {
+	var log = log.WithFields(logrus.Fields{
+		"tabula": t.Id,
+	})
+
+	log.Trace("beginning transaction")
 	tx, err := db.Begin()
 
 	if err == nil {
+		log.Trace("saving tabula")
 		err = t.SaveTx(db.Dialect(), tx)
 	}
 
 	if err == nil {
+		log.Trace("committing transaction")
 		err = tx.Commit()
 	}
 
-	if err != nil && tx != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			err = fmt.Errorf("%v and during rollback: %v", rbErr)
+	if err != nil {
+		log.WithError(err).Error("encountered error")
+		if tx != nil {
+			log.Trace("attempting rollback")
+			if rbErr := tx.Rollback(); rbErr != nil {
+				log.WithError(rbErr).Error("rollback failed")
+				err = fmt.Errorf("%v and during rollback: %v", rbErr)
+			}
 		}
 	}
 
+	log.Trace("save complete")
 	return err
 }
 

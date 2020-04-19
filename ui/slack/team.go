@@ -171,6 +171,7 @@ func (t *Team) run() {
 var slackUrlRe = regexp.MustCompile(`<(http[^>]*)(\|[^>]+)?>`)
 
 func (t *Team) manageMessages() {
+	var log = log.WithField("team", t.Info.ID)
 	for {
 		select {
 		case <-t.Quit:
@@ -181,22 +182,25 @@ func (t *Team) manageMessages() {
 		case event := <-t.rtm.IncomingEvents:
 			switch event.Type {
 			case "user_typing":
-				go func() {
-					if msg, ok := event.Data.(*slack.UserTypingEvent); ok {
-						_, err := user.Get(db.Instance, types.UserId(msg.User))
+				if msg, ok := event.Data.(*slack.UserTypingEvent); ok {
+					go func(id string) {
+						_, err := user.Get(db.Instance, types.UserId(id))
 						if err != nil {
 							log.Errorf("user preload in response to typing failed: %s", err)
 							return
 						}
-					}
-				}()
+					}(msg.User)
+				}
 			case "emoji_changed":
 				go t.updateEmoji()
 			case "message":
 				go t.handleMessage(event)
+			case "hello":
+				log.Info("connected")
 			case "latency_report":
 			case "reconnect_url":
 			case "presence_change":
+			case "connected":
 			default:
 				log.Debugf("unhandled message type %q", event.Type)
 			}
@@ -279,7 +283,7 @@ func (t *Team) sendWorkflowMessage(h *hub.Hub, c *hub.Command, msg *workflow.Wor
 
 	channel := comps[4]
 
-	opts := t.renderWorkflowMessage(msg)
+	opts := t.renderWorkflowMessage(c.Context, msg)
 	if len(opts) > 0 {
 		_, _, err := t.botClient.PostMessage(channel, opts...)
 

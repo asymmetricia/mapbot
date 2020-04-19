@@ -4,7 +4,9 @@ package workflow
 import (
 	"fmt"
 	. "github.com/pdbogen/mapbot/common/log"
+	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/ui/slack/context"
+	"github.com/sirupsen/logrus"
 	"image"
 	"strings"
 )
@@ -36,11 +38,21 @@ type Workflow struct {
 // newState and newOpaque should be updated in the user's entry for this
 // workflow if they are non-nil.
 
-func (wf *Workflow) State(workflowName string, state string, opaque interface{}, choice *string) (
+func (wf *Workflow) State(log *logrus.Entry, workflowName string, state string,
+	opaque interface{}, choice *string) (
 	newState *string, newOpaque interface{}, msg *WorkflowMessage,
 ) {
+	log = log.WithFields(logrus.Fields{
+		"workflow": workflowName,
+		"state":    state,
+		"choice":   choice,
+	})
+
+	log.Trace("computing state change")
+
 	stateObj, ok := wf.States[strings.ToLower(state)]
 	if !ok {
+		log.Warningf("no such state in workflow")
 		return nil, nil, &WorkflowMessage{
 			Workflow: workflowName,
 			Text:     fmt.Sprintf("invalid state %q", state),
@@ -48,8 +60,10 @@ func (wf *Workflow) State(workflowName string, state string, opaque interface{},
 	}
 
 	if choice == nil {
+		log.Trace("nil choice means entry event")
 		// we're handling a state entry
 		if stateObj.Challenge == nil && stateObj.OnStateEnter == nil {
+			log.Debug("state has no entry action")
 			return nil, nil, &WorkflowMessage{
 				Workflow: workflowName,
 				Text:     fmt.Sprintf("no on-enter associated with state %q", state),
@@ -57,6 +71,7 @@ func (wf *Workflow) State(workflowName string, state string, opaque interface{},
 		}
 
 		if stateObj.Challenge != nil {
+			log.Warn("state has deprecated Challenge")
 			msg := stateObj.Challenge(opaque)
 			if msg.State == "" {
 				return nil, nil, msg
@@ -64,11 +79,14 @@ func (wf *Workflow) State(workflowName string, state string, opaque interface{},
 			return &msg.State, nil, msg
 		}
 
+		log.Trace("state has OnStateEnter")
 		return stateObj.OnStateEnter(opaque)
 	}
 
+	log.Trace("non-nil choice means action event")
 	// we're handling state activity
 	if stateObj.Response == nil && stateObj.OnUserAction == nil {
+		log.Warning("received action for state with no Action handler")
 		return nil, nil, &WorkflowMessage{
 			Workflow: workflowName,
 			Text:     fmt.Sprintf("no on-action associated with state %q", state),
@@ -76,10 +94,12 @@ func (wf *Workflow) State(workflowName string, state string, opaque interface{},
 	}
 
 	if stateObj.Response != nil {
+		log.Warning("state has deprecated Response")
 		newState, newOpaque := stateObj.Response(opaque, choice)
 		return &newState, newOpaque, nil
 	}
 
+	log.Trace("state has OnUserAction")
 	return stateObj.OnUserAction(opaque, choice)
 }
 
@@ -131,6 +151,9 @@ type WorkflowMessage struct {
 	Choices    []string
 	ChoiceSets [][]string
 	Image      image.Image
+
+	// If present, given tabula will be rendered as part of message
+	TabulaId *types.TabulaId
 }
 
 func (wfm *WorkflowMessage) Id() string {

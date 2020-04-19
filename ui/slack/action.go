@@ -9,9 +9,12 @@ import (
 	"github.com/pdbogen/mapbot/common/blobserv"
 	"github.com/pdbogen/mapbot/common/db"
 	"github.com/pdbogen/mapbot/hub"
+	mbContext "github.com/pdbogen/mapbot/model/context"
+	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/types"
 	"github.com/pdbogen/mapbot/model/user"
 	"github.com/pdbogen/mapbot/model/workflow"
+	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"image"
 	"image/png"
@@ -113,16 +116,23 @@ func (s *SlackUi) Action(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (t *Team) Action(payload *slack.InteractionCallback, rw http.ResponseWriter, req *http.Request) {
+	var log = log.WithFields(logrus.Fields{
+		"team":         t.Info.ID,
+		"user":         payload.User.ID,
+		"payload_type": payload.Type,
+		"n_actions":    len(payload.ActionCallback.BlockActions),
+	})
+
 	userObj, err := user.Get(db.Instance, types.UserId(payload.User.ID))
 	if err != nil {
 		writeResponse(rw, "could not retrieve user")
-		log.Errorf("could not retrieve user %q in action", payload.User.ID)
+		log.Error("cannot retrieve user")
 		return
 	}
 
 	if payload.Type != "block_actions" || len(payload.ActionCallback.BlockActions) == 0 {
+		log.Error("unhandled or empty payload type")
 		writeResponse(rw, "cannot handle action callback type "+string(payload.Type))
-		log.Errorf("unhandled action callback %v", payload)
 		return
 
 	}
@@ -136,6 +146,8 @@ func (t *Team) Action(payload *slack.InteractionCallback, rw http.ResponseWriter
 		return
 	}
 
+	log.WithField("value", av).Trace("dispatching")
+
 	t.hub.Publish(&hub.Command{
 		User:    userObj,
 		From:    fmt.Sprintf("internal:updateAction:slack:%s:%s:%s", t.Info.ID, payload.Channel.ID, payload.ResponseURL),
@@ -146,9 +158,17 @@ func (t *Team) Action(payload *slack.InteractionCallback, rw http.ResponseWriter
 }
 
 func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
+	var log = log.WithFields(map[string]interface{}{
+		"team":         t.Info.ID,
+		"user":         c.User.Id,
+		"from":         c.From,
+		"type":         c.Type,
+		"payload_type": fmt.Sprintf("%T", c.Payload),
+	})
+
 	comps := strings.Split(string(c.Type), ":")
 	if len(comps) < 6 {
-		log.Errorf("%s: received but cannot process command %s", t.Info.ID, c.Type)
+		log.Error("invalid type for updateAction")
 		return
 	}
 	responseUrl := strings.Join(comps[5:], ":")
@@ -156,11 +176,13 @@ func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
 	var opts []slack.MsgOption
 	switch msg := c.Payload.(type) {
 	case *workflow.WorkflowMessage:
-		opts = t.renderWorkflowMessage(msg)
+		log.Trace("rendering workflow message")
+		opts = t.renderWorkflowMessage(c.Context, msg)
 	case string:
+		log.Trace("rendering simple message")
 		opts = []slack.MsgOption{slack.MsgOptionText(msg, false)}
 	default:
-		log.Errorf("uh, no clue how to handle a %T payload", c.Payload)
+		log.Error("invalid payload for updateAction")
 		return
 	}
 
@@ -168,21 +190,20 @@ func (t *Team) updateAction(h *hub.Hub, c *hub.Command) {
 		slack.MsgOptionReplaceOriginal(responseUrl),
 	)
 
-	ch, ts, txt, err := t.botClient.SendMessage(comps[4], opts...)
+	_, _, _, err := t.botClient.SendMessage(comps[4], opts...)
 	if err != nil {
 		log.Errorf("POSTing action update: %v", err)
 	}
-	log.Debugf("ch=%v, ts=%v, txt=%v", ch, ts, txt)
 }
 
-func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) []slack.MsgOption {
+func (t *Team) renderWorkflowMessage(ctx mbContext.Context, msg *workflow.WorkflowMessage) []slack.MsgOption {
 	if msg.Text == "" {
 		return nil
 	}
 
 	var blocks []slack.Block
 	blocks = append(blocks, slack.NewSectionBlock(
-		slack.NewTextBlockObject("mrkdwn", msg.Text, false, false),
+		slack.NewTextBlockObject(mrkdwn, msg.Text, false, false),
 		nil,
 		nil,
 	))
@@ -208,10 +229,33 @@ func (t *Team) renderWorkflowMessage(msg *workflow.WorkflowMessage) []slack.MsgO
 		b, err := imageBlock(msg.Image)
 		if err != nil {
 			log.Errorf("failed to attach non-nil image: %v", err)
+			blocks = append(blocks,
+				slack.NewTextBlockObject(mrkdwn, "could not render image", false, false))
 		} else {
 			blocks = append(blocks, b)
 		}
 	}
+
+	if msg.TabulaId != nil {
+		var log = log.WithField("tabula", msg.TabulaId)
+		tab, err := tabula.Load(db.Instance, *msg.TabulaId)
+		var img image.Image
+		if err == nil {
+			img, err = tab.Render(ctx, nil)
+		}
+		var b slack.Block
+		if err == nil {
+			b, err = imageBlock(img)
+		}
+		if err == nil {
+			blocks = append(blocks, b)
+		}
+		if err != nil {
+			log.WithError(err).Error("tabula render failed")
+			blocks = append(blocks, slack.NewTextBlockObject(mrkdwn, "cannot render map", false, false))
+		}
+	}
+
 	return []slack.MsgOption{slack.MsgOptionBlocks(blocks...)}
 }
 

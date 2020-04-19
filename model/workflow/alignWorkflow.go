@@ -45,8 +45,8 @@ var alignWorkflow = Workflow{
 			Response:  alignFineBRResponse,
 		},
 		"top": {
-			Challenge: alignTopChallenge,
-			Response:  alignTopResponse,
+			Challenge:    alignTopChallenge,
+			OnUserAction: alignTopResponse,
 		},
 		"exit": {
 			Challenge: alignExit,
@@ -463,15 +463,16 @@ func alignFineChallenge(opaque interface{}) *WorkflowMessage {
 		return alignErrorChallenge(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
-	img := state.MapImage(state.Left, state.Top, state.Left+360, state.Top+360)
+	dpi := state.Tabula.Dpi
+	img := state.MapImage(state.Left, state.Top, state.Left+int(dpi*5), state.Top+int(dpi*5))
 	if img == nil {
 		return alignErrorChallenge("sorry! something's wrong with the map image.")
 	}
 
 	i := 0
 	for {
-		x := state.Tabula.OffsetX - state.Left + int(float32(i)*state.Tabula.Dpi)
-		if x > 360 {
+		x := state.Tabula.OffsetX - state.Left + int(float32(i)*dpi)
+		if x > state.Left+int(dpi*5) {
 			break
 		}
 		VerticalLine(img, x)
@@ -480,8 +481,8 @@ func alignFineChallenge(opaque interface{}) *WorkflowMessage {
 
 	return &WorkflowMessage{
 		Text: fmt.Sprintf("Now we can fine-tune the DPI. Current DPI: %0.2f\n\n", state.Tabula.Dpi) +
-			"Smaller -- If the red grid lines advance to the right of the map grid lines, they need to be smaller.\n" +
-			"Bigger -- If the red grid lines shrink to the left of the map grid lines, they need to be bigger.\n" +
+			"* `Smaller` -- If the red grid lines advance to the right of the map grid lines, they need to be smaller.\n" +
+			"* `Bigger` -- If the red grid lines shrink to the left of the map grid lines, they need to be bigger.\n" +
 			"_(you can also shift the entire grid left or right one pixel at a time, if you want)_",
 		State: "fine",
 		Image: img,
@@ -687,19 +688,19 @@ func alignTopChallenge(opaque interface{}) *WorkflowMessage {
 	}
 }
 
-func alignTopResponse(opaque interface{}, choice *string) (string, interface{}) {
+func alignTopResponse(opaque interface{}, choice *string) (newState *string, newOpaque interface{}, message *WorkflowMessage) {
 	shift := 200
 	state, ok := opaque.(*alignWorkflowOpaque)
 	if !ok {
-		return alignError("invalid opaque data (was a %T)", opaque)
+		return alignErrorNew("invalid opaque data (was a %T)", opaque)
 	}
 
 	if err := state.Hydrate(); err != nil {
-		return alignError(fmt.Sprintf("could not hydrate opaque data: %s", err))
+		return alignErrorNew(fmt.Sprintf("could not hydrate opaque data: %s", err))
 	}
 
 	if choice == nil {
-		return alignError("huh, got a nil string pointer...")
+		return alignErrorNew("huh, got a nil string pointer...")
 	}
 	switch *choice {
 	case alignRestart:
@@ -719,9 +720,13 @@ func alignTopResponse(opaque interface{}, choice *string) (string, interface{}) 
 		// shift back up that much.
 		state.Tabula.OffsetY -= int(state.Tabula.Dpi*float32(int(float32(state.Tabula.OffsetY)/state.Tabula.Dpi+0.2)) + 0.5)
 		if err := state.Tabula.Save(db.Instance); err != nil {
-			return alignError("huh! couldn't save the table: %s", err)
+			return alignErrorNew("huh! couldn't save the table: %s", err)
 		}
-		return "exit", state
+
+		return String("exit"), struct{}{}, &WorkflowMessage{
+			Text:     "Ok! We've done our best. Some maps don't have perfectly rectangular grids, but I hope this one turned out well.",
+			TabulaId: &state.TabulaId,
+		}
 	case alignUp:
 		if state.Top-shift >= -50 {
 			state.Top -= shift
@@ -744,10 +749,10 @@ func alignTopResponse(opaque interface{}, choice *string) (string, interface{}) 
 	}
 
 	if err := state.Tabula.Save(db.Instance); err != nil {
-		return alignError("huh! couldn't save the table: %s", err)
+		return alignErrorNew("huh! couldn't save the table: %s", err)
 	}
 
-	return "top", state
+	return String("top"), state, nil
 }
 
 func alignExit(opaque interface{}) *WorkflowMessage {
