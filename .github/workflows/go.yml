@@ -22,7 +22,7 @@ jobs:
         go get -v -t -d ./...
     - name: Build
       run: |
-				make release
+        make release
     - name: Release
       id: create_release      
       uses: actions/create-release@v1
