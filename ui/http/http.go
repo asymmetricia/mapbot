@@ -1,8 +1,13 @@
 package http
 
 import (
+	"embed"
 	"errors"
 	"fmt"
+	"image/png"
+	"net/http"
+	"time"
+
 	"github.com/gorilla/websocket"
 	"github.com/pdbogen/mapbot/common/db/anydb"
 	mbLog "github.com/pdbogen/mapbot/common/log"
@@ -10,9 +15,6 @@ import (
 	"github.com/pdbogen/mapbot/model/context"
 	"github.com/pdbogen/mapbot/model/tabula"
 	"github.com/pdbogen/mapbot/model/webSession"
-	"image/png"
-	"net/http"
-	"time"
 )
 
 type Http struct {
@@ -36,10 +38,10 @@ func logRequests(handler http.Handler) http.Handler {
 	})
 }
 
-func New(db anydb.AnyDb, hub *hub.Hub, prov *context.ContextProvider, prefix string) *Http {
+func New(db anydb.AnyDb, hub *hub.Hub, prov *context.ContextProvider, prefix string, assets embed.FS) *Http {
 	ret := &Http{db: db, hub: hub, prov: prov, prefix: prefix}
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(assets))
+	mux.Handle("/", http.FileServer(http.FS(assets)))
 	mux.HandleFunc("/map", ret.GetMap)
 	mux.HandleFunc("/ws", ret.WebSocket)
 	ret.mux = mux

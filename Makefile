@@ -15,16 +15,24 @@ dev: .push_dev
 push: .push
 .push: .docker
 	@ set -e; \
-	eval "$$(aws ecr get-login --no-include-email)" && \
-	docker push ${IMAGE_URL} && \
+	IMAGE_URL=${IMAGE_URL}; \
+	aws ecr get-login-password \
+	| docker login \
+			--username AWS \
+			--password-stdin $${IMAGE_URL%%/*}; \
+	docker push ${IMAGE_URL}; \
 	touch .push
 
 push_dev: .push_dev
 .push_dev: .docker
 	@ set -e; \
-	eval "$$(aws ecr get-login --no-include-email)" && \
-	docker tag ${IMAGE_URL} ${IMAGE_URL}:dev && \
-	docker push ${IMAGE_URL}:dev && \
+	IMAGE_URL=${IMAGE_URL}; \
+	aws ecr get-login-password \
+	| docker login \
+			--username AWS \
+			--password-stdin $${IMAGE_URL%%/*}; \
+	docker tag ${IMAGE_URL} ${IMAGE_URL}:dev; \
+	docker push ${IMAGE_URL}:dev; \
 	touch .push_dev
 
 .docker: mapbot Dockerfile run.sh emoji
@@ -36,7 +44,7 @@ push_dev: .push_dev
 mapbot: ${shell find -name \*.go} ui/slack/context/emoji.go static/js/main.js
 	go fmt github.com/pdbogen/mapbot/...
 	go generate
-	go build -o mapbot
+	CGO_ENABLED=0 go build -o mapbot
 
 static/js/main.js: ${shell find ts/}
 	docker build -t ts - < Dockerfile.ts

@@ -1,26 +1,24 @@
 module github.com/pdbogen/mapbot
 
-go 1.13
+go 1.19
 
 require (
-	github.com/golang/freetype v0.0.0-20161208064710-d9be45aaf745
-	github.com/golang/protobuf v0.0.0-20161117033126-8ee79997227b // indirect
-	github.com/gorilla/websocket v1.4.0
-	github.com/lib/pq v0.0.0-20170206200638-0477eb88c5ca
-	github.com/mattn/go-sqlite3 v2.0.3+incompatible
-	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
-	github.com/ryanuber/go-glob v0.0.0-20170128012129-256dc444b735
-	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
-	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd // indirect
-	github.com/sirupsen/logrus v1.5.0
-	github.com/slack-go/slack v0.6.3
-	github.com/stretchr/testify v1.5.1 // indirect
-	golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
-	golang.org/x/image v0.0.0-20170210230806-df2aa51d4407
-	golang.org/x/net v0.0.0-20170211013127-61557ac0112b
-	golang.org/x/oauth2 v0.0.0-20170209002143-de0725b330ab
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	google.golang.org/appengine v1.0.1-0.20170206203024-2e4a801b39fc // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
+	github.com/gorilla/websocket v1.5.0
+	github.com/lib/pq v1.10.7
+	github.com/mattn/go-sqlite3 v1.14.15
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	github.com/pkg/errors v0.9.1 // indirect
+	github.com/ryanuber/go-glob v1.0.0
+	github.com/sirupsen/logrus v1.9.0
+	github.com/slack-go/slack v0.11.3
+	golang.org/x/crypto v0.0.0-20221010152910-d6f0a8c073c2
+	golang.org/x/image v0.0.0-20220902085622-e7cb96979f69
+	golang.org/x/net v0.0.0-20221004154528-8021a29435af
+	golang.org/x/oauth2 v0.0.0-20221006150949-b44042a4b9c1
+	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
+	golang.org/x/text v0.3.8 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 )
 
 replace github.com/slack-go/slack => github.com/frozenbonito/slack v0.6.4-0.20200405161309-e7a7eaea721c

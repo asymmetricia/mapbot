@@ -254,6 +254,19 @@ var schema = []Migration{
 			`)`},
 		Down: map[string]string{"any": `DROP TABLE tabula_data`},
 	},
+	{
+		Id: 24,
+		Up: map[string]string{"any": `ALTER TABLE last_token     ALTER COLUMN user_id TYPE VARCHAR(11);` +
+			`ALTER TABLE user_workflows ALTER COLUMN user_id TYPE VARCHAR(11);` +
+			`ALTER TABLE user_tabulas   ALTER COLUMN user_id TYPE VARCHAR(11);` +
+			`ALTER TABLE users          ALTER COLUMN id      TYPE VARCHAR(11);`,
+		},
+		Down: map[string]string{"any": `ALTER TABLE last_token     ALTER COLUMN user_id TYPE VARCHAR(9);` +
+			`ALTER TABLE user_workflows ALTER COLUMN user_id TYPE VARCHAR(9);` +
+			`ALTER TABLE user_tabulas   ALTER COLUMN user_id TYPE VARCHAR(9);` +
+			`ALTER TABLE users          ALTER COLUMN id      TYPE VARCHAR(9);`,
+		},
+	},
 }
 
 func Reset(db anydb.AnyDb) error {
