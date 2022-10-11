@@ -53,13 +53,13 @@ static/js/main.js: ${shell find ts/}
 release: mapbot.darwin_amd64 mapbot.linux_amd64 mapbot.windows_amd64.exe
 
 mapbot.darwin_amd64: mapbot
-	GOOS=darwin  GOARCH=amd64 go build -o mapbot.darwin_amd64
+	CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64 go build -o mapbot.darwin_amd64
 
 mapbot.linux_amd64: mapbot
-	GOOS=linux   GOARCH=amd64 go build -o mapbot.linux_amd64
+	CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build -o mapbot.linux_amd64
 
 mapbot.windows_amd64.exe: mapbot
-	GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o mapbot.windows_amd64.exe
 
 tail:
 	ssh -At mapbot.cernu.us 'for i in 1 2 3 4 5; do docker logs --tail 1 mapbot >/dev/null && exit 0; sleep $$i; done; exit 1'
